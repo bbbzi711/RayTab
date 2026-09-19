@@ -1,0 +1,6 @@
+{
+  "extensionName": { "message": "RayTab 新标签页" },
+  "extensionDescription": { "message": "简洁、可扩展的网站导航新标签页。" },
+  "openRayTab": { "message": "打开 RayTab" },
+  "quickAdd": { "message": "RayTab 快速添加" }
+}

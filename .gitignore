@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.output/
+.wxt/
+artifacts/
+*.log
+*.tsbuildinfo
+.env*
+!.env.example
+/docs/plan/
+/public/THIRD_PARTY_NOTICES.txt

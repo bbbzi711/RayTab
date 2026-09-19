@@ -1,0 +1,6 @@
+{
+  "extensionName": { "message": "RayTab New Tab" },
+  "extensionDescription": { "message": "A calm and extensible new-tab site navigator." },
+  "openRayTab": { "message": "Open RayTab" },
+  "quickAdd": { "message": "Quick add to RayTab" }
+}

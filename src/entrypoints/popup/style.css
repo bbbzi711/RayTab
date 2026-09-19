@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+:root {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: #29423a;
+  background: #f6f7f2;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  width: 330px;
+  min-height: 360px;
+}
+.popup-shell {
+  padding: 20px;
+}
+.popup-shell header {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #dce3de;
+}
+.popup-shell header span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.popup-shell header small {
+  color: #73827c;
+}
+.popup-shell form {
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+}
+.popup-shell label {
+  display: grid;
+  gap: 6px;
+  color: #586a63;
+  font-size: 12px;
+}
+.popup-shell input,
+.popup-shell select {
+  height: 38px;
+  border: 1px solid #ced8d3;
+  border-radius: 9px;
+  padding: 0 10px;
+  background: #fff;
+  color: #29423a;
+}
+.popup-shell button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: #315f52;
+  color: #fff;
+  cursor: pointer;
+}
+.popup-shell p {
+  margin: 0;
+  color: #b84040;
+  font-size: 12px;
+}
+.popup-success {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: #315f52;
+}
+.popup-success button {
+  width: 130px;
+  margin-top: 10px;
+}
+.popup-loading {
+  padding: 24px;
+}
