@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useResourceUrl } from '@/hooks/useResourceUrl';
 import type { SpaceSettings } from '@/storage/model';
+import { DEFAULT_WALLPAPER_URL } from './wallpapers';
 
 export function Background({ settings }: { settings: SpaceSettings }) {
   const image = useResourceUrl(settings.background === 'custom' ? settings.wallpaperId : undefined);
   const remoteImage = ['bing', 'unsplash', 'custom'].includes(settings.background)
     ? settings.onlineWallpaperUrl
     : undefined;
-  const requestedImage = image ?? remoteImage;
+  const requestedImage = image ?? remoteImage ?? (settings.background === 'custom' ? DEFAULT_WALLPAPER_URL : undefined);
   const [loadedImage, setLoadedImage] = useState<string>();
   useEffect(() => {
     if (!requestedImage) {
@@ -24,12 +25,15 @@ export function Background({ settings }: { settings: SpaceSettings }) {
       cancelled = true;
     };
   }, [requestedImage]);
+  const isLegacyGreen = settings.solidColor === '#193540';
+  const effectiveBgColor = settings.background === 'color' ? settings.solidColor : isLegacyGreen ? 'transparent' : settings.solidColor;
+
   return (
     <div
       className={`page-background background-${settings.background}`}
       aria-hidden="true"
       style={{
-        backgroundColor: settings.solidColor,
+        backgroundColor: effectiveBgColor,
         ...(settings.background === 'gradient'
           ? { backgroundImage: settings.gradient }
           : loadedImage

@@ -214,9 +214,9 @@ export const defaultSettings: SpaceSettings = {
   cardOpacity: 0.2,
   navigationCollapsed: false,
   background: 'custom',
-  gradient: 'linear-gradient(135deg, #163c3b 0%, #6b755f 52%, #9b795e 100%)',
-  solidColor: '#193540',
-  overlay: 0.15,
+  gradient: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)',
+  solidColor: '#0b0f19',
+  overlay: 0.1,
   textColorMode: 'auto',
   textColors: {
     clock: '#ffffff',

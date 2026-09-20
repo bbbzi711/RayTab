@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from 'react';
 import type { Language } from '@/locales';
 import type { SpaceSettings } from '@/storage/model';
+import { cn } from '@/lib/utils';
 
 export const Clock = memo(function Clock({
   language,
@@ -9,6 +10,7 @@ export const Clock = memo(function Clock({
   showLunar = true,
   showGreeting = true,
   customGreetings,
+  compact = false,
 }: {
   language: Language;
   hour12: boolean;
@@ -16,6 +18,7 @@ export const Clock = memo(function Clock({
   showLunar?: boolean;
   showGreeting?: boolean;
   customGreetings?: SpaceSettings['customGreetings'];
+  compact?: boolean;
 }) {
   const locale = language === 'en' ? 'en-US' : 'zh-CN';
   const [now, setNow] = useState(() => new Date());
@@ -38,26 +41,47 @@ export const Clock = memo(function Clock({
       document.removeEventListener('visibilitychange', resume);
     };
   }, []);
+
+  const timeString = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12 });
+
+  const dateStr = now.toLocaleDateString(locale, {
+    month: 'numeric',
+    day: 'numeric',
+    weekday: 'short',
+  });
+  // 转换形如 "9月20日 星期日"
+  const formattedDate = language === 'zh-CN'
+    ? `${now.getMonth() + 1}月${now.getDate()}日 ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`
+    : dateStr;
+
   return (
-    <section className="clock" aria-label={language === 'en' ? 'Clock' : '时钟'}>
-      <time className="clock-time" dateTime={now.toISOString()}>
-        {now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12 })}
+    <section
+      className={cn(
+        'flex flex-col items-center justify-center select-none text-center transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
+        compact ? 'mb-3' : 'mb-6',
+      )}
+      aria-label={language === 'en' ? 'Clock' : '时钟'}
+    >
+      <time
+        className={cn(
+          'tabular-nums drop-shadow-[0_2px_16px_rgba(0,0,0,0.35)] text-[var(--home-clock-color,#fff)] leading-none transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
+          compact
+            ? 'text-[38px] sm:text-[42px] mb-1 font-light tracking-tight'
+            : 'text-[68px] sm:text-[76px] leading-[76px] mb-2 font-light tracking-tight',
+        )}
+        dateTime={now.toISOString()}
+      >
+        {timeString}
       </time>
-      {(showDate || showGreeting) && (
-        <p className="clock-date">
-          {showDate && (
-            <span className="clock-date-value">
-              {now.toLocaleDateString(locale, { month: 'long', day: 'numeric', weekday: 'long' })}
-            </span>
+      {showDate && (
+        <p
+          className={cn(
+            'flex items-center justify-center gap-2.5 font-normal text-[var(--home-date-color,#fff)] opacity-85 drop-shadow-[0_1px_6px_rgba(0,0,0,0.3)] transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
+            compact ? 'text-[11px] opacity-75' : 'text-[13px] sm:text-[14px]',
           )}
-          {showDate && showLunar && language === 'zh-CN' && <i>•</i>}
-          {showDate && showLunar && language === 'zh-CN' && (
-            <span className="clock-date-value">{formatLunar(now)}</span>
-          )}
-          {showDate && showGreeting && <i>•</i>}
-          {showGreeting && (
-            <span className="clock-greeting">{greeting(now, language, customGreetings)}</span>
-          )}
+        >
+          <span>{formattedDate}</span>
+          {showLunar && language === 'zh-CN' && <span>{formatLunar(now)}</span>}
         </p>
       )}
     </section>

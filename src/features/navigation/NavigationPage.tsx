@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getBrandIcon } from './brandIcons';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -102,28 +104,28 @@ export function NavigationPage({
 
   return (
     <section
-      className="navigation-shell"
+      className="w-full flex flex-col items-center select-none"
       aria-label={tr('网站导航')}
       data-show-site-title={settings.showSiteTitle}
-      style={
-        {
-          '--site-card-size': `${settings.cardSize}px`,
-          '--site-icon-ratio': settings.iconSizeRatio,
-          '--site-gap': `${settings.iconSpacing + 4}px`,
-          '--max-cards': settings.maxCardsPerRow,
-          '--site-card-opacity': settings.cardOpacity,
-        } as React.CSSProperties
-      }
     >
       {space.desktops.length > 1 && (
-        <div className="desktop-bar">
-          <div className="desktop-tabs" role="tablist" aria-label={tr('桌面')}>
+        <div className="flex items-center justify-center mb-3">
+          <div
+            className="inline-flex items-center p-1 rounded-2xl bg-white/10 dark:bg-black/25 backdrop-blur-md border border-white/15 shadow-sm"
+            role="tablist"
+            aria-label={tr('桌面')}
+          >
             {orderedDesktops.map((desktop) => (
               <button
                 key={desktop.id}
                 role="tab"
                 aria-selected={desktop.id === desktopId}
-                className={desktop.id === desktopId ? 'active' : ''}
+                className={cn(
+                  'px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all duration-150',
+                  desktop.id === desktopId
+                    ? 'bg-white/25 text-white shadow-xs font-semibold'
+                    : 'text-white/70 hover:text-white hover:bg-white/10',
+                )}
                 onClick={() => run({ type: 'select-desktop', spaceId, desktopId: desktop.id })}
               >
                 {desktop.name}
@@ -134,55 +136,68 @@ export function NavigationPage({
       )}
 
       {settings.showCategories && !settings.navigationCollapsed && (
-        <nav className="category-tabs" aria-label={tr('分类')}>
+        <nav
+          className="flex items-center justify-center flex-wrap gap-1.5 mb-5 px-2 max-w-4xl"
+          aria-label={tr('分类')}
+        >
           <button
-            className={selected === null ? 'active' : ''}
+            className={cn(
+              'flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs transition-all duration-150 border cursor-pointer select-none',
+              selected === null
+                ? 'bg-white/35 border-white/50 text-white shadow-sm font-semibold backdrop-blur-md'
+                : 'bg-black/15 hover:bg-black/25 dark:bg-white/10 dark:hover:bg-white/20 border-white/20 text-white/85 hover:text-white backdrop-blur-md',
+            )}
             onClick={() => run({ type: 'select-category', spaceId, desktopId, categoryId: null })}
           >
-            {tr('全部')}{' '}
-            <small>
+            <span>{tr('全部')}</span>
+            <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-normal">
               {
                 space.sites.filter((site) =>
                   categories.some((category) => category.id === site.categoryId),
                 ).length
               }
-            </small>
+            </span>
           </button>
           {categories
             .filter((item) => !item.isDefault)
             .map((category) => (
               <button
                 key={category.id}
-                className={selected === category.id ? 'active' : ''}
+                className={cn(
+                  'flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs transition-all duration-150 border cursor-pointer select-none',
+                  selected === category.id
+                    ? 'bg-white/35 border-white/50 text-white shadow-sm font-semibold backdrop-blur-md'
+                    : 'bg-black/15 hover:bg-black/25 dark:bg-white/10 dark:hover:bg-white/20 border-white/20 text-white/85 hover:text-white backdrop-blur-md',
+                )}
                 onClick={() =>
                   run({ type: 'select-category', spaceId, desktopId, categoryId: category.id })
                 }
               >
-                <i style={{ background: category.color }} />
-                {category.name}
-                <small>
+                <span
+                  className="w-2 h-2 rounded-full shrink-0 shadow-xs"
+                  style={{ background: category.color }}
+                />
+                <span>{category.name}</span>
+                <span className="inline-flex items-center justify-center px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-normal">
                   {space.sites.filter((site) => site.categoryId === category.id).length}
-                </small>
+                </span>
               </button>
             ))}
         </nav>
       )}
 
-      {visibleSites.length ? (
-        <GridView
-          sites={visibleSites}
-          spaceId={spaceId}
-          openInNewTab={settings.openInNewTab}
-          showCardBackground={settings.showCardBackground}
-          tr={tr}
-          onEdit={(site) => setEditor({ open: true, site })}
-        />
-      ) : (
-        <div className="navigation-empty">
-          <span>{tr('这里还没有网站')}</span>
-          <button onClick={() => setEditor({ open: true })}>{tr('添加第一个网站')}</button>
-        </div>
-      )}
+      <GridView
+        sites={visibleSites}
+        spaceId={spaceId}
+        openInNewTab={settings.openInNewTab}
+        showCardBackground={settings.showCardBackground}
+        cardOpacity={settings.cardOpacity}
+        showSiteTitle={settings.showSiteTitle}
+        tr={tr}
+        onEdit={(site) => setEditor({ open: true, site })}
+        onAdd={() => setEditor({ open: true })}
+      />
+
       <SiteEditor
         editor={editor}
         categories={space.categories}
@@ -208,14 +223,20 @@ function GridView({
   spaceId,
   openInNewTab,
   showCardBackground,
+  cardOpacity,
+  showSiteTitle,
   onEdit,
+  onAdd,
   tr,
 }: {
   sites: Site[];
   spaceId: SpaceId;
   openInNewTab: boolean;
   showCardBackground: boolean;
+  cardOpacity: number;
+  showSiteTitle: boolean;
   onEdit: (site: Site) => void;
+  onAdd: () => void;
   tr: Translator;
 }) {
   const sensors = useSensors(
@@ -241,16 +262,32 @@ function GridView({
         items={sites.map((item) => `site:${item.id}`)}
         strategy={rectSortingStrategy}
       >
-        <div className={`site-grid${showCardBackground ? ' show-card-background' : ''}`}>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] gap-3 sm:gap-5 w-full mx-auto px-2 py-4">
           {sites.map((site) => (
             <DraggableGridSite
               site={site}
               openInNewTab={openInNewTab}
+              showCardBackground={showCardBackground}
+              cardOpacity={cardOpacity}
+              showSiteTitle={showSiteTitle}
               onEdit={onEdit}
               tr={tr}
               key={site.id}
             />
           ))}
+          <button
+            type="button"
+            onClick={onAdd}
+            aria-label={tr('添加网站')}
+            className="group relative flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-white/20 hover:border-white/45 bg-white/[0.03] hover:bg-white/[0.08] transition-all duration-200 cursor-pointer min-h-[98px] text-white/60 hover:text-white"
+          >
+            <div className="w-11 h-11 rounded-2xl border border-white/15 bg-white/10 flex items-center justify-center mb-1.5 group-hover:scale-105 group-hover:bg-white/20 transition-all duration-200 shadow-sm">
+              <Plus size={20} />
+            </div>
+            <span className="text-xs font-medium leading-tight drop-shadow-xs">
+              {tr('添加网站')}
+            </span>
+          </button>
         </div>
       </SortableContext>
     </DndContext>
@@ -260,11 +297,17 @@ function GridView({
 function DraggableGridSite({
   site,
   openInNewTab,
+  showCardBackground,
+  cardOpacity,
+  showSiteTitle,
   onEdit,
   tr,
 }: {
   site: Site;
   openInNewTab: boolean;
+  showCardBackground: boolean;
+  cardOpacity: number;
+  showSiteTitle: boolean;
   onEdit: (site: Site) => void;
   tr: Translator;
 }) {
@@ -274,34 +317,46 @@ function DraggableGridSite({
   return (
     <article
       ref={setNodeRef}
-      className={`site-card${isDragging ? ' is-dragging' : ''}`}
-      style={
-        transform
-          ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, transition }
-          : undefined
-      }
+      className={cn(
+        'group relative flex flex-col items-center p-2.5 rounded-2xl transition-all duration-200 select-none text-center',
+        showCardBackground
+          ? 'backdrop-blur-md shadow-sm border border-white/10 hover:border-white/25 hover:-translate-y-1'
+          : 'hover:bg-white/10 hover:backdrop-blur-sm hover:-translate-y-1',
+        isDragging && 'opacity-45 scale-95 z-50',
+      )}
+      style={{
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        transition,
+        backgroundColor: showCardBackground ? `rgba(255, 255, 255, ${cardOpacity})` : undefined,
+      }}
     >
       <a
         href={site.url}
         target={openInNewTab ? '_blank' : undefined}
         rel={openInNewTab ? 'noreferrer' : undefined}
         aria-label={`${tr('打开')} ${site.title}`}
+        className="w-full flex flex-col items-center no-underline text-[var(--home-cards-color,#fff)]"
       >
         <SiteIcon site={site} />
-        <span className="site-copy">
-          <strong>{site.title}</strong>
-          <small>{new URL(site.url).hostname.replace(/^www\./, '')}</small>
-        </span>
-        <ExternalLink className="site-open" size={15} />
+        {showSiteTitle && (
+          <div className="w-full mt-1.5 px-0.5 overflow-hidden">
+            <span className="block text-xs font-medium truncate leading-tight drop-shadow-xs text-white/95">
+              {site.title}
+            </span>
+          </div>
+        )}
       </a>
       <button
-        className="site-menu"
+        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 backdrop-blur-sm z-10 cursor-pointer"
         aria-label={`${tr('编辑')} ${site.title}`}
-        onClick={() => onEdit(site)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(site);
+        }}
         {...listeners}
         {...attributes}
       >
-        <MoreHorizontal size={17} />
+        <MoreHorizontal size={14} />
       </button>
     </article>
   );
@@ -311,13 +366,22 @@ function SiteIcon({ site }: { site: Site }) {
   const url = useResourceUrl(site.iconId);
   const [fallbackFailed, setFallbackFailed] = useState(false);
   useEffect(() => setFallbackFailed(false), [site.url]);
+  const brandIcon = getBrandIcon(site.url, site.title);
+
   return (
     <span
-      className="site-icon"
+      className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-[0_6px_20px_rgba(0,0,0,0.22)] ring-1 ring-white/20 transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_10px_28px_rgba(0,0,0,0.32)] overflow-hidden"
       style={{ background: site.color, color: readableTextColor(site.color) }}
     >
       {url && !fallbackFailed ? (
-        <img src={url} alt={site.title} onError={() => setFallbackFailed(true)} />
+        <img
+          src={url}
+          alt={site.title}
+          className="w-full h-full object-cover"
+          onError={() => setFallbackFailed(true)}
+        />
+      ) : brandIcon ? (
+        brandIcon
       ) : (
         site.title.slice(0, 1).toUpperCase()
       )}
@@ -459,9 +523,9 @@ function NavigationManager({
                 </div>
               ))}
             </div>
-            <form className="manager-add" onSubmit={addDesktop}>
-              <Input name="name" placeholder={tr('新桌面名称')} required maxLength={80} />
-              <Button type="submit" size="sm">
+            <form className="manager-add flex gap-2 mt-2" onSubmit={addDesktop}>
+              <Input name="name" placeholder={tr('新桌面名称')} required maxLength={80} className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5" />
+              <Button type="submit" size="sm" className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0">
                 <Plus size={15} />
                 {tr('新增')}
               </Button>
@@ -585,10 +649,12 @@ function NavigationManager({
                   </div>
                 ))}
             </div>
-            <form className="manager-add" onSubmit={addCategory}>
-              <Input name="color" type="color" defaultValue="#4f7c68" aria-label={tr('分类颜色')} />
-              <Input name="name" placeholder={tr('新分类名称')} required maxLength={80} />
-              <Button type="submit" size="sm">
+            <form className="manager-add flex items-center gap-2 mt-2" onSubmit={addCategory}>
+              <div className="flex items-center justify-center w-8 h-8 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 shrink-0 overflow-hidden">
+                <input name="color" type="color" defaultValue="#3b82f6" aria-label={tr('分类颜色')} className="w-9 h-9 -m-1 border-0 cursor-pointer p-0 bg-transparent" />
+              </div>
+              <Input name="name" placeholder={tr('新分类名称')} required maxLength={80} className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5" />
+              <Button type="submit" size="sm" className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0">
                 <Plus size={15} />
                 {tr('新增')}
               </Button>
@@ -779,35 +845,64 @@ function SiteEditor({
                   ))}
                 </select>
               </label>
-              <label>
-                {tr('标识颜色')}
-                <Input name="color" type="color" defaultValue={site?.color ?? '#4f7c68'} />
-              </label>
-              <label>
-                {tr('自定义图标')}
-                <Input name="icon" type="file" accept="image/png,image/jpeg,image/webp" />
-              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                  {tr('标识颜色')}
+                  <div className="flex items-center gap-2 h-9 px-2 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5">
+                    <input
+                      name="color"
+                      type="color"
+                      defaultValue={site?.color ?? '#3b82f6'}
+                      className="w-6 h-6 rounded-lg border-0 cursor-pointer bg-transparent p-0"
+                    />
+                    <span className="text-[11px] text-slate-500 font-mono">自定义颜色</span>
+                  </div>
+                </label>
+                <label className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                  {tr('自定义图标')}
+                  <div className="relative flex items-center h-9 px-2.5 rounded-xl border border-dashed border-black/15 dark:border-white/20 bg-black/[0.02] dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer overflow-hidden">
+                    <span className="text-[11px] text-slate-500 truncate">{tr('点击上传图片')}</span>
+                    <input
+                      name="icon"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-6 flex items-center justify-end gap-2.5">
             {site && (
               <Button
                 type="button"
                 variant="destructive"
+                className="rounded-xl px-4 py-2 cursor-pointer mr-auto"
                 onClick={() =>
                   void dispatch({ type: 'delete-site', spaceId, id: site.id })
                     .then(onClose)
                     .catch((error: Error) => onError(error.message))
                 }
               >
-                <Trash2 size={16} />
+                <Trash2 size={15} />
                 {tr('删除')}
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="rounded-xl px-4 py-2 cursor-pointer border-black/10 dark:border-white/15"
+            >
               {tr('取消')}
             </Button>
-            <Button type="submit">{tr('保存')}</Button>
+            <Button
+              type="submit"
+              className="rounded-xl px-5 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs"
+            >
+              {tr('保存')}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
