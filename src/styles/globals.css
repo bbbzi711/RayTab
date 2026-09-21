@@ -459,9 +459,9 @@ select:focus-visible {
     box-shadow var(--motion-standard) var(--ease-standard);
 }
 .icon-frame--site {
-  width: 48px;
-  height: 48px;
-  border-radius: 15px;
+  width: var(--site-icon-size, 48px);
+  height: var(--site-icon-size, 48px);
+  border-radius: clamp(12px, calc(var(--site-icon-size, 48px) * 0.31), 22px);
 }
 .icon-frame--preview {
   width: 72px;
@@ -480,7 +480,7 @@ select:focus-visible {
   object-fit: contain;
 }
 .icon-frame__letter {
-  font-size: 18px;
+  font-size: clamp(16px, calc(var(--site-icon-size, 48px) * 0.37), 30px);
   font-weight: 700;
 }
 .icon-frame--preview .icon-frame__letter {
@@ -951,6 +951,65 @@ select:focus-visible {
 .manage-toolbar__actions [data-variant='outline']:hover {
   background: #fff;
   color: #0f172a;
+}
+.site-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, var(--site-card-size, 110px)), var(--site-card-size, 110px))
+  );
+  justify-content: center;
+  gap: var(--site-grid-gap, 20px);
+  margin: 0 auto;
+  padding: 16px 8px;
+}
+.site-card,
+.add-site-card {
+  position: relative;
+  display: flex;
+  min-height: var(--site-card-size, 110px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  padding: 10px;
+  text-align: center;
+  user-select: none;
+  transition:
+    background var(--motion-standard) var(--ease-standard),
+    border-color var(--motion-standard) var(--ease-standard),
+    transform var(--motion-standard) var(--ease-standard),
+    opacity var(--motion-standard) var(--ease-standard);
+}
+.add-site-card {
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.62);
+}
+.add-site-card:hover {
+  border-color: rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+.add-site-icon {
+  display: flex;
+  width: min(var(--site-icon-size, 48px), 56px);
+  height: min(var(--site-icon-size, 48px), 56px);
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: clamp(12px, calc(var(--site-icon-size, 48px) * 0.31), 18px);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+  transition:
+    background var(--motion-standard) var(--ease-standard),
+    transform var(--motion-standard) var(--ease-standard);
+}
+.add-site-card:hover .add-site-icon {
+  background: rgba(255, 255, 255, 0.18);
+  transform: scale(1.04);
 }
 .site-card--managing {
   border-color: rgba(255, 255, 255, 0.34) !important;

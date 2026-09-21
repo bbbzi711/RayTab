@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -231,6 +231,10 @@ export function NavigationPage({
         showCardBackground={settings.showCardBackground}
         cardOpacity={settings.cardOpacity}
         showSiteTitle={settings.showSiteTitle}
+        cardSize={settings.cardSize}
+        iconSizeRatio={settings.iconSizeRatio}
+        maxCardsPerRow={settings.maxCardsPerRow}
+        iconSpacing={settings.iconSpacing}
         manageMode={manageMode}
         tr={tr}
         onEdit={(site) => setEditor({ open: true, site })}
@@ -264,6 +268,10 @@ function GridView({
   showCardBackground,
   cardOpacity,
   showSiteTitle,
+  cardSize,
+  iconSizeRatio,
+  maxCardsPerRow,
+  iconSpacing,
   manageMode,
   onEdit,
   onAdd,
@@ -275,6 +283,10 @@ function GridView({
   showCardBackground: boolean;
   cardOpacity: number;
   showSiteTitle: boolean;
+  cardSize: number;
+  iconSizeRatio: number;
+  maxCardsPerRow: number;
+  iconSpacing: number;
   manageMode: boolean;
   onEdit: (site: Site) => void;
   onAdd: () => void;
@@ -297,13 +309,22 @@ function GridView({
         beforeId: target.id,
       });
   };
+  const iconSize = Math.round(cardSize * iconSizeRatio);
+  const gridMaxWidth =
+    cardSize * maxCardsPerRow + iconSpacing * Math.max(0, maxCardsPerRow - 1) + 16;
+  const gridStyle = {
+    '--site-card-size': `${cardSize}px`,
+    '--site-icon-size': `${iconSize}px`,
+    '--site-grid-gap': `${iconSpacing}px`,
+    maxWidth: `${gridMaxWidth}px`,
+  } as CSSProperties;
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dropped}>
       <SortableContext
         items={sites.map((item) => `site:${item.id}`)}
         strategy={rectSortingStrategy}
       >
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(126px,1fr))] gap-3 sm:gap-5 w-full mx-auto px-2 py-4">
+        <div className="site-grid" style={gridStyle}>
           {sites.map((site) => (
             <DraggableGridSite
               site={site}
@@ -321,9 +342,9 @@ function GridView({
             type="button"
             onClick={onAdd}
             aria-label={tr('添加网站')}
-            className="group relative flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed border-white/20 hover:border-white/45 bg-white/[0.03] hover:bg-white/[0.08] transition-all duration-200 cursor-pointer min-h-[98px] text-white/60 hover:text-white"
+            className="add-site-card group"
           >
-            <div className="w-11 h-11 rounded-2xl border border-white/15 bg-white/10 flex items-center justify-center mb-1.5 group-hover:scale-105 group-hover:bg-white/20 transition-all duration-200 shadow-sm">
+            <div className="add-site-icon">
               <Plus size={20} />
             </div>
             <span className="text-xs font-medium leading-tight drop-shadow-xs">
@@ -363,7 +384,7 @@ function DraggableGridSite({
     <article
       ref={setNodeRef}
       className={cn(
-        'group relative flex flex-col items-center p-2.5 rounded-2xl transition-all duration-200 select-none text-center',
+        'site-card group',
         showCardBackground
           ? 'backdrop-blur-md shadow-sm border border-white/10 hover:border-white/25 hover:-translate-y-1'
           : 'hover:bg-white/10 hover:backdrop-blur-sm hover:-translate-y-1',
