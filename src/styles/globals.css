@@ -937,6 +937,7 @@ select:focus-visible {
 .manage-toolbar__actions {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .manage-toolbar__actions button {
@@ -1015,6 +1016,58 @@ select:focus-visible {
   border-color: rgba(255, 255, 255, 0.34) !important;
   background: rgba(255, 255, 255, 0.12);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.site-card--selected {
+  border-color: rgba(147, 197, 253, 0.92) !important;
+  background: rgba(37, 99, 235, 0.28) !important;
+  box-shadow:
+    inset 0 0 0 2px rgba(191, 219, 254, 0.72),
+    0 12px 30px rgba(15, 23, 42, 0.2);
+}
+.site-card-main {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--home-cards-color, #fff);
+  cursor: pointer;
+  text-align: center;
+}
+.site-card-main:focus-visible {
+  border-radius: 14px;
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 4px;
+}
+.site-card-selection {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  z-index: 9;
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.5);
+  color: #fff;
+  pointer-events: none;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+.site-card-selection.is-selected {
+  border-color: #fff;
+  background: #2563eb;
+  transform: scale(1.04);
 }
 .site-card-action {
   position: absolute;
@@ -1287,7 +1340,7 @@ select:focus-visible {
     width: 100%;
   }
   .manage-toolbar__actions button {
-    flex: 1;
+    flex: 1 1 calc(50% - 4px);
   }
 }
 .settings-help {

@@ -227,6 +227,15 @@ const english: Record<string, string> = {
   编辑网站: 'Edit site',
   拖动排序: 'Drag to reorder',
   整理导航: 'Arrange navigation',
+  已选择: 'Selected',
+  全选当前: 'Select visible',
+  取消全选: 'Clear visible selection',
+  删除所选: 'Delete selected',
+  取消选择: 'Deselect',
+  已删除: 'Deleted',
+  '确定删除所选网站？': 'Delete selected sites?',
+  '点击网站选择，拖动手柄排序，更多按钮编辑。':
+    'Select sites with a click, drag handles to reorder, or use the more button to edit.',
   '拖动网站调整顺序，点击编辑修改内容。':
     'Drag sites to reorder them, or select one to edit its details.',
   桌面与分类: 'Desktops and categories',

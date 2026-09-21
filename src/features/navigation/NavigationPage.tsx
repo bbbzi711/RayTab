@@ -78,6 +78,7 @@ export function NavigationPage({
   const [editor, setEditor] = useState<Editor>({ open: false });
   const [managerOpen, setManagerOpen] = useState(false);
   const [manageMode, setManageMode] = useState(false);
+  const [selectedSiteIds, setSelectedSiteIds] = useState<Set<string>>(() => new Set());
   const orderedDesktops = useMemo(() => [...space.desktops].sort(byOrder), [space.desktops]);
   useEffect(() => {
     if (addRequested) setEditor({ open: true });
@@ -97,6 +98,19 @@ export function NavigationPage({
     return () => window.removeEventListener('keydown', exitManageMode);
   }, [manageMode]);
   useEffect(() => {
+    setSelectedSiteIds(new Set());
+  }, [desktopId, spaceId]);
+  useEffect(() => {
+    if (!manageMode) setSelectedSiteIds(new Set());
+  }, [manageMode]);
+  useEffect(() => {
+    const existingIds = new Set(space.sites.map((site) => site.id));
+    setSelectedSiteIds((current) => {
+      if ([...current].every((id) => existingIds.has(id))) return current;
+      return new Set([...current].filter((id) => existingIds.has(id)));
+    });
+  }, [space.sites]);
+  useEffect(() => {
     if (orderedDesktops.length < 2) return;
     const switchDesktop = (event: KeyboardEvent) => {
       if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
@@ -115,6 +129,43 @@ export function NavigationPage({
 
   const run = (command: Parameters<typeof dispatch>[0]) =>
     void dispatch(command).catch((error: Error) => onError(error.message));
+  const toggleSiteSelection = (id: string) =>
+    setSelectedSiteIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const allVisibleSelected =
+    visibleSites.length > 0 && visibleSites.every((site) => selectedSiteIds.has(site.id));
+  const toggleVisibleSelection = () =>
+    setSelectedSiteIds((current) => {
+      const next = new Set(current);
+      visibleSites.forEach((site) => {
+        if (allVisibleSelected) next.delete(site.id);
+        else next.add(site.id);
+      });
+      return next;
+    });
+  const deleteSelectedSites = () => {
+    const ids = [...selectedSiteIds];
+    if (!ids.length) return;
+    const names = space.sites
+      .filter((site) => selectedSiteIds.has(site.id))
+      .slice(0, 5)
+      .map((site) => site.title);
+    const remainder = ids.length - names.length;
+    const summary = `${names.join('、')}${remainder > 0 ? '…' : ''}`;
+    if (!window.confirm(`${tr('确定删除所选网站？')} ${ids.length} ${tr('个网站')}\n${summary}`)) {
+      return;
+    }
+    void dispatch({ type: 'delete-sites', spaceId, ids })
+      .then(() => {
+        setSelectedSiteIds(new Set());
+        onError(`${tr('已删除')} ${ids.length} ${tr('个网站')}`);
+      })
+      .catch((error: Error) => onError(error.message));
+  };
 
   return (
     <section
@@ -126,9 +177,27 @@ export function NavigationPage({
         <div className="manage-toolbar" role="toolbar" aria-label={tr('整理导航')}>
           <span className="manage-toolbar__copy">
             <strong>{tr('整理导航')}</strong>
-            <small>{tr('拖动网站调整顺序，点击编辑修改内容。')}</small>
+            <small aria-live="polite">
+              {selectedSiteIds.size
+                ? `${tr('已选择')} ${selectedSiteIds.size} ${tr('个网站')}`
+                : tr('点击网站选择，拖动手柄排序，更多按钮编辑。')}
+            </small>
           </span>
           <span className="manage-toolbar__actions">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!visibleSites.length}
+              onClick={toggleVisibleSelection}
+            >
+              {tr(allVisibleSelected ? '取消全选' : '全选当前')}
+            </Button>
+            {selectedSiteIds.size > 0 && (
+              <Button type="button" variant="destructive" onClick={deleteSelectedSites}>
+                <Trash2 size={16} />
+                {tr('删除所选')}
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => setManagerOpen(true)}>
               <ListTree size={16} />
               {tr('桌面与分类')}
@@ -236,7 +305,9 @@ export function NavigationPage({
         maxCardsPerRow={settings.maxCardsPerRow}
         iconSpacing={settings.iconSpacing}
         manageMode={manageMode}
+        selectedSiteIds={selectedSiteIds}
         tr={tr}
+        onToggleSelection={toggleSiteSelection}
         onEdit={(site) => setEditor({ open: true, site })}
         onAdd={() => setEditor({ open: true })}
       />
@@ -273,6 +344,8 @@ function GridView({
   maxCardsPerRow,
   iconSpacing,
   manageMode,
+  selectedSiteIds,
+  onToggleSelection,
   onEdit,
   onAdd,
   tr,
@@ -288,6 +361,8 @@ function GridView({
   maxCardsPerRow: number;
   iconSpacing: number;
   manageMode: boolean;
+  selectedSiteIds: Set<string>;
+  onToggleSelection: (id: string) => void;
   onEdit: (site: Site) => void;
   onAdd: () => void;
   tr: Translator;
@@ -333,6 +408,8 @@ function GridView({
               cardOpacity={cardOpacity}
               showSiteTitle={showSiteTitle}
               manageMode={manageMode}
+              selected={selectedSiteIds.has(site.id)}
+              onToggleSelection={onToggleSelection}
               onEdit={onEdit}
               tr={tr}
               key={site.id}
@@ -364,6 +441,8 @@ function DraggableGridSite({
   cardOpacity,
   showSiteTitle,
   manageMode,
+  selected,
+  onToggleSelection,
   onEdit,
   tr,
 }: {
@@ -373,6 +452,8 @@ function DraggableGridSite({
   cardOpacity: number;
   showSiteTitle: boolean;
   manageMode: boolean;
+  selected: boolean;
+  onToggleSelection: (id: string) => void;
   onEdit: (site: Site) => void;
   tr: Translator;
 }) {
@@ -390,6 +471,7 @@ function DraggableGridSite({
           : 'hover:bg-white/10 hover:backdrop-blur-sm hover:-translate-y-1',
         isDragging && 'opacity-45 scale-95 z-50',
         manageMode && 'site-card--managing',
+        selected && 'site-card--selected',
       )}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -397,27 +479,34 @@ function DraggableGridSite({
         backgroundColor: showCardBackground ? `rgba(255, 255, 255, ${cardOpacity})` : undefined,
       }}
     >
-      <a
-        href={site.url}
-        target={openInNewTab ? '_blank' : undefined}
-        rel={openInNewTab ? 'noreferrer' : undefined}
-        aria-label={`${tr('打开')} ${site.title}`}
-        onClick={(event) => {
-          if (!manageMode) return;
-          event.preventDefault();
-          onEdit(site);
-        }}
-        className="w-full flex flex-col items-center no-underline text-[var(--home-cards-color,#fff)]"
-      >
-        <SiteIcon site={site} interactive />
-        {showSiteTitle && (
-          <div className="w-full mt-1.5 px-0.5 overflow-hidden">
-            <span className="block text-xs font-medium truncate leading-tight drop-shadow-xs text-white/95">
-              {site.title}
-            </span>
-          </div>
-        )}
-      </a>
+      {manageMode ? (
+        <button
+          type="button"
+          className="site-card-main"
+          aria-label={`${tr(selected ? '取消选择' : '选择')} ${site.title}`}
+          aria-pressed={selected}
+          onClick={() => onToggleSelection(site.id)}
+        >
+          <SiteIcon site={site} interactive />
+          {showSiteTitle && <SiteTitle title={site.title} />}
+        </button>
+      ) : (
+        <a
+          href={site.url}
+          target={openInNewTab ? '_blank' : undefined}
+          rel={openInNewTab ? 'noreferrer' : undefined}
+          aria-label={`${tr('打开')} ${site.title}`}
+          className="site-card-main no-underline"
+        >
+          <SiteIcon site={site} interactive />
+          {showSiteTitle && <SiteTitle title={site.title} />}
+        </a>
+      )}
+      {manageMode && (
+        <span className={cn('site-card-selection', selected && 'is-selected')} aria-hidden="true">
+          {selected && <Check size={15} />}
+        </span>
+      )}
       <button
         type="button"
         className={cn(
@@ -446,6 +535,16 @@ function DraggableGridSite({
         </button>
       )}
     </article>
+  );
+}
+
+function SiteTitle({ title }: { title: string }) {
+  return (
+    <span className="w-full mt-1.5 px-0.5 overflow-hidden">
+      <span className="block text-xs font-medium truncate leading-tight drop-shadow-xs text-white/95">
+        {title}
+      </span>
+    </span>
   );
 }
 

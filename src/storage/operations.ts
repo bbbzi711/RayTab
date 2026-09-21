@@ -31,6 +31,7 @@ export type Command =
       expected?: number;
     }
   | { type: 'delete-site'; spaceId: SpaceId; id: string }
+  | { type: 'delete-sites'; spaceId: SpaceId; ids: string[] }
   | { type: 'move-site'; spaceId: SpaceId; id: string; categoryId: string; beforeId?: string }
   | { type: 'move-category'; spaceId: SpaceId; id: string; desktopId: string; beforeId?: string }
   | { type: 'settings'; spaceId: SpaceId; patch: Partial<SpaceSettings> }
@@ -286,6 +287,16 @@ export function applyCommand(state: RayState, command: Command) {
     if (!space.sites.some((item) => item.id === command.id)) throw new Error('网站不存在');
     space.sites = space.sites.filter((item) => item.id !== command.id);
     tombstone(state, command.spaceId, 'site', command.id);
+    return;
+  }
+  if (command.type === 'delete-sites') {
+    const ids = [...new Set(command.ids)];
+    if (!ids.length) return;
+    const existingIds = new Set(space.sites.map((item) => item.id));
+    if (ids.some((id) => !existingIds.has(id))) throw new Error('网站不存在');
+    const deletingIds = new Set(ids);
+    space.sites = space.sites.filter((item) => !deletingIds.has(item.id));
+    ids.forEach((id) => tombstone(state, command.spaceId, 'site', id));
     return;
   }
   if (command.type === 'move-site') {

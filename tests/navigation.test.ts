@@ -60,6 +60,38 @@ describe('navigation data model', () => {
     expect(rayStateSchema.safeParse(state).success).toBe(true);
   });
 
+  it('deletes multiple sites atomically and records a tombstone for each one', () => {
+    const state = createInitialState();
+    const deletingIds = state.spaces.normal.sites.slice(0, 2).map((site) => site.id);
+    const remainingId = state.spaces.normal.sites[2].id;
+
+    applyCommand(state, { type: 'delete-sites', spaceId: 'normal', ids: deletingIds });
+
+    expect(state.spaces.normal.sites.some((site) => deletingIds.includes(site.id))).toBe(false);
+    expect(state.spaces.normal.sites).toContainEqual(expect.objectContaining({ id: remainingId }));
+    expect(
+      state.spaces.normal.tombstones
+        .filter((item) => item.entity === 'site' && deletingIds.includes(item.id))
+        .map((item) => item.id),
+    ).toEqual(deletingIds);
+    expect(rayStateSchema.safeParse(state).success).toBe(true);
+  });
+
+  it('does not partially delete a batch when one site is missing', () => {
+    const state = createInitialState();
+    const originalIds = state.spaces.normal.sites.map((site) => site.id);
+
+    expect(() =>
+      applyCommand(state, {
+        type: 'delete-sites',
+        spaceId: 'normal',
+        ids: [originalIds[0], 'missing-site'],
+      }),
+    ).toThrow('网站不存在');
+    expect(state.spaces.normal.sites.map((site) => site.id)).toEqual(originalIds);
+    expect(state.spaces.normal.tombstones).toEqual([]);
+  });
+
   it('moves sites to the default category when deleting a category', () => {
     const state = createInitialState();
     const category = state.spaces.normal.categories.find((item) => !item.isDefault)!;
