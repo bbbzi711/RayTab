@@ -48,8 +48,8 @@ export default function SettingsPanel({
     );
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="settings-panel" closeLabel={tr('关闭')}>
-        <DialogHeader>
+      <DialogContent variant="workspace" className="settings-workspace" closeLabel={tr('关闭')}>
+        <DialogHeader className="settings-workspace-header">
           <DialogTitle>{tr('设置')}</DialogTitle>
           <DialogDescription>
             {spaceId === 'normal'

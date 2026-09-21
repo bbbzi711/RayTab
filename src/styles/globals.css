@@ -38,16 +38,16 @@
 .background-solid {
   background-image: none;
 }
-[data-slot='dialog-content'].settings-panel {
-  width: min(960px, calc(100% - 64px));
-  height: min(720px, calc(100dvh - 64px));
-  max-width: none;
-  overflow: hidden;
-  display: flex;
+[data-slot='dialog-content'].settings-workspace {
+  width: min(840px, calc(100vw - 96px));
   flex-direction: column;
-  padding: 28px 32px 24px;
 }
-.settings-panel [data-slot='dialog-description'] {
+.settings-workspace-header {
+  flex: 0 0 auto;
+  padding: 28px 30px 20px;
+  border-bottom: 1px solid var(--dialog-inner-border);
+}
+.settings-workspace [data-slot='dialog-description'] {
   margin-top: 6px;
   color: var(--dialog-muted);
   font-size: 13px;
@@ -56,14 +56,13 @@
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   min-height: 0;
-  margin: 22px -8px 0;
   flex: 1;
 }
 .settings-tabs {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 16px 0 0;
+  padding: 22px 16px 22px 24px;
   border-right: 1px solid var(--dialog-inner-border);
 }
 .settings-tabs button {
@@ -91,7 +90,7 @@
 .settings-content {
   min-width: 0;
   overflow-y: auto;
-  padding: 0 12px 12px 28px;
+  padding: 24px 30px 30px;
 }
 .settings-section {
   padding: 0 0 24px;
@@ -107,7 +106,7 @@
 }
 .background-options {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .background-swatch {
@@ -223,21 +222,20 @@
   color: #94a3b8;
 }
 @media (max-width: 720px) {
-  [data-slot='dialog-content'].settings-panel {
-    width: calc(100% - 20px);
-    height: calc(100dvh - 20px);
-    padding: 24px 20px 18px;
-    border-radius: 20px;
+  [data-slot='dialog-content'].settings-workspace {
+    width: 100%;
+  }
+  .settings-workspace-header {
+    padding: 24px 22px 18px;
   }
   .settings-layout {
     display: flex;
     flex-direction: column;
-    margin-top: 18px;
   }
   .settings-tabs {
     flex-direction: row;
     overflow-x: auto;
-    padding: 0 0 12px;
+    padding: 12px 22px;
     border-right: 0;
     border-bottom: 1px solid var(--dialog-inner-border);
   }
@@ -246,7 +244,10 @@
     flex: none;
   }
   .settings-content {
-    padding: 20px 2px 4px;
+    padding: 20px 22px calc(24px + env(safe-area-inset-bottom));
+  }
+  .background-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 .is-dragging {
