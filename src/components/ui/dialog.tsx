@@ -42,18 +42,22 @@ function DialogContent({
   children,
   showCloseButton = true,
   closeLabel = 'Close',
+  variant = 'center',
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
   closeLabel?: string;
+  variant?: 'center' | 'workspace';
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      <DialogOverlay className={variant === 'workspace' ? 'dialog-workspace-overlay' : undefined} />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'ray-dialog fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 outline-none duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg',
+          variant === 'center'
+            ? 'ray-dialog fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 outline-none duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg'
+            : 'ray-workspace fixed z-50 outline-none',
           className,
         )}
         {...props}

@@ -233,6 +233,7 @@ const english: Record<string, string> = {
   自定义颜色: 'Custom color',
   删除: 'Delete',
   '确定删除网站？': 'Delete this site?',
+  '放弃未保存的更改？': 'Discard unsaved changes?',
   取消: 'Cancel',
   保存: 'Save',
   添加: 'Add',

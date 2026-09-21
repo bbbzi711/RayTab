@@ -732,9 +732,11 @@ function SiteEditor({
   tr: Translator;
 }) {
   const site = editor.site;
+  const firstCategory = categories.find((item) => !item.isDefault) ?? categories[0];
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [color, setColor] = useState('#3b82f6');
+  const [categoryId, setCategoryId] = useState('');
   const [fetchedIcon, setFetchedIcon] = useState<Blob>();
   const [uploadedIcon, setUploadedIcon] = useState<File>();
   const [previewIconUrl, setPreviewIconUrl] = useState<string>();
@@ -744,10 +746,11 @@ function SiteEditor({
     setTitle(site?.title ?? '');
     setUrl(site?.url ?? '');
     setColor(site?.color ?? '#3b82f6');
+    setCategoryId(site?.categoryId ?? firstCategory?.id ?? '');
     setFetchedIcon(undefined);
     setUploadedIcon(undefined);
     setFetching(false);
-  }, [editor.open, site]);
+  }, [editor.open, firstCategory?.id, site]);
   useEffect(() => {
     const image = uploadedIcon ?? fetchedIcon;
     if (!image) {
@@ -774,7 +777,6 @@ function SiteEditor({
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
     try {
       const image = uploadedIcon ?? fetchedIcon;
       const prepared = image ? await prepareImage(image, 'icon') : undefined;
@@ -784,7 +786,7 @@ function SiteEditor({
           spaceId,
           id: site?.id ?? crypto.randomUUID(),
           expected: site?.updatedAt,
-          categoryId: String(data.get('categoryId')),
+          categoryId,
           site: {
             title,
             url,
@@ -799,18 +801,31 @@ function SiteEditor({
       onError((error as Error).message);
     }
   };
-  const firstCategory = categories.find((item) => !item.isDefault) ?? categories[0];
+  const initialTitle = site?.title ?? '';
+  const initialUrl = site?.url ?? '';
+  const initialColor = site?.color ?? '#3b82f6';
+  const initialCategoryId = site?.categoryId ?? firstCategory?.id ?? '';
+  const isDirty =
+    title !== initialTitle ||
+    url !== initialUrl ||
+    color !== initialColor ||
+    categoryId !== initialCategoryId ||
+    Boolean(fetchedIcon || uploadedIcon);
+  const requestClose = () => {
+    if (isDirty && !window.confirm(tr('放弃未保存的更改？'))) return;
+    onClose();
+  };
   return (
-    <Dialog open={editor.open} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="editor-dialog" closeLabel={tr('关闭')}>
-        <form onSubmit={submit}>
-          <DialogHeader>
+    <Dialog open={editor.open} onOpenChange={(open) => !open && requestClose()}>
+      <DialogContent variant="workspace" className="site-editor-workspace" closeLabel={tr('关闭')}>
+        <form className="site-editor-form" onSubmit={submit}>
+          <DialogHeader className="site-editor-header">
             <DialogTitle>{site ? tr('编辑网站') : tr('添加网站')}</DialogTitle>
             <DialogDescription>
               {tr('网站会保存到当前空间，可随时移动到其他分类。')}
             </DialogDescription>
           </DialogHeader>
-          <div className="editor-layout">
+          <div className="site-editor-scroll">
             <aside className="editor-preview" aria-hidden="true">
               <SiteIcon
                 site={{
@@ -822,8 +837,10 @@ function SiteEditor({
                 previewUrl={previewIconUrl}
                 size="preview"
               />
-              <strong>{title.trim() || tr('添加网站')}</strong>
-              <small>{url.trim() || 'example.com'}</small>
+              <span className="editor-preview-copy">
+                <strong>{title.trim() || tr('添加网站')}</strong>
+                <small>{url.trim() || 'example.com'}</small>
+              </span>
             </aside>
             <div className="editor-fields">
               <label>
@@ -866,7 +883,8 @@ function SiteEditor({
                 {tr('分类')}
                 <select
                   name="categoryId"
-                  defaultValue={site?.categoryId ?? firstCategory?.id}
+                  value={categoryId}
+                  onChange={(event) => setCategoryId(event.currentTarget.value)}
                   required
                 >
                   {categories.map((item) => (
@@ -876,7 +894,7 @@ function SiteEditor({
                   ))}
                 </select>
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="editor-appearance-fields">
                 <label className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                   {tr('标识颜色')}
                   <div className="flex items-center gap-2 h-9 px-2 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5">
@@ -908,7 +926,7 @@ function SiteEditor({
               </div>
             </div>
           </div>
-          <DialogFooter className="mt-6 flex items-center justify-end gap-2.5">
+          <DialogFooter className="site-editor-footer">
             {site && (
               <Button
                 type="button"
@@ -928,7 +946,7 @@ function SiteEditor({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={requestClose}
               className="rounded-xl px-4 py-2 cursor-pointer border-black/10 dark:border-white/15"
             >
               {tr('取消')}
