@@ -12,10 +12,12 @@ import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sort
 import {
   ArrowDown,
   ArrowUp,
+  Check,
   ExternalLink,
   Globe2,
   GripVertical,
   Layers3,
+  ListTree,
   LoaderCircle,
   MoreHorizontal,
   Plus,
@@ -75,13 +77,25 @@ export function NavigationPage({
   }, [categories, selected, space.sites]);
   const [editor, setEditor] = useState<Editor>({ open: false });
   const [managerOpen, setManagerOpen] = useState(false);
+  const [manageMode, setManageMode] = useState(false);
   const orderedDesktops = useMemo(() => [...space.desktops].sort(byOrder), [space.desktops]);
   useEffect(() => {
     if (addRequested) setEditor({ open: true });
   }, [addRequested]);
   useEffect(() => {
-    if (manageRequested) setManagerOpen(true);
+    if (!manageRequested) return;
+    setManageMode(true);
+    setManagerOpen(false);
   }, [manageRequested]);
+  useEffect(() => {
+    if (!manageMode) return;
+    const exitManageMode = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || document.querySelector('[role="dialog"]')) return;
+      setManageMode(false);
+    };
+    window.addEventListener('keydown', exitManageMode);
+    return () => window.removeEventListener('keydown', exitManageMode);
+  }, [manageMode]);
   useEffect(() => {
     if (orderedDesktops.length < 2) return;
     const switchDesktop = (event: KeyboardEvent) => {
@@ -108,6 +122,30 @@ export function NavigationPage({
       aria-label={tr('网站导航')}
       data-show-site-title={settings.showSiteTitle}
     >
+      {manageMode && (
+        <div className="manage-toolbar" role="toolbar" aria-label={tr('整理导航')}>
+          <span className="manage-toolbar__copy">
+            <strong>{tr('整理导航')}</strong>
+            <small>{tr('拖动网站调整顺序，点击编辑修改内容。')}</small>
+          </span>
+          <span className="manage-toolbar__actions">
+            <Button type="button" variant="outline" onClick={() => setManagerOpen(true)}>
+              <ListTree size={16} />
+              {tr('桌面与分类')}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setManagerOpen(false);
+                setManageMode(false);
+              }}
+            >
+              <Check size={16} />
+              {tr('完成')}
+            </Button>
+          </span>
+        </div>
+      )}
       {space.desktops.length > 1 && (
         <div className="flex items-center justify-center mb-3">
           <div
@@ -193,6 +231,7 @@ export function NavigationPage({
         showCardBackground={settings.showCardBackground}
         cardOpacity={settings.cardOpacity}
         showSiteTitle={settings.showSiteTitle}
+        manageMode={manageMode}
         tr={tr}
         onEdit={(site) => setEditor({ open: true, site })}
         onAdd={() => setEditor({ open: true })}
@@ -225,6 +264,7 @@ function GridView({
   showCardBackground,
   cardOpacity,
   showSiteTitle,
+  manageMode,
   onEdit,
   onAdd,
   tr,
@@ -235,6 +275,7 @@ function GridView({
   showCardBackground: boolean;
   cardOpacity: number;
   showSiteTitle: boolean;
+  manageMode: boolean;
   onEdit: (site: Site) => void;
   onAdd: () => void;
   tr: Translator;
@@ -270,6 +311,7 @@ function GridView({
               showCardBackground={showCardBackground}
               cardOpacity={cardOpacity}
               showSiteTitle={showSiteTitle}
+              manageMode={manageMode}
               onEdit={onEdit}
               tr={tr}
               key={site.id}
@@ -300,6 +342,7 @@ function DraggableGridSite({
   showCardBackground,
   cardOpacity,
   showSiteTitle,
+  manageMode,
   onEdit,
   tr,
 }: {
@@ -308,11 +351,13 @@ function DraggableGridSite({
   showCardBackground: boolean;
   cardOpacity: number;
   showSiteTitle: boolean;
+  manageMode: boolean;
   onEdit: (site: Site) => void;
   tr: Translator;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `site:${site.id}`,
+    disabled: !manageMode,
   });
   return (
     <article
@@ -323,6 +368,7 @@ function DraggableGridSite({
           ? 'backdrop-blur-md shadow-sm border border-white/10 hover:border-white/25 hover:-translate-y-1'
           : 'hover:bg-white/10 hover:backdrop-blur-sm hover:-translate-y-1',
         isDragging && 'opacity-45 scale-95 z-50',
+        manageMode && 'site-card--managing',
       )}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -335,6 +381,11 @@ function DraggableGridSite({
         target={openInNewTab ? '_blank' : undefined}
         rel={openInNewTab ? 'noreferrer' : undefined}
         aria-label={`${tr('打开')} ${site.title}`}
+        onClick={(event) => {
+          if (!manageMode) return;
+          event.preventDefault();
+          onEdit(site);
+        }}
         className="w-full flex flex-col items-center no-underline text-[var(--home-cards-color,#fff)]"
       >
         <SiteIcon site={site} interactive />
@@ -348,7 +399,10 @@ function DraggableGridSite({
       </a>
       <button
         type="button"
-        className="absolute top-1 right-1 w-9 h-9 rounded-full bg-black/45 hover:bg-black/70 text-white/85 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 backdrop-blur-sm z-10 cursor-pointer focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+        className={cn(
+          'site-card-action site-card-action--edit',
+          manageMode && 'site-card-action--visible',
+        )}
         aria-label={`${tr('编辑')} ${site.title}`}
         title={`${tr('编辑')} ${site.title}`}
         onClick={(e) => {
@@ -358,16 +412,18 @@ function DraggableGridSite({
       >
         <MoreHorizontal size={17} />
       </button>
-      <button
-        type="button"
-        className="absolute top-1 left-1 w-9 h-9 rounded-full bg-black/45 hover:bg-black/70 text-white/85 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 backdrop-blur-sm z-10 cursor-grab active:cursor-grabbing focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 touch-none"
-        aria-label={`${tr('拖动排序')} ${site.title}`}
-        title={`${tr('拖动排序')} ${site.title}`}
-        {...listeners}
-        {...attributes}
-      >
-        <GripVertical size={17} />
-      </button>
+      {manageMode && (
+        <button
+          type="button"
+          className="site-card-action site-card-action--drag site-card-action--visible"
+          aria-label={`${tr('拖动排序')} ${site.title}`}
+          title={`${tr('拖动排序')} ${site.title}`}
+          {...listeners}
+          {...attributes}
+        >
+          <GripVertical size={17} />
+        </button>
+      )}
     </article>
   );
 }
@@ -421,223 +477,86 @@ function NavigationManager({
   };
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="manager-dialog" closeLabel={tr('关闭')}>
-        <DialogHeader>
+      <DialogContent variant="workspace" className="manager-workspace" closeLabel={tr('关闭')}>
+        <DialogHeader className="manager-workspace-header">
           <DialogTitle>{tr('管理导航')}</DialogTitle>
           <DialogDescription>
             {tr('桌面保存不同场景，分类用于整理当前桌面的网站。')}
           </DialogDescription>
         </DialogHeader>
-        <div className="manager-grid">
-          <section className="manager-section">
-            <div className="manager-section-heading">
-              <span>
-                <Layers3 size={17} />
-              </span>
-              <div>
-                <h3>{tr('桌面')}</h3>
-                <p>{tr('桌面保存不同场景，分类用于整理当前桌面的网站。')}</p>
-              </div>
-            </div>
-            <div className="manager-list">
-              {orderedDesktops.map((desktop, index) => (
-                <div key={desktop.id}>
-                  <button
-                    className={desktop.id === activeDesktopId ? 'active' : ''}
-                    aria-label={`${tr('选择')} ${desktop.name}`}
-                    onClick={() =>
-                      void run({ type: 'select-desktop', spaceId, desktopId: desktop.id })
-                    }
-                  >
-                    {tr('选择')}
-                  </button>
-                  <Input
-                    aria-label={`${tr('桌面名称')} ${desktop.name}`}
-                    defaultValue={desktop.name}
-                    maxLength={80}
-                    onBlur={(event) => {
-                      if (event.currentTarget.value.trim() !== desktop.name)
-                        void run({
-                          type: 'save-desktop',
-                          spaceId,
-                          id: desktop.id,
-                          name: event.currentTarget.value,
-                          expected: desktop.updatedAt,
-                        });
-                    }}
-                  />
-                  <OrderButtons
-                    label={desktop.name}
-                    index={index}
-                    length={orderedDesktops.length}
-                    moveUp={() =>
-                      void run({
-                        type: 'move-desktop',
-                        spaceId,
-                        id: desktop.id,
-                        beforeId: orderedDesktops[index - 1]?.id,
-                      })
-                    }
-                    moveDown={() =>
-                      void run({
-                        type: 'move-desktop',
-                        spaceId,
-                        id: desktop.id,
-                        beforeId: orderedDesktops[index + 2]?.id,
-                      })
-                    }
-                    tr={tr}
-                  />
-                  {space.desktops.length > 1 && desktop.id !== activeDesktopId && (
-                    <button
-                      className="manager-icon-button"
-                      aria-label={`${tr('删除桌面')} ${desktop.name}`}
-                      onClick={() => {
-                        if (!window.confirm(`${tr('确定删除桌面？')}\n${desktop.name}`)) return;
-                        void run({
-                          type: 'delete-desktop',
-                          spaceId,
-                          id: desktop.id,
-                          destinationDesktopId: activeDesktopId,
-                        });
-                      }}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
+        <div className="manager-workspace-scroll">
+          <div className="manager-grid">
+            <section className="manager-section">
+              <div className="manager-section-heading">
+                <span>
+                  <Layers3 size={17} />
+                </span>
+                <div>
+                  <h3>{tr('桌面')}</h3>
+                  <p>{tr('桌面保存不同场景，分类用于整理当前桌面的网站。')}</p>
                 </div>
-              ))}
-            </div>
-            <form className="manager-add flex gap-2 mt-2" onSubmit={addDesktop}>
-              <Input
-                name="name"
-                placeholder={tr('新桌面名称')}
-                required
-                maxLength={80}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-              <Button
-                type="submit"
-                size="sm"
-                className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0"
-              >
-                <Plus size={15} />
-                {tr('新增')}
-              </Button>
-            </form>
-          </section>
-          <section className="manager-section">
-            <div className="manager-section-heading">
-              <span>
-                <Globe2 size={17} />
-              </span>
-              <div>
-                <h3>{tr('当前桌面的分类')}</h3>
-                <p>{tr('网站会保存到当前空间，可随时移动到其他分类。')}</p>
               </div>
-            </div>
-            <div className="manager-list">
-              {space.categories
-                .filter((item) => item.desktopId === activeDesktopId)
-                .sort(byOrder)
-                .map((category, index, orderedCategories) => (
-                  <div key={category.id}>
-                    <span>
-                      <i style={{ background: category.color }} />
-                      {category.isDefault && <small>{tr('默认')}</small>}
-                    </span>
-                    {category.isDefault ? (
-                      <span>{category.name}</span>
-                    ) : (
-                      <>
-                        <Input
-                          aria-label={`${tr('分类名称')} ${category.name}`}
-                          defaultValue={category.name}
-                          maxLength={80}
-                          onBlur={(event) => {
-                            if (event.currentTarget.value.trim() !== category.name)
-                              void run({
-                                type: 'save-category',
-                                spaceId,
-                                id: category.id,
-                                desktopId: category.desktopId,
-                                name: event.currentTarget.value,
-                                color: category.color,
-                                showInAll: category.showInAll,
-                                expected: category.updatedAt,
-                              });
-                          }}
-                        />
-                        <select
-                          aria-label={`${tr('移动分类')} ${category.name}`}
-                          value={category.desktopId}
-                          onChange={(event) =>
-                            void run({
-                              type: 'move-category',
-                              spaceId,
-                              id: category.id,
-                              desktopId: event.currentTarget.value,
-                            })
-                          }
-                        >
-                          {[...space.desktops].sort(byOrder).map((desktop) => (
-                            <option key={desktop.id} value={desktop.id}>
-                              {desktop.name}
-                            </option>
-                          ))}
-                        </select>
-                        <label className="manager-toggle">
-                          <input
-                            type="checkbox"
-                            checked={category.showInAll}
-                            onChange={(event) =>
-                              void run({
-                                type: 'save-category',
-                                spaceId,
-                                id: category.id,
-                                desktopId: category.desktopId,
-                                name: category.name,
-                                color: category.color,
-                                showInAll: event.currentTarget.checked,
-                                expected: category.updatedAt,
-                              })
-                            }
-                          />
-                          {tr('全部中显示')}
-                        </label>
-                        <OrderButtons
-                          label={category.name}
-                          index={index}
-                          length={orderedCategories.length}
-                          moveUp={() =>
-                            void run({
-                              type: 'move-category',
-                              spaceId,
-                              id: category.id,
-                              desktopId: category.desktopId,
-                              beforeId: orderedCategories[index - 1]?.id,
-                            })
-                          }
-                          moveDown={() =>
-                            void run({
-                              type: 'move-category',
-                              spaceId,
-                              id: category.id,
-                              desktopId: category.desktopId,
-                              beforeId: orderedCategories[index + 2]?.id,
-                            })
-                          }
-                          tr={tr}
-                        />
-                      </>
-                    )}
-                    {!category.isDefault && (
+              <div className="manager-list">
+                {orderedDesktops.map((desktop, index) => (
+                  <div key={desktop.id}>
+                    <button
+                      className={desktop.id === activeDesktopId ? 'active' : ''}
+                      aria-label={`${tr('选择')} ${desktop.name}`}
+                      onClick={() =>
+                        void run({ type: 'select-desktop', spaceId, desktopId: desktop.id })
+                      }
+                    >
+                      {tr('选择')}
+                    </button>
+                    <Input
+                      aria-label={`${tr('桌面名称')} ${desktop.name}`}
+                      defaultValue={desktop.name}
+                      maxLength={80}
+                      onBlur={(event) => {
+                        if (event.currentTarget.value.trim() !== desktop.name)
+                          void run({
+                            type: 'save-desktop',
+                            spaceId,
+                            id: desktop.id,
+                            name: event.currentTarget.value,
+                            expected: desktop.updatedAt,
+                          });
+                      }}
+                    />
+                    <OrderButtons
+                      label={desktop.name}
+                      index={index}
+                      length={orderedDesktops.length}
+                      moveUp={() =>
+                        void run({
+                          type: 'move-desktop',
+                          spaceId,
+                          id: desktop.id,
+                          beforeId: orderedDesktops[index - 1]?.id,
+                        })
+                      }
+                      moveDown={() =>
+                        void run({
+                          type: 'move-desktop',
+                          spaceId,
+                          id: desktop.id,
+                          beforeId: orderedDesktops[index + 2]?.id,
+                        })
+                      }
+                      tr={tr}
+                    />
+                    {space.desktops.length > 1 && desktop.id !== activeDesktopId && (
                       <button
                         className="manager-icon-button"
-                        aria-label={`${tr('删除分类')} ${category.name}`}
+                        aria-label={`${tr('删除桌面')} ${desktop.name}`}
                         onClick={() => {
-                          if (!window.confirm(`${tr('确定删除分类？')}\n${category.name}`)) return;
-                          void run({ type: 'delete-category', spaceId, id: category.id });
+                          if (!window.confirm(`${tr('确定删除桌面？')}\n${desktop.name}`)) return;
+                          void run({
+                            type: 'delete-desktop',
+                            spaceId,
+                            id: desktop.id,
+                            destinationDesktopId: activeDesktopId,
+                          });
                         }}
                       >
                         <Trash2 size={15} />
@@ -645,34 +564,174 @@ function NavigationManager({
                     )}
                   </div>
                 ))}
-            </div>
-            <form className="manager-add flex items-center gap-2 mt-2" onSubmit={addCategory}>
-              <div className="flex items-center justify-center w-8 h-8 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 shrink-0 overflow-hidden">
-                <input
-                  name="color"
-                  type="color"
-                  defaultValue="#3b82f6"
-                  aria-label={tr('分类颜色')}
-                  className="w-9 h-9 -m-1 border-0 cursor-pointer p-0 bg-transparent"
-                />
               </div>
-              <Input
-                name="name"
-                placeholder={tr('新分类名称')}
-                required
-                maxLength={80}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-              <Button
-                type="submit"
-                size="sm"
-                className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0"
-              >
-                <Plus size={15} />
-                {tr('新增')}
-              </Button>
-            </form>
-          </section>
+              <form className="manager-add flex gap-2 mt-2" onSubmit={addDesktop}>
+                <Input
+                  name="name"
+                  placeholder={tr('新桌面名称')}
+                  required
+                  maxLength={80}
+                  className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus size={15} />
+                  {tr('新增')}
+                </Button>
+              </form>
+            </section>
+            <section className="manager-section">
+              <div className="manager-section-heading">
+                <span>
+                  <Globe2 size={17} />
+                </span>
+                <div>
+                  <h3>{tr('当前桌面的分类')}</h3>
+                  <p>{tr('网站会保存到当前空间，可随时移动到其他分类。')}</p>
+                </div>
+              </div>
+              <div className="manager-list">
+                {space.categories
+                  .filter((item) => item.desktopId === activeDesktopId)
+                  .sort(byOrder)
+                  .map((category, index, orderedCategories) => (
+                    <div key={category.id}>
+                      <span>
+                        <i style={{ background: category.color }} />
+                        {category.isDefault && <small>{tr('默认')}</small>}
+                      </span>
+                      {category.isDefault ? (
+                        <span>{category.name}</span>
+                      ) : (
+                        <>
+                          <Input
+                            aria-label={`${tr('分类名称')} ${category.name}`}
+                            defaultValue={category.name}
+                            maxLength={80}
+                            onBlur={(event) => {
+                              if (event.currentTarget.value.trim() !== category.name)
+                                void run({
+                                  type: 'save-category',
+                                  spaceId,
+                                  id: category.id,
+                                  desktopId: category.desktopId,
+                                  name: event.currentTarget.value,
+                                  color: category.color,
+                                  showInAll: category.showInAll,
+                                  expected: category.updatedAt,
+                                });
+                            }}
+                          />
+                          <select
+                            aria-label={`${tr('移动分类')} ${category.name}`}
+                            value={category.desktopId}
+                            onChange={(event) =>
+                              void run({
+                                type: 'move-category',
+                                spaceId,
+                                id: category.id,
+                                desktopId: event.currentTarget.value,
+                              })
+                            }
+                          >
+                            {[...space.desktops].sort(byOrder).map((desktop) => (
+                              <option key={desktop.id} value={desktop.id}>
+                                {desktop.name}
+                              </option>
+                            ))}
+                          </select>
+                          <label className="manager-toggle">
+                            <input
+                              type="checkbox"
+                              checked={category.showInAll}
+                              onChange={(event) =>
+                                void run({
+                                  type: 'save-category',
+                                  spaceId,
+                                  id: category.id,
+                                  desktopId: category.desktopId,
+                                  name: category.name,
+                                  color: category.color,
+                                  showInAll: event.currentTarget.checked,
+                                  expected: category.updatedAt,
+                                })
+                              }
+                            />
+                            {tr('全部中显示')}
+                          </label>
+                          <OrderButtons
+                            label={category.name}
+                            index={index}
+                            length={orderedCategories.length}
+                            moveUp={() =>
+                              void run({
+                                type: 'move-category',
+                                spaceId,
+                                id: category.id,
+                                desktopId: category.desktopId,
+                                beforeId: orderedCategories[index - 1]?.id,
+                              })
+                            }
+                            moveDown={() =>
+                              void run({
+                                type: 'move-category',
+                                spaceId,
+                                id: category.id,
+                                desktopId: category.desktopId,
+                                beforeId: orderedCategories[index + 2]?.id,
+                              })
+                            }
+                            tr={tr}
+                          />
+                        </>
+                      )}
+                      {!category.isDefault && (
+                        <button
+                          className="manager-icon-button"
+                          aria-label={`${tr('删除分类')} ${category.name}`}
+                          onClick={() => {
+                            if (!window.confirm(`${tr('确定删除分类？')}\n${category.name}`))
+                              return;
+                            void run({ type: 'delete-category', spaceId, id: category.id });
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+              </div>
+              <form className="manager-add flex items-center gap-2 mt-2" onSubmit={addCategory}>
+                <div className="flex items-center justify-center w-8 h-8 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 shrink-0 overflow-hidden">
+                  <input
+                    name="color"
+                    type="color"
+                    defaultValue="#3b82f6"
+                    aria-label={tr('分类颜色')}
+                    className="w-9 h-9 -m-1 border-0 cursor-pointer p-0 bg-transparent"
+                  />
+                </div>
+                <Input
+                  name="name"
+                  placeholder={tr('新分类名称')}
+                  required
+                  maxLength={80}
+                  className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0"
+                >
+                  <Plus size={15} />
+                  {tr('新增')}
+                </Button>
+              </form>
+            </section>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

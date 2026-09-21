@@ -226,6 +226,11 @@ const english: Record<string, string> = {
   下移: 'Move down',
   编辑网站: 'Edit site',
   拖动排序: 'Drag to reorder',
+  整理导航: 'Arrange navigation',
+  '拖动网站调整顺序，点击编辑修改内容。':
+    'Drag sites to reorder them, or select one to edit its details.',
+  桌面与分类: 'Desktops and categories',
+  完成: 'Done',
   '网站会保存到当前空间，可随时移动到其他分类。':
     'The site is saved in this space and can be moved to another category at any time.',
   标识颜色: 'Accent color',

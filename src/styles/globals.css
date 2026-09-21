@@ -902,6 +902,118 @@ select:focus-visible {
   padding: 18px 30px;
   background: color-mix(in srgb, var(--dialog-surface) 92%, transparent);
 }
+.manage-toolbar {
+  display: flex;
+  width: min(720px, calc(100% - 32px));
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 auto 16px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(20px) saturate(125%);
+}
+.manage-toolbar__copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.manage-toolbar__copy strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+.manage-toolbar__copy small {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.manage-toolbar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.manage-toolbar__actions button {
+  min-height: 38px;
+  border-radius: 12px;
+}
+.manage-toolbar__actions [data-variant='outline'] {
+  border-color: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.94);
+  color: #172033;
+}
+.manage-toolbar__actions [data-variant='outline']:hover {
+  background: #fff;
+  color: #0f172a;
+}
+.site-card--managing {
+  border-color: rgba(255, 255, 255, 0.34) !important;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.site-card-action {
+  position: absolute;
+  top: 4px;
+  z-index: 10;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: rgba(255, 255, 255, 0.88);
+  opacity: 0;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(10px);
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+.site-card-action--edit {
+  right: 4px;
+}
+.site-card-action--drag {
+  left: 4px;
+  cursor: grab;
+  touch-action: none;
+}
+.site-card-action--drag:active {
+  cursor: grabbing;
+}
+.group:hover .site-card-action,
+.group:focus-within .site-card-action,
+.site-card-action:focus-visible,
+.site-card-action--visible {
+  opacity: 1;
+}
+.site-card-action:hover {
+  background: rgba(15, 23, 42, 0.9);
+  color: #fff;
+  transform: translateY(-1px);
+}
+.manager-workspace {
+  width: min(780px, calc(100vw - 96px));
+  flex-direction: column;
+}
+.manager-workspace-header {
+  flex: 0 0 auto;
+  padding: 28px 30px 20px;
+  border-bottom: 1px solid var(--dialog-inner-border);
+}
+.manager-workspace-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden auto;
+  padding: 24px 30px 30px;
+}
 .manager-dialog {
   width: min(920px, calc(100% - 48px));
   max-width: none;
@@ -909,7 +1021,7 @@ select:focus-visible {
 }
 .manager-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 .manager-section {
@@ -1097,6 +1209,25 @@ select:focus-visible {
   }
   .editor-appearance-fields {
     grid-template-columns: 1fr;
+  }
+  .manager-workspace {
+    width: 100%;
+  }
+  .manager-workspace-header {
+    padding: 24px 22px 18px;
+  }
+  .manager-workspace-scroll {
+    padding: 20px 22px 24px;
+  }
+  .manage-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .manage-toolbar__actions {
+    width: 100%;
+  }
+  .manage-toolbar__actions button {
+    flex: 1;
   }
 }
 .settings-help {
