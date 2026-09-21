@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import {
   Globe2,
   Grid2X2,
@@ -41,6 +41,13 @@ export default function App() {
   const [unlockOpen, setUnlockOpen] = useState(false);
   const [addRequested, setAddRequested] = useState(0);
   const [manageRequested, setManageRequested] = useState(0);
+  const rootTheme = state ? effectiveSettings(state, state.local.activeSpace).theme : undefined;
+  const rootHomeMode = state?.local.homeMode;
+  useEffect(() => {
+    if (!rootTheme || !rootHomeMode) return;
+    document.documentElement.dataset.theme = rootTheme;
+    document.documentElement.dataset.homeMode = rootHomeMode;
+  }, [rootHomeMode, rootTheme]);
   if (!state)
     return (
       <main className="loading">
@@ -99,7 +106,7 @@ export default function App() {
       {/* 右上角模式切换（带柔和磨砂底色与动态图标） */}
       <div className="fixed top-4 right-4 z-40">
         <button
-          className="flex items-center justify-center w-8 h-8 rounded-xl bg-black/20 hover:bg-black/35 text-white/80 hover:text-white backdrop-blur-xl border border-white/15 shadow-sm transition-all duration-200 cursor-pointer active:scale-95"
+          className="flex items-center justify-center w-11 h-11 rounded-2xl bg-black/25 hover:bg-black/40 text-white/85 hover:text-white backdrop-blur-xl border border-white/20 shadow-sm transition-[color,background-color,transform] duration-200 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
           aria-label={homeMode === 'focus' ? tr('展开导航') : tr('进入简洁模式')}
           title={homeMode === 'focus' ? tr('展开导航') : tr('进入简洁模式')}
           onClick={() =>
@@ -116,19 +123,23 @@ export default function App() {
       {/* 左侧贴边极简侧边栏（导航模式滑入，简洁模式滑出） */}
       <aside
         className={cn(
-          'fixed left-0 top-0 bottom-0 w-[52px] sm:w-14 flex flex-col items-center py-3.5 z-30 bg-black/25 hover:bg-black/35 backdrop-blur-2xl border-r border-white/10 transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) select-none',
-          homeMode === 'focus' ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100',
+          'fixed left-2.5 right-2.5 bottom-2.5 h-[60px] flex flex-row items-center px-2 py-2 z-30 bg-black/30 hover:bg-black/40 backdrop-blur-2xl border border-white/15 rounded-2xl transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) select-none sm:left-0 sm:right-auto sm:top-0 sm:bottom-0 sm:h-auto sm:w-14 sm:flex-col sm:px-0 sm:py-3.5 sm:rounded-none sm:border-y-0 sm:border-l-0 sm:border-r sm:border-white/10',
+          homeMode === 'focus'
+            ? '-translate-x-full opacity-0 pointer-events-none'
+            : 'translate-x-0 opacity-100',
         )}
         aria-label={tr('空间')}
+        aria-hidden={homeMode === 'focus'}
+        inert={homeMode === 'focus'}
       >
         <div
-          className="w-8 h-8 rounded-xl bg-gradient-to-br from-white/90 to-white/60 text-slate-900 font-bold text-xs flex items-center justify-center shadow-md select-none mb-4"
+          className="hidden sm:flex w-8 h-8 rounded-xl bg-gradient-to-br from-white/90 to-white/60 text-slate-900 font-bold text-xs items-center justify-center shadow-md select-none mb-4"
           aria-label="RayTab"
           title="RayTab"
         >
           R
         </div>
-        <nav className="flex flex-col gap-2.5" aria-label={tr('空间')}>
+        <nav className="flex gap-2 sm:flex-col sm:gap-2.5" aria-label={tr('空间')}>
           <button
             className={cn(
               'relative flex flex-col items-center justify-center w-10 h-11 rounded-xl transition-all duration-150 cursor-pointer',
@@ -142,7 +153,7 @@ export default function App() {
             onClick={() => switchSpace('normal')}
           >
             <Globe2 size={16} />
-            <span className="text-[10px] font-medium leading-none mt-1">普通</span>
+            <span className="text-[10px] font-medium leading-none mt-1">{tr('普通')}</span>
           </button>
           <button
             className={cn(
@@ -157,10 +168,10 @@ export default function App() {
             onClick={() => switchSpace('private')}
           >
             <LockKeyhole size={15} />
-            <span className="text-[10px] font-medium leading-none mt-1">私密</span>
+            <span className="text-[10px] font-medium leading-none mt-1">{tr('私密')}</span>
           </button>
         </nav>
-        <div className="flex flex-col gap-2 mt-auto">
+        <div className="flex gap-2 ml-auto pl-2 border-l border-white/15 sm:flex-col sm:mt-auto sm:ml-0 sm:pl-0 sm:border-l-0">
           <button
             className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
             aria-label={tr('添加网站')}
@@ -168,7 +179,7 @@ export default function App() {
             onClick={() => setAddRequested((value) => value + 1)}
           >
             <Plus size={16} />
-            <span className="text-[10px] font-medium leading-none mt-1">添加</span>
+            <span className="text-[10px] font-medium leading-none mt-1">{tr('添加')}</span>
           </button>
           <button
             className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
@@ -177,7 +188,7 @@ export default function App() {
             onClick={() => setManageRequested((value) => value + 1)}
           >
             <MoreHorizontal size={16} />
-            <span className="text-[10px] font-medium leading-none mt-1">管理</span>
+            <span className="text-[10px] font-medium leading-none mt-1">{tr('管理')}</span>
           </button>
           <button
             className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
@@ -186,7 +197,7 @@ export default function App() {
             onClick={() => setSettingsOpen(true)}
           >
             <Settings size={15} />
-            <span className="text-[10px] font-medium leading-none mt-1">设置</span>
+            <span className="text-[10px] font-medium leading-none mt-1">{tr('设置')}</span>
           </button>
         </div>
       </aside>
@@ -194,10 +205,10 @@ export default function App() {
       {/* 主工作区（时钟、搜索框与卡片网格持久渲染，位置与缩放通过 CSS 动画平滑过渡） */}
       <div
         className={cn(
-          'relative w-full min-h-screen flex flex-col items-center justify-between pb-8 transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
+          'relative w-full min-h-screen flex flex-col items-center justify-between transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
           homeMode === 'focus'
-            ? 'pt-[16vh] sm:pt-[18vh] px-4'
-            : 'pt-5 sm:pt-6 pl-14 sm:pl-16 pr-4 sm:pr-8',
+            ? 'pt-[16vh] sm:pt-[18vh] px-4 pb-8'
+            : 'pt-5 px-4 pb-24 sm:pt-6 sm:pl-16 sm:pr-8 sm:pb-8',
         )}
       >
         <div className="w-full max-w-6xl mx-auto flex flex-col items-center transition-all duration-500">
@@ -225,6 +236,8 @@ export default function App() {
                 ? 'opacity-0 max-h-0 pointer-events-none overflow-hidden translate-y-6 scale-[0.98]'
                 : 'opacity-100 max-h-[10000px] translate-y-0 scale-100',
             )}
+            aria-hidden={homeMode === 'focus'}
+            inert={homeMode === 'focus'}
           >
             <NavigationPage
               state={state}
@@ -243,7 +256,9 @@ export default function App() {
             homeMode === 'focus' ? 'mt-auto pt-8' : 'mt-6 pb-2',
           )}
         >
-          「要始终记得自己是一个可以不断生长的人，始终对生活、生命有敬畏，有期待，有相信，有开创。」
+          {tr(
+            '「要始终记得自己是一个可以不断生长的人，始终对生活、生命有敬畏，有期待，有相信，有开创。」',
+          )}
         </footer>
       </div>
 
@@ -254,7 +269,7 @@ export default function App() {
         >
           <span>{tr(notice || error || '')}</span>
           <button
-            className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-white/15 text-white/70 hover:text-white text-sm transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/15 text-white/70 hover:text-white text-sm transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
             onClick={() => {
               setNotice('');
               if (error) void refresh();

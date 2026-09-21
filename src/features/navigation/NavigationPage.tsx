@@ -14,6 +14,7 @@ import {
   ArrowUp,
   ExternalLink,
   Globe2,
+  GripVertical,
   Layers3,
   LoaderCircle,
   MoreHorizontal,
@@ -23,7 +24,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getBrandIcon } from './brandIcons';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -35,10 +35,10 @@ import {
 } from '@/components/ui/dialog';
 import { dispatch } from '@/storage/store';
 import { prepareImage } from '@/lib/images';
-import { useResourceUrl } from '@/hooks/useResourceUrl';
 import { effectiveSettings, type RayState, type Site, type SpaceId } from '@/storage/model';
 import { t } from '@/locales';
 import { fetchSiteIcon, fetchSiteMetadata } from './site-metadata';
+import { SiteIcon } from './SiteIcon';
 
 type Editor = { site?: Site; open: boolean };
 type Translator = (text: string) => string;
@@ -121,7 +121,7 @@ export function NavigationPage({
                 role="tab"
                 aria-selected={desktop.id === desktopId}
                 className={cn(
-                  'px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all duration-150',
+                  'min-h-9 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-colors duration-150',
                   desktop.id === desktopId
                     ? 'bg-white/25 text-white shadow-xs font-semibold'
                     : 'text-white/70 hover:text-white hover:bg-white/10',
@@ -142,7 +142,7 @@ export function NavigationPage({
         >
           <button
             className={cn(
-              'flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs transition-all duration-150 border cursor-pointer select-none',
+              'flex min-h-9 items-center gap-1.5 px-3.5 py-1 rounded-full text-xs transition-colors duration-150 border cursor-pointer select-none',
               selected === null
                 ? 'bg-white/35 border-white/50 text-white shadow-sm font-semibold backdrop-blur-md'
                 : 'bg-black/15 hover:bg-black/25 dark:bg-white/10 dark:hover:bg-white/20 border-white/20 text-white/85 hover:text-white backdrop-blur-md',
@@ -164,7 +164,7 @@ export function NavigationPage({
               <button
                 key={category.id}
                 className={cn(
-                  'flex items-center gap-1.5 px-3.5 py-1 rounded-full text-xs transition-all duration-150 border cursor-pointer select-none',
+                  'flex min-h-9 items-center gap-1.5 px-3.5 py-1 rounded-full text-xs transition-colors duration-150 border cursor-pointer select-none',
                   selected === category.id
                     ? 'bg-white/35 border-white/50 text-white shadow-sm font-semibold backdrop-blur-md'
                     : 'bg-black/15 hover:bg-black/25 dark:bg-white/10 dark:hover:bg-white/20 border-white/20 text-white/85 hover:text-white backdrop-blur-md',
@@ -337,7 +337,7 @@ function DraggableGridSite({
         aria-label={`${tr('打开')} ${site.title}`}
         className="w-full flex flex-col items-center no-underline text-[var(--home-cards-color,#fff)]"
       >
-        <SiteIcon site={site} />
+        <SiteIcon site={site} interactive />
         {showSiteTitle && (
           <div className="w-full mt-1.5 px-0.5 overflow-hidden">
             <span className="block text-xs font-medium truncate leading-tight drop-shadow-xs text-white/95">
@@ -347,45 +347,28 @@ function DraggableGridSite({
         )}
       </a>
       <button
-        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/40 hover:bg-black/70 text-white/80 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 backdrop-blur-sm z-10 cursor-pointer"
+        type="button"
+        className="absolute top-1 right-1 w-9 h-9 rounded-full bg-black/45 hover:bg-black/70 text-white/85 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 backdrop-blur-sm z-10 cursor-pointer focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
         aria-label={`${tr('编辑')} ${site.title}`}
+        title={`${tr('编辑')} ${site.title}`}
         onClick={(e) => {
           e.stopPropagation();
           onEdit(site);
         }}
+      >
+        <MoreHorizontal size={17} />
+      </button>
+      <button
+        type="button"
+        className="absolute top-1 left-1 w-9 h-9 rounded-full bg-black/45 hover:bg-black/70 text-white/85 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 backdrop-blur-sm z-10 cursor-grab active:cursor-grabbing focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 touch-none"
+        aria-label={`${tr('拖动排序')} ${site.title}`}
+        title={`${tr('拖动排序')} ${site.title}`}
         {...listeners}
         {...attributes}
       >
-        <MoreHorizontal size={14} />
+        <GripVertical size={17} />
       </button>
     </article>
-  );
-}
-
-function SiteIcon({ site }: { site: Site }) {
-  const url = useResourceUrl(site.iconId);
-  const [fallbackFailed, setFallbackFailed] = useState(false);
-  useEffect(() => setFallbackFailed(false), [site.url]);
-  const brandIcon = getBrandIcon(site.url, site.title);
-
-  return (
-    <span
-      className="w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-[0_6px_20px_rgba(0,0,0,0.22)] ring-1 ring-white/20 transition-all duration-200 group-hover:scale-105 group-hover:shadow-[0_10px_28px_rgba(0,0,0,0.32)] overflow-hidden"
-      style={{ background: site.color, color: readableTextColor(site.color) }}
-    >
-      {url && !fallbackFailed ? (
-        <img
-          src={url}
-          alt={site.title}
-          className="w-full h-full object-cover"
-          onError={() => setFallbackFailed(true)}
-        />
-      ) : brandIcon ? (
-        brandIcon
-      ) : (
-        site.title.slice(0, 1).toUpperCase()
-      )}
-    </span>
   );
 }
 
@@ -507,15 +490,17 @@ function NavigationManager({
                   />
                   {space.desktops.length > 1 && desktop.id !== activeDesktopId && (
                     <button
+                      className="manager-icon-button"
                       aria-label={`${tr('删除桌面')} ${desktop.name}`}
-                      onClick={() =>
+                      onClick={() => {
+                        if (!window.confirm(`${tr('确定删除桌面？')}\n${desktop.name}`)) return;
                         void run({
                           type: 'delete-desktop',
                           spaceId,
                           id: desktop.id,
                           destinationDesktopId: activeDesktopId,
-                        })
-                      }
+                        });
+                      }}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -524,8 +509,18 @@ function NavigationManager({
               ))}
             </div>
             <form className="manager-add flex gap-2 mt-2" onSubmit={addDesktop}>
-              <Input name="name" placeholder={tr('新桌面名称')} required maxLength={80} className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5" />
-              <Button type="submit" size="sm" className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0">
+              <Input
+                name="name"
+                placeholder={tr('新桌面名称')}
+                required
+                maxLength={80}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0"
+              >
                 <Plus size={15} />
                 {tr('新增')}
               </Button>
@@ -638,10 +633,12 @@ function NavigationManager({
                     )}
                     {!category.isDefault && (
                       <button
+                        className="manager-icon-button"
                         aria-label={`${tr('删除分类')} ${category.name}`}
-                        onClick={() =>
-                          void run({ type: 'delete-category', spaceId, id: category.id })
-                        }
+                        onClick={() => {
+                          if (!window.confirm(`${tr('确定删除分类？')}\n${category.name}`)) return;
+                          void run({ type: 'delete-category', spaceId, id: category.id });
+                        }}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -651,10 +648,26 @@ function NavigationManager({
             </div>
             <form className="manager-add flex items-center gap-2 mt-2" onSubmit={addCategory}>
               <div className="flex items-center justify-center w-8 h-8 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 shrink-0 overflow-hidden">
-                <input name="color" type="color" defaultValue="#3b82f6" aria-label={tr('分类颜色')} className="w-9 h-9 -m-1 border-0 cursor-pointer p-0 bg-transparent" />
+                <input
+                  name="color"
+                  type="color"
+                  defaultValue="#3b82f6"
+                  aria-label={tr('分类颜色')}
+                  className="w-9 h-9 -m-1 border-0 cursor-pointer p-0 bg-transparent"
+                />
               </div>
-              <Input name="name" placeholder={tr('新分类名称')} required maxLength={80} className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5" />
-              <Button type="submit" size="sm" className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0">
+              <Input
+                name="name"
+                placeholder={tr('新分类名称')}
+                required
+                maxLength={80}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                className="rounded-xl px-3.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs shrink-0"
+              >
                 <Plus size={15} />
                 {tr('新增')}
               </Button>
@@ -721,15 +734,30 @@ function SiteEditor({
   const site = editor.site;
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
+  const [color, setColor] = useState('#3b82f6');
   const [fetchedIcon, setFetchedIcon] = useState<Blob>();
+  const [uploadedIcon, setUploadedIcon] = useState<File>();
+  const [previewIconUrl, setPreviewIconUrl] = useState<string>();
   const [fetching, setFetching] = useState(false);
   useEffect(() => {
     if (!editor.open) return;
     setTitle(site?.title ?? '');
     setUrl(site?.url ?? '');
+    setColor(site?.color ?? '#3b82f6');
     setFetchedIcon(undefined);
+    setUploadedIcon(undefined);
     setFetching(false);
   }, [editor.open, site]);
+  useEffect(() => {
+    const image = uploadedIcon ?? fetchedIcon;
+    if (!image) {
+      setPreviewIconUrl(undefined);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(image);
+    setPreviewIconUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [fetchedIcon, uploadedIcon]);
 
   const autoFetch = async () => {
     if (!url.trim()) return onError(tr('请先输入网址'));
@@ -748,8 +776,7 @@ function SiteEditor({
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     try {
-      const icon = data.get('icon');
-      const image = icon instanceof File && icon.size ? icon : fetchedIcon;
+      const image = uploadedIcon ?? fetchedIcon;
       const prepared = image ? await prepareImage(image, 'icon') : undefined;
       await dispatch(
         {
@@ -761,7 +788,7 @@ function SiteEditor({
           site: {
             title,
             url,
-            color: String(data.get('color')),
+            color,
             iconId: prepared?.id ?? site?.iconId,
           },
         },
@@ -785,12 +812,16 @@ function SiteEditor({
           </DialogHeader>
           <div className="editor-layout">
             <aside className="editor-preview" aria-hidden="true">
-              <span
-                className="editor-preview-icon"
-                style={{ background: site?.color ?? '#4f7c68' }}
-              >
-                {title.trim().slice(0, 1).toUpperCase() || <Globe2 size={28} />}
-              </span>
+              <SiteIcon
+                site={{
+                  title: title.trim() || tr('添加网站'),
+                  url,
+                  color,
+                  iconId: site?.iconId,
+                }}
+                previewUrl={previewIconUrl}
+                size="preview"
+              />
               <strong>{title.trim() || tr('添加网站')}</strong>
               <small>{url.trim() || 'example.com'}</small>
             </aside>
@@ -852,20 +883,24 @@ function SiteEditor({
                     <input
                       name="color"
                       type="color"
-                      defaultValue={site?.color ?? '#3b82f6'}
+                      value={color}
+                      onChange={(event) => setColor(event.currentTarget.value)}
                       className="w-6 h-6 rounded-lg border-0 cursor-pointer bg-transparent p-0"
                     />
-                    <span className="text-[11px] text-slate-500 font-mono">自定义颜色</span>
+                    <span className="text-[11px] text-slate-500 font-mono">{tr('自定义颜色')}</span>
                   </div>
                 </label>
                 <label className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                   {tr('自定义图标')}
                   <div className="relative flex items-center h-9 px-2.5 rounded-xl border border-dashed border-black/15 dark:border-white/20 bg-black/[0.02] dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer overflow-hidden">
-                    <span className="text-[11px] text-slate-500 truncate">{tr('点击上传图片')}</span>
+                    <span className="text-[11px] text-slate-500 truncate">
+                      {tr('点击上传图片')}
+                    </span>
                     <input
                       name="icon"
                       type="file"
                       accept="image/png,image/jpeg,image/webp"
+                      onChange={(event) => setUploadedIcon(event.currentTarget.files?.[0])}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
                   </div>
@@ -879,11 +914,12 @@ function SiteEditor({
                 type="button"
                 variant="destructive"
                 className="rounded-xl px-4 py-2 cursor-pointer mr-auto"
-                onClick={() =>
+                onClick={() => {
+                  if (!window.confirm(`${tr('确定删除网站？')}\n${site.title}`)) return;
                   void dispatch({ type: 'delete-site', spaceId, id: site.id })
                     .then(onClose)
-                    .catch((error: Error) => onError(error.message))
-                }
+                    .catch((error: Error) => onError(error.message));
+                }}
               >
                 <Trash2 size={15} />
                 {tr('删除')}
@@ -912,13 +948,4 @@ function SiteEditor({
 
 function byOrder(a: { order: number; id: string }, b: { order: number; id: string }) {
   return a.order - b.order || a.id.localeCompare(b.id);
-}
-
-function readableTextColor(color: string) {
-  const hex = color.match(/^#([\da-f]{6})$/i)?.[1];
-  if (!hex) return '#ffffff';
-  const [red, green, blue] = [0, 2, 4].map((index) =>
-    Number.parseInt(hex.slice(index, index + 2), 16),
-  );
-  return red * 0.299 + green * 0.587 + blue * 0.114 > 168 ? '#243b34' : '#ffffff';
 }

@@ -1,86 +1,158 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
+import {
+  siBaidu,
+  siBilibili,
+  siDuckduckgo,
+  siGithub,
+  siSinaweibo,
+  siYoutube,
+  type SimpleIcon,
+} from 'simple-icons';
+import { IconFrame } from '@/components/ui/icon-frame';
 
-/**
- * 常用网站高清品牌矢量徽标（SVG）
- * 解决原生首字母单色方块死板粗糙问题，提供 Apple / iTab 级精致视觉
- */
+const brandMatchers: Array<{ matches: string[]; icon: SimpleIcon }> = [
+  { matches: ['github'], icon: siGithub },
+  { matches: ['youtube'], icon: siYoutube },
+  { matches: ['bilibili', '哔哩', 'b站'], icon: siBilibili },
+  { matches: ['weibo', '微博'], icon: siSinaweibo },
+  { matches: ['baidu', '百度'], icon: siBaidu },
+  { matches: ['duckduckgo'], icon: siDuckduckgo },
+];
+
+function SimpleBrandIcon({ icon, className }: { icon: SimpleIcon; className: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill={`#${icon.hex}`} aria-hidden="true">
+      <path d={icon.path} />
+    </svg>
+  );
+}
+
+function GoogleIcon({ className }: { className: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+      />
+    </svg>
+  );
+}
+
+function BingIcon({ className }: { className: string }) {
+  // Microsoft Bing Fluent mark. Preserve the official paths, colors, and vertical proportions.
+  const gradientId = useId().replaceAll(':', '');
+  const stemGradient = `${gradientId}-bing-stem`;
+  const baseGradient = `${gradientId}-bing-base`;
+  const loopGradient = `${gradientId}-bing-loop`;
+
+  return (
+    <svg className={className} viewBox="0 0 678 1024" fill="none" aria-hidden="true">
+      <path
+        fill={`url(#${stemGradient})`}
+        d="M0 778.3c14.6 123.8 223.8 143 236.8 79.9-.3-.4-.5-678.1-.5-678.1-3.6-46-26.2-72-61.6-96.5-33-22.7-74.4-50.4-96.9-66.4C14.2-28 .1 31.4 0 33.2c0 0 .3 746.4 0 745.1z"
+      />
+      <path
+        fill={`url(#${baseGradient})`}
+        d="M236.8 832.8c-96.2 72.5-217 42.7-234.4-44-.8-4.2-2.4-10.4-2.4-10.4s.9 8.5 2 16.6c1.2 8.5 3.7 20.8 6.3 31.3 30 117.8 132.1 186 230.4 196.6C373.3 1034.8 497.4 931 599 855.8c6.3-6.2 15.4-16.2 18.1-20.1 66.2-95-13.6-197-72.5-193a59154 59154 0 0 0-307.7 190.1Z"
+      />
+      <path
+        fill={`url(#${loopGradient})`}
+        fillRule="evenodd"
+        d="M312.8 381c7.4 47 34.6 108.7 59.6 172.6 20.2 41.3 62 53.4 103 65.5 42.4 12.6 65.6 21 85.6 30.9 138.5 68.7 38.5 207.7 59.6 181.4 89-110.7 79.7-325.4-90-418.1-57.6-28.7-115.4-66.6-156.5-83.6-41-17-68.7 4.3-61.3 51.3z"
+        clipRule="evenodd"
+      />
+      <defs>
+        <radialGradient
+          id={loopGradient}
+          cx="0"
+          cy="0"
+          r="1"
+          gradientTransform="matrix(-347 -399.3 287.3 -249.8 655 722)"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#00CACC" />
+          <stop offset="1" stopColor="#048FCE" />
+        </radialGradient>
+        <radialGradient
+          id={baseGradient}
+          cx="0"
+          cy="0"
+          r="1"
+          gradientTransform="matrix(526 -225.4 375.6 876.6 88.8 915.1)"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#00BBEC" />
+          <stop offset="1" stopColor="#2756A9" />
+        </radialGradient>
+        <linearGradient
+          id={stemGradient}
+          x1="118.4"
+          x2="118.4"
+          y1="0"
+          y2="884.4"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#00BBEC" />
+          <stop offset="1" stopColor="#2756A9" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
+export function getSearchEngineIcon(id: string, name: string): ReactNode {
+  const key = `${id} ${name}`.toLowerCase();
+  if (key.includes('google'))
+    return (
+      <IconFrame size="search">
+        <GoogleIcon className="brand-icon-glyph brand-icon-glyph--google" />
+      </IconFrame>
+    );
+  if (key.includes('bing') || key.includes('必应'))
+    return (
+      <IconFrame size="search">
+        <BingIcon className="brand-icon-glyph brand-icon-glyph--bing" />
+      </IconFrame>
+    );
+  const match = brandMatchers.find(({ matches }) => matches.some((value) => key.includes(value)));
+  if (match)
+    return (
+      <IconFrame size="search">
+        <SimpleBrandIcon icon={match.icon} className="brand-icon-glyph" />
+      </IconFrame>
+    );
+  return (
+    <IconFrame size="search">
+      <span className="search-engine-fallback">{name.slice(0, 1).toUpperCase()}</span>
+    </IconFrame>
+  );
+}
+
 export function getBrandIcon(url: string, title: string): ReactNode | null {
-  const host = (() => {
+  const key = (() => {
     try {
-      return new URL(url).hostname.toLowerCase();
+      return `${new URL(url).hostname} ${title}`.toLowerCase();
     } catch {
       return title.toLowerCase();
     }
   })();
-  const name = title.toLowerCase();
 
-  // GitHub
-  if (host.includes('github') || name.includes('github')) {
-    return (
-      <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
-      </svg>
-    );
-  }
-
-  // Google
-  if (host.includes('google') || name.includes('google')) {
-    return (
-      <svg className="w-6 h-6" viewBox="0 0 24 24">
-        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-      </svg>
-    );
-  }
-
-  // YouTube
-  if (host.includes('youtube') || name.includes('youtube')) {
-    return (
-      <svg className="w-6 h-6" viewBox="0 0 24 24">
-        <path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z" />
-        <path fill="#FFFFFF" d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-      </svg>
-    );
-  }
-
-  // Bilibili 哔哩哔哩
-  if (host.includes('bilibili') || name.includes('哔哩') || name.includes('b站')) {
-    return (
-      <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M17.813 4.653h.854c1.51 0 2.733 1.224 2.733 2.734v9.226a2.734 2.734 0 0 1-2.733 2.734H5.333a2.734 2.734 0 0 1-2.733-2.734V7.387a2.734 2.734 0 0 1 2.733-2.734h.854L4.85 3.316a.75.75 0 0 1 1.06-1.061l2.457 2.457c.362-.039.73-.059 1.103-.059h5.06c.373 0 .74.02 1.103.059l2.457-2.457a.75.75 0 0 1 1.06 1.06l-1.337 1.338zm-12.48 2.734a1.234 1.234 0 0 0-1.233 1.234v9.226c0 .682.552 1.234 1.233 1.234h12.334c.681 0 1.233-.552 1.233-1.234V8.62a1.234 1.234 0 0 0-1.233-1.234H5.333zm3.167 4.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zm7 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z" />
-      </svg>
-    );
-  }
-
-  // Weibo 微博
-  if (host.includes('weibo') || name.includes('微博')) {
-    return (
-      <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M10.08 19.34c-4.4 0-8-2.61-8-5.83 0-1.89 1.27-3.56 3.25-4.66.42-.23.85.22.61.64-.78 1.35-.61 2.87.53 3.84 1.48 1.26 4.09 1.35 6.06.27.4-.22.82.19.61.6-.57 1.12-1.37 2.14-3.06 2.14zm4.18-7.98c-.28-.09-.45-.37-.41-.65.17-1.1-.38-2.23-1.38-2.82-.99-.58-2.22-.51-3.08.16-.22.17-.53.15-.71-.05-.18-.21-.15-.52.07-.69 1.2-1 2.92-1.07 4.31-.26 1.39.81 2.15 2.38 1.91 3.91-.04.28-.33.47-.71.4zm2.84.14c-.2-.07-.31-.28-.27-.49.27-1.5-.42-3.04-1.74-3.87-1.32-.82-2.98-.74-4.17.2-.2.16-.5.13-.67-.06-.16-.2-.13-.5.07-.66 1.54-1.2 3.69-1.31 5.38-.26 1.69 1.05 2.58 3.02 2.23 4.94-.04.22-.26.36-.83.2z" />
-      </svg>
-    );
-  }
-
-  // Twitter / X
-  if (host.includes('twitter') || host.includes('x.com') || name === 'x') {
-    return (
-      <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-      </svg>
-    );
-  }
-
-  // Baidu 百度
-  if (host.includes('baidu') || name.includes('百度')) {
-    return (
-      <svg className="w-6 h-6" viewBox="0 0 24 24">
-        <rect width="24" height="24" rx="6" fill="#2932E1" />
-        <path fill="#fff" d="M12.5 6.2c.4 1.1-.3 2.3-1.5 2.6-1.1.4-2.3-.3-2.6-1.5-.4-1.1.3-2.3 1.5-2.6 1.2-.4 2.3.3 2.6 1.5zm3.7 2c.2.8-.2 1.7-1 1.9-.8.2-1.7-.2-1.9-1-.2-.8.2-1.7 1-1.9.8-.3 1.7.2 1.9 1zm-8.3.1c.3.8-.1 1.7-.9 1.9-.8.3-1.7-.1-1.9-.9-.3-.8.1-1.7.9-1.9.8-.3 1.6.1 1.9.9zm4.2 3.1c-2.3 0-3.6 1.3-3.6 2.8 0 1.9 2 2.6 3.6 2.6 1.8 0 3.6-.8 3.6-2.6 0-1.6-1.3-2.8-3.6-2.8z" />
-      </svg>
-    );
-  }
-
-  return null;
+  if (key.includes('google'))
+    return <GoogleIcon className="brand-icon-glyph brand-icon-glyph--google" />;
+  if (key.includes('bing') || key.includes('必应'))
+    return <BingIcon className="brand-icon-glyph brand-icon-glyph--bing" />;
+  const match = brandMatchers.find(({ matches }) => matches.some((value) => key.includes(value)));
+  return match ? <SimpleBrandIcon icon={match.icon} className="brand-icon-glyph" /> : null;
 }

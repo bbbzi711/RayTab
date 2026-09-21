@@ -8,7 +8,8 @@ export function Background({ settings }: { settings: SpaceSettings }) {
   const remoteImage = ['bing', 'unsplash', 'custom'].includes(settings.background)
     ? settings.onlineWallpaperUrl
     : undefined;
-  const requestedImage = image ?? remoteImage ?? (settings.background === 'custom' ? DEFAULT_WALLPAPER_URL : undefined);
+  const requestedImage =
+    image ?? remoteImage ?? (settings.background === 'custom' ? DEFAULT_WALLPAPER_URL : undefined);
   const [loadedImage, setLoadedImage] = useState<string>();
   useEffect(() => {
     if (!requestedImage) {
@@ -26,7 +27,12 @@ export function Background({ settings }: { settings: SpaceSettings }) {
     };
   }, [requestedImage]);
   const isLegacyGreen = settings.solidColor === '#193540';
-  const effectiveBgColor = settings.background === 'color' ? settings.solidColor : isLegacyGreen ? 'transparent' : settings.solidColor;
+  const effectiveBgColor =
+    settings.background === 'color'
+      ? settings.solidColor
+      : isLegacyGreen
+        ? 'transparent'
+        : settings.solidColor;
 
   return (
     <div

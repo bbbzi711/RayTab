@@ -50,9 +50,10 @@ export const Clock = memo(function Clock({
     weekday: 'short',
   });
   // 转换形如 "9月20日 星期日"
-  const formattedDate = language === 'zh-CN'
-    ? `${now.getMonth() + 1}月${now.getDate()}日 ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`
-    : dateStr;
+  const formattedDate =
+    language === 'zh-CN'
+      ? `${now.getMonth() + 1}月${now.getDate()}日 ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`
+      : dateStr;
 
   return (
     <section
