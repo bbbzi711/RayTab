@@ -26,6 +26,7 @@ export function SearchBar({
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (document.querySelector('[role="dialog"]')) return;
       const target = event.target as HTMLElement | null;
       if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
       event.preventDefault();

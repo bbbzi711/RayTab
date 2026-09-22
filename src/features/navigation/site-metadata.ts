@@ -54,7 +54,21 @@ export async function fetchSiteIcon(iconUrl?: string) {
     const response = await fetch(iconUrl, { credentials: 'omit' });
     if (!response.ok) return undefined;
     const blob = await response.blob();
-    return ['image/png', 'image/jpeg', 'image/webp'].includes(blob.type) ? blob : undefined;
+    const type = blob.type.toLowerCase();
+    const isImage =
+      type.startsWith('image/') ||
+      ['image/x-icon', 'image/vnd.microsoft.icon', 'image/svg+xml'].includes(type) ||
+      /\.(ico|png|jpe?g|webp|svg)(\?.*)?$/i.test(iconUrl);
+    if (!isImage) return undefined;
+    const normalizedType =
+      type && type !== 'application/octet-stream'
+        ? type
+        : /\.(ico)(\?.*)?$/i.test(iconUrl)
+          ? 'image/x-icon'
+          : /\.(svg)(\?.*)?$/i.test(iconUrl)
+            ? 'image/svg+xml'
+            : blob.type;
+    return normalizedType === blob.type ? blob : new Blob([blob], { type: normalizedType });
   } catch {
     return undefined;
   }

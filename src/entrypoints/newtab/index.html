@@ -1,10 +1,17 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="preload">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#233e42" />
+    <meta name="theme-color" content="#0b0f19" />
     <title>RayTab</title>
+    <script>
+      try {
+        const meta = JSON.parse(localStorage.getItem('raytab-quick-meta') || '{}');
+        if (meta.theme) document.documentElement.dataset.theme = meta.theme;
+        if (meta.homeMode) document.documentElement.dataset.homeMode = meta.homeMode;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

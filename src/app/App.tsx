@@ -44,6 +44,13 @@ export default function App() {
   const rootTheme = state ? effectiveSettings(state, state.local.activeSpace).theme : undefined;
   const rootHomeMode = state?.local.homeMode;
   useEffect(() => {
+    // 确保首帧完成初始绘制后移除 preload，恢复后续正常的平滑交互动效
+    const raf = requestAnimationFrame(() => {
+      document.documentElement.classList.remove('preload');
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  useEffect(() => {
     if (!rootTheme || !rootHomeMode) return;
     document.documentElement.dataset.theme = rootTheme;
     document.documentElement.dataset.homeMode = rootHomeMode;

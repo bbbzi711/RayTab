@@ -1096,7 +1096,7 @@ function SiteEditor({
                     <input
                       name="icon"
                       type="file"
-                      accept="image/png,image/jpeg,image/webp"
+                      accept="image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.ico,.svg"
                       onChange={(event) => setUploadedIcon(event.currentTarget.files?.[0])}
                       className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     />
