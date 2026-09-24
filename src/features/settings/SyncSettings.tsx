@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CloudCog, GitBranch, Server } from 'lucide-react';
+import { CloudCog, GitBranch, RefreshCw, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import {
   clearSyncConfig,
   loadSyncConfig,
@@ -13,6 +15,7 @@ import {
 import type { SyncConnection } from '@/sync/providers';
 import { refresh } from '@/storage/store';
 import { t, type Language } from '@/locales';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type SyncDraft = {
   type: SyncConnection['type'];
@@ -78,6 +81,7 @@ export function SyncSettings({
   onError: (message: string) => void;
 }) {
   const tr = (text: string) => t(language, text);
+  const [confirm, confirmDialog] = useConfirm();
   const [draft, setDraft] = useState<SyncDraft>(emptyDraft);
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState<SyncStatus>({ conflicts: [] });
@@ -142,7 +146,14 @@ export function SyncSettings({
     }
   };
   const disconnect = async () => {
-    if (!confirm(tr('清除当前同步连接？'))) return;
+    const ok = await confirm({
+      title: tr('清除当前同步连接？'),
+      description: tr('将清除本机的同步配置，已同步到云端的数据不受影响。'),
+      confirmText: tr('清除'),
+      cancelText: tr('取消'),
+      variant: 'destructive',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await clearSyncConfig();
@@ -196,45 +207,49 @@ export function SyncSettings({
           {draft.type === 'webdav' ? <Server size={16} /> : <GitBranch size={16} />}
           {tr('服务')}
         </span>
-        <select
+        <Select
+          containerClassName="w-48"
           value={draft.type}
           onChange={(event) => update('type', event.target.value as SyncConnection['type'])}
         >
           <option value="webdav">WebDAV</option>
           <option value="github">GitHub {tr('仓库')}</option>
           <option value="gitee">Gitee {tr('仓库')}</option>
-        </select>
+        </Select>
       </label>
       {draft.type === 'webdav' ? (
         <>
           <label>
             {tr('文件地址')}
-            <input
+            <Input
               name="url"
               type="url"
               required
               placeholder="https://dav.example.com/raytab.json"
               value={draft.url}
               onChange={(event) => update('url', event.target.value)}
+              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
           <label>
             {tr('用户名')}
-            <input
+            <Input
               name="username"
               autoComplete="username"
               value={draft.username}
               onChange={(event) => update('username', event.target.value)}
+              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
           <label>
             {tr('密码')}
-            <input
+            <Input
               name="password"
               type="password"
               autoComplete="current-password"
               value={draft.password}
               onChange={(event) => update('password', event.target.value)}
+              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
         </>
@@ -242,49 +257,54 @@ export function SyncSettings({
         <>
           <label>
             {tr('访问令牌')}
-            <input
+            <Input
               name="token"
               type="password"
               required
               value={draft.token}
               onChange={(event) => update('token', event.target.value)}
+              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
           <div className="sync-pair">
             <label>
               {tr('所有者')}
-              <input
+              <Input
                 name="owner"
                 required
                 value={draft.owner}
                 onChange={(event) => update('owner', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
               />
             </label>
             <label>
               {tr('仓库')}
-              <input
+              <Input
                 name="repo"
                 required
                 value={draft.repo}
                 onChange={(event) => update('repo', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
               />
             </label>
           </div>
           <label>
             {tr('文件路径')}
-            <input
+            <Input
               name="path"
               value={draft.path}
               onChange={(event) => update('path', event.target.value)}
               required
+              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
           <label>
             {tr('分支（可选）')}
-            <input
+            <Input
               name="branch"
               value={draft.branch}
               onChange={(event) => update('branch', event.target.value)}
+              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
         </>
@@ -309,25 +329,33 @@ export function SyncSettings({
       </label>
       <label>
         {tr('私密同步密码（启用私密空间时）')}
-        <input
+        <Input
           name="privatePassword"
           type="password"
           minLength={6}
           value={draft.privatePassword}
           onChange={(event) => update('privatePassword', event.target.value)}
+          className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
         />
       </label>
-      <Button type="submit" size="sm" disabled={busy}>
+      <Button
+        type="submit"
+        size="sm"
+        disabled={busy}
+        className="w-full h-9 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs transition-all"
+      >
         {busy ? tr('同步中…') : tr('保存并同步')}
       </Button>
-      <div className="data-actions">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button
           type="button"
           size="sm"
           variant="outline"
           disabled={busy}
+          className="rounded-xl border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground cursor-pointer font-medium"
           onClick={() => void run('auto')}
         >
+          <RefreshCw size={13} className={busy ? 'spin' : ''} />
           {tr('双向同步')}
         </Button>
         <Button
@@ -335,6 +363,7 @@ export function SyncSettings({
           size="sm"
           variant="outline"
           disabled={busy}
+          className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
           onClick={() => void run('push')}
         >
           {tr('本机覆盖云端')}
@@ -344,6 +373,7 @@ export function SyncSettings({
           size="sm"
           variant="outline"
           disabled={busy}
+          className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
           onClick={() => void run('pull')}
         >
           {tr('云端恢复本机')}
@@ -352,8 +382,9 @@ export function SyncSettings({
           <Button
             type="button"
             size="sm"
-            variant="outline"
+            variant="ghost"
             disabled={busy}
+            className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer ml-auto text-xs"
             onClick={() => void disconnect()}
           >
             {tr('清除连接')}
@@ -415,6 +446,7 @@ export function SyncSettings({
           ))}
         </section>
       )}
+      {confirmDialog}
     </form>
   );
 }

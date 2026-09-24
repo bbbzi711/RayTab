@@ -9,3 +9,4 @@ artifacts/
 !.env.example
 /docs/plan/
 /public/THIRD_PARTY_NOTICES.txt
+.DS_Store

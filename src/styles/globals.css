@@ -19,9 +19,10 @@
   background-position: center;
   background-size: cover;
 }
-.page-background > div {
+.page-background-overlay {
   position: absolute;
   inset: 0;
+  pointer-events: none;
 }
 .page-background-image {
   position: absolute;
@@ -336,7 +337,7 @@
   text-rendering: optimizeLegibility;
 }
 [data-home-mode='navigation'] {
-  --dialog-center-offset: 28px;
+  --dialog-center-offset: 0px;
 }
 [data-theme='dark'] {
   --background: #111827;

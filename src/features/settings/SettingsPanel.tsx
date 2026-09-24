@@ -159,6 +159,27 @@ export default function SettingsPanel({
                     onChange={(navigationCollapsed) => update({ navigationCollapsed })}
                   />
                 </SettingsSection>
+                <SettingsSection title={tr('侧边栏')}>
+                  <Segmented
+                    label={tr('侧边栏显示')}
+                    value={settings.sidebarMode ?? 'always'}
+                    options={[
+                      ['always', tr('常驻显示')],
+                      ['auto', tr('自动隐藏')],
+                      ['hidden', tr('完全隐藏')],
+                    ]}
+                    onChange={(sidebarMode) =>
+                      update({ sidebarMode: sidebarMode as SpaceSettings['sidebarMode'] })
+                    }
+                  />
+                  <p className="text-[12px] text-[var(--dialog-muted)] -mt-1 leading-relaxed">
+                    {settings.sidebarMode === 'auto' &&
+                      tr('鼠标移至屏幕左侧边缘自动滑出，移开后平滑收起。')}
+                    {settings.sidebarMode === 'hidden' &&
+                      tr('侧边栏完全收起，可通过左下角触点或快捷键唤出。')}
+                    {settings.sidebarMode === 'always' && tr('侧边栏固定停靠在屏幕左侧。')}
+                  </p>
+                </SettingsSection>
                 <SettingsSection title={tr('外观')}>
                   <Segmented
                     label={tr('主题')}
@@ -849,6 +870,7 @@ const settingLabels: Partial<Record<keyof SpaceSettings, string>> = {
   showCardBackground: '卡片背景',
   cardOpacity: '卡片透明度',
   navigationCollapsed: '分类导航',
+  sidebarMode: '侧边栏',
   background: '背景',
   gradient: '渐变',
   solidColor: '纯色',

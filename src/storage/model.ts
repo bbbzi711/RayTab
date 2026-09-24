@@ -102,6 +102,7 @@ export const spaceSettingsSchema = z.object({
   showCardBackground: z.boolean(),
   cardOpacity: z.number().min(0.05).max(0.95),
   navigationCollapsed: z.boolean(),
+  sidebarMode: z.enum(['always', 'auto', 'hidden']).default('always'),
   background: z.enum(['gradient', 'bing', 'unsplash', 'custom', 'color']),
   gradient: z.string().max(300),
   solidColor: colorSchema,
@@ -151,9 +152,10 @@ export const rayStateSchema = z
     revision: z.number().int().nonnegative(),
     spaces: z.object({ normal: spaceDataSchema, private: spaceDataSchema }),
     normalSettings: spaceSettingsSchema,
-    privateSettingOverrides: spaceSettingsSchema
-      .partial()
-      .extend({ language: z.enum(['zh-CN', 'en']).optional() }),
+    privateSettingOverrides: spaceSettingsSchema.partial().extend({
+      language: z.enum(['zh-CN', 'en']).optional(),
+      sidebarMode: z.enum(['always', 'auto', 'hidden']).optional(),
+    }),
     privateSecurity: z.object({ protected: z.boolean(), locked: z.boolean() }),
     local: localStateSchema,
   })
@@ -213,6 +215,7 @@ export const defaultSettings: SpaceSettings = {
   showCardBackground: false,
   cardOpacity: 0.2,
   navigationCollapsed: false,
+  sidebarMode: 'always',
   background: 'custom',
   gradient: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)',
   solidColor: '#0b0f19',

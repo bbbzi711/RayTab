@@ -59,7 +59,10 @@ export function Background({ settings }: { settings: SpaceSettings }) {
           style={{ backgroundImage: `url("${loadedImage}")` }}
         />
       )}
-      <div style={{ background: `rgba(0,0,0,${settings.overlay})` }} />
+      <div
+        className="page-background-overlay"
+        style={{ backgroundColor: `rgba(0,0,0,${settings.overlay})` }}
+      />
     </div>
   );
 }

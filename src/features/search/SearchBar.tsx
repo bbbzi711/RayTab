@@ -5,6 +5,7 @@ import type { SpaceId, SpaceSettings } from '@/storage/model';
 import { t } from '@/locales';
 import { cn } from '@/lib/utils';
 import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
+import { Tooltip } from '@/components/ui/tooltip';
 
 export function SearchBar({
   settings,
@@ -94,36 +95,37 @@ export function SearchBar({
     >
       {/* 自定义毛玻璃引擎切换器（彻底消灭原生白底 select） */}
       <div className="relative flex shrink-0">
-        <button
-          ref={triggerRef}
-          type="button"
-          className="search-engine-trigger"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-            event.preventDefault();
-            setMenuOpen(true);
-            const selectedIndex = settings.searchEngines.findIndex(
-              (engine) => engine.id === settings.searchEngine,
-            );
-            requestAnimationFrame(() =>
-              focusEngine(
-                event.key === 'ArrowUp' ? settings.searchEngines.length - 1 : selectedIndex,
-              ),
-            );
-          }}
-          aria-label={tr('切换搜索引擎')}
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          title={tr('切换搜索引擎')}
-        >
-          {getSearchEngineIcon(currentEngine.id, currentEngine.name)}
-          <ChevronDown
-            size={13}
-            aria-hidden="true"
-            className={cn('search-engine-chevron', menuOpen && 'search-engine-chevron--open')}
-          />
-        </button>
+        <Tooltip content={tr('切换搜索引擎')} side="bottom" open={menuOpen ? false : undefined}>
+          <button
+            ref={triggerRef}
+            type="button"
+            className="search-engine-trigger"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+              event.preventDefault();
+              setMenuOpen(true);
+              const selectedIndex = settings.searchEngines.findIndex(
+                (engine) => engine.id === settings.searchEngine,
+              );
+              requestAnimationFrame(() =>
+                focusEngine(
+                  event.key === 'ArrowUp' ? settings.searchEngines.length - 1 : selectedIndex,
+                ),
+              );
+            }}
+            aria-label={tr('切换搜索引擎')}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+          >
+            {getSearchEngineIcon(currentEngine.id, currentEngine.name)}
+            <ChevronDown
+              size={13}
+              aria-hidden="true"
+              className={cn('search-engine-chevron', menuOpen && 'search-engine-chevron--open')}
+            />
+          </button>
+        </Tooltip>
 
         {menuOpen && (
           <div
@@ -204,22 +206,26 @@ export function SearchBar({
 
       {/* 一键清空按钮 */}
       {query.length > 0 && (
-        <button
-          type="button"
-          aria-label={tr('清空')}
-          onClick={() => {
-            setQuery('');
-            inputRef.current?.focus();
-          }}
-          className="search-action search-action--clear"
-        >
-          <X size={13} />
-        </button>
+        <Tooltip content={tr('清空')} side="top">
+          <button
+            type="button"
+            aria-label={tr('清空')}
+            onClick={() => {
+              setQuery('');
+              inputRef.current?.focus();
+            }}
+            className="search-action search-action--clear"
+          >
+            <X size={13} />
+          </button>
+        </Tooltip>
       )}
 
-      <button type="submit" aria-label={tr('搜索')} className="search-action">
-        <Search size={17} />
-      </button>
+      <Tooltip content={tr('搜索')} side="bottom">
+        <button type="submit" aria-label={tr('搜索')} className="search-action">
+          <Search size={17} />
+        </button>
+      </Tooltip>
     </form>
   );
 }

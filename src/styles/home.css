@@ -20,18 +20,13 @@ body {
 
 .background-custom {
   background-image:
-    radial-gradient(circle at 18% 18%, rgb(116 190 174 / 38%), transparent 32%),
-    radial-gradient(circle at 82% 22%, rgb(238 179 116 / 34%), transparent 30%),
-    radial-gradient(circle at 66% 86%, rgb(88 123 151 / 36%), transparent 34%),
-    linear-gradient(145deg, #112e31 0%, #304a43 46%, #66564a 100%);
+    radial-gradient(ellipse at 20% 20%, rgba(99, 102, 241, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #0b0f19 0%, #111827 50%, #1e1b4b 100%);
 }
 
 .background-color {
   background-image: none;
-}
-
-.page-background > div {
-  background: rgb(0 0 0 / 18%) !important;
 }
 
 .topbar {

@@ -8,13 +8,19 @@ export default defineConfig({
     default_locale: 'zh_CN',
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',
-    permissions: ['storage', 'alarms', 'activeTab'],
+    permissions: [
+      'storage',
+      'alarms',
+      'activeTab',
+      'favicon',
+      ...(manifestVersion === 2 ? ['https://*/*', 'http://*/*'] : []),
+    ],
     ...(manifestVersion === 3
       ? {
+          host_permissions: ['https://*/*', 'http://*/*'],
           optional_permissions: ['bookmarks'],
-          optional_host_permissions: ['https://*/*', 'http://*/*'],
         }
-      : { optional_permissions: ['bookmarks', 'https://*/*', 'http://*/*'] }),
+      : { optional_permissions: ['bookmarks'] }),
     browser_specific_settings: {
       gecko: {
         id: 'raytab@raytab.app',

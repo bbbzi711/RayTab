@@ -13,19 +13,24 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  Copy,
   ExternalLink,
+  FolderInput,
   Globe2,
   GripVertical,
   Layers3,
   ListTree,
   LoaderCircle,
   MoreHorizontal,
+  Pencil,
   Plus,
   Sparkles,
   Trash2,
+  Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -35,12 +40,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { dispatch } from '@/storage/store';
 import { prepareImage } from '@/lib/images';
 import { effectiveSettings, type RayState, type Site, type SpaceId } from '@/storage/model';
 import { t } from '@/locales';
 import { fetchSiteIcon, fetchSiteMetadata } from './site-metadata';
 import { SiteIcon } from './SiteIcon';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { Tooltip } from '@/components/ui/tooltip';
 
 type Editor = { site?: Site; open: boolean };
 type Translator = (text: string) => string;
@@ -147,7 +165,8 @@ export function NavigationPage({
       });
       return next;
     });
-  const deleteSelectedSites = () => {
+  const [confirm, confirmDialog] = useConfirm();
+  const deleteSelectedSites = async () => {
     const ids = [...selectedSiteIds];
     if (!ids.length) return;
     const names = space.sites
@@ -156,15 +175,44 @@ export function NavigationPage({
       .map((site) => site.title);
     const remainder = ids.length - names.length;
     const summary = `${names.join('、')}${remainder > 0 ? '…' : ''}`;
-    if (!window.confirm(`${tr('确定删除所选网站？')} ${ids.length} ${tr('个网站')}\n${summary}`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: `${tr('确定删除所选网站？')} (${ids.length} ${tr('个网站')})`,
+      description: summary,
+      confirmText: tr('删除'),
+      cancelText: tr('取消'),
+      variant: 'destructive',
+    });
+    if (!ok) return;
     void dispatch({ type: 'delete-sites', spaceId, ids })
       .then(() => {
         setSelectedSiteIds(new Set());
         onError(`${tr('已删除')} ${ids.length} ${tr('个网站')}`);
       })
       .catch((error: Error) => onError(error.message));
+  };
+
+  const handleDeleteSite = async (site: Site) => {
+    const ok = await confirm({
+      title: tr('确定删除网站？'),
+      description: site.title,
+      confirmText: tr('删除'),
+      cancelText: tr('取消'),
+      variant: 'destructive',
+    });
+    if (!ok) return;
+    void dispatch({ type: 'delete-site', spaceId, id: site.id })
+      .then(() => onError(`${tr('已删除')} ${site.title}`))
+      .catch((error: Error) => onError(error.message));
+  };
+
+  const handleMoveCategory = (site: Site, categoryId: string) => {
+    if (site.categoryId === categoryId) return;
+    void dispatch({
+      type: 'move-site',
+      spaceId,
+      id: site.id,
+      categoryId,
+    }).catch((error: Error) => onError(error.message));
   };
 
   return (
@@ -307,9 +355,13 @@ export function NavigationPage({
         manageMode={manageMode}
         selectedSiteIds={selectedSiteIds}
         tr={tr}
+        categories={categories}
         onToggleSelection={toggleSiteSelection}
         onEdit={(site) => setEditor({ open: true, site })}
         onAdd={() => setEditor({ open: true })}
+        onDeleteSite={handleDeleteSite}
+        onMoveCategory={handleMoveCategory}
+        onCopyUrl={() => onError(tr('已复制网址到剪贴板'))}
       />
 
       <SiteEditor
@@ -328,6 +380,7 @@ export function NavigationPage({
         onError={onError}
         tr={tr}
       />
+      {confirmDialog}
     </section>
   );
 }
@@ -345,9 +398,13 @@ function GridView({
   iconSpacing,
   manageMode,
   selectedSiteIds,
+  categories,
   onToggleSelection,
   onEdit,
   onAdd,
+  onDeleteSite,
+  onMoveCategory,
+  onCopyUrl,
   tr,
 }: {
   sites: Site[];
@@ -362,9 +419,13 @@ function GridView({
   iconSpacing: number;
   manageMode: boolean;
   selectedSiteIds: Set<string>;
+  categories: RayState['spaces']['normal']['categories'];
   onToggleSelection: (id: string) => void;
   onEdit: (site: Site) => void;
   onAdd: () => void;
+  onDeleteSite: (site: Site) => void;
+  onMoveCategory: (site: Site, categoryId: string) => void;
+  onCopyUrl: () => void;
   tr: Translator;
 }) {
   const sensors = useSensors(
@@ -409,8 +470,12 @@ function GridView({
               showSiteTitle={showSiteTitle}
               manageMode={manageMode}
               selected={selectedSiteIds.has(site.id)}
+              categories={categories}
               onToggleSelection={onToggleSelection}
               onEdit={onEdit}
+              onDeleteSite={onDeleteSite}
+              onMoveCategory={onMoveCategory}
+              onCopyUrl={onCopyUrl}
               tr={tr}
               key={site.id}
             />
@@ -442,8 +507,12 @@ function DraggableGridSite({
   showSiteTitle,
   manageMode,
   selected,
+  categories,
   onToggleSelection,
   onEdit,
+  onDeleteSite,
+  onMoveCategory,
+  onCopyUrl,
   tr,
 }: {
   site: Site;
@@ -453,15 +522,20 @@ function DraggableGridSite({
   showSiteTitle: boolean;
   manageMode: boolean;
   selected: boolean;
+  categories: RayState['spaces']['normal']['categories'];
   onToggleSelection: (id: string) => void;
   onEdit: (site: Site) => void;
+  onDeleteSite?: (site: Site) => void;
+  onMoveCategory?: (site: Site, categoryId: string) => void;
+  onCopyUrl?: () => void;
   tr: Translator;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `site:${site.id}`,
     disabled: !manageMode,
   });
-  return (
+
+  const cardNode = (
     <article
       ref={setNodeRef}
       className={cn(
@@ -507,34 +581,94 @@ function DraggableGridSite({
           {selected && <Check size={15} />}
         </span>
       )}
-      <button
-        type="button"
-        className={cn(
-          'site-card-action site-card-action--edit',
-          manageMode && 'site-card-action--visible',
-        )}
-        aria-label={`${tr('编辑')} ${site.title}`}
-        title={`${tr('编辑')} ${site.title}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit(site);
-        }}
-      >
-        <MoreHorizontal size={17} />
-      </button>
-      {manageMode && (
+      <Tooltip content={`${tr('编辑')} ${site.title}`} side="top">
         <button
           type="button"
-          className="site-card-action site-card-action--drag site-card-action--visible"
-          aria-label={`${tr('拖动排序')} ${site.title}`}
-          title={`${tr('拖动排序')} ${site.title}`}
-          {...listeners}
-          {...attributes}
+          className={cn(
+            'site-card-action site-card-action--edit',
+            manageMode && 'site-card-action--visible',
+          )}
+          aria-label={`${tr('编辑')} ${site.title}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(site);
+          }}
         >
-          <GripVertical size={17} />
+          <MoreHorizontal size={17} />
         </button>
+      </Tooltip>
+      {manageMode && (
+        <Tooltip content={`${tr('拖动排序')} ${site.title}`} side="top">
+          <button
+            type="button"
+            className="site-card-action site-card-action--drag site-card-action--visible"
+            aria-label={`${tr('拖动排序')} ${site.title}`}
+            {...listeners}
+            {...attributes}
+          >
+            <GripVertical size={17} />
+          </button>
+        </Tooltip>
       )}
     </article>
+  );
+
+  if (manageMode) {
+    return cardNode;
+  }
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{cardNode}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => window.open(site.url, '_blank')}>
+          <ExternalLink size={14} />
+          <span>{tr('在新标签页打开')}</span>
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() => {
+            void navigator.clipboard.writeText(site.url);
+            onCopyUrl?.();
+          }}
+        >
+          <Copy size={14} />
+          <span>{tr('复制网址')}</span>
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => onEdit(site)}>
+          <Pencil size={14} />
+          <span>{tr('编辑网站')}</span>
+        </ContextMenuItem>
+        {categories.length > 1 && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <FolderInput size={14} />
+              <span>{tr('移动到分类')}</span>
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {categories.map((cat) => (
+                <ContextMenuCheckboxItem
+                  key={cat.id}
+                  checked={site.categoryId === cat.id}
+                  onClick={() => onMoveCategory?.(site, cat.id)}
+                >
+                  <span
+                    className="inline-block w-2 h-2 rounded-full mr-1.5 shrink-0"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                  <span>{cat.name}</span>
+                </ContextMenuCheckboxItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onClick={() => onDeleteSite?.(site)}>
+          <Trash2 size={14} />
+          <span>{tr('删除')}</span>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -563,6 +697,7 @@ function NavigationManager({
   onError: (message: string) => void;
   tr: Translator;
 }) {
+  const [confirm, confirmDialog] = useConfirm();
   const space = state.spaces[spaceId];
   const activeDesktopId = state.local.activeDesktop[spaceId];
   const orderedDesktops = [...space.desktops].sort(byOrder);
@@ -617,73 +752,102 @@ function NavigationManager({
                 </div>
               </div>
               <div className="manager-list">
-                {orderedDesktops.map((desktop, index) => (
-                  <div key={desktop.id}>
-                    <button
-                      className={desktop.id === activeDesktopId ? 'active' : ''}
-                      aria-label={`${tr('选择')} ${desktop.name}`}
-                      onClick={() =>
-                        void run({ type: 'select-desktop', spaceId, desktopId: desktop.id })
-                      }
+                {orderedDesktops.map((desktop, index) => {
+                  const isActive = desktop.id === activeDesktopId;
+                  return (
+                    <div
+                      key={desktop.id}
+                      className="flex items-center gap-2.5 p-2 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] transition-colors"
                     >
-                      {tr('选择')}
-                    </button>
-                    <Input
-                      aria-label={`${tr('桌面名称')} ${desktop.name}`}
-                      defaultValue={desktop.name}
-                      maxLength={80}
-                      onBlur={(event) => {
-                        if (event.currentTarget.value.trim() !== desktop.name)
-                          void run({
-                            type: 'save-desktop',
-                            spaceId,
-                            id: desktop.id,
-                            name: event.currentTarget.value,
-                            expected: desktop.updatedAt,
-                          });
-                      }}
-                    />
-                    <OrderButtons
-                      label={desktop.name}
-                      index={index}
-                      length={orderedDesktops.length}
-                      moveUp={() =>
-                        void run({
-                          type: 'move-desktop',
-                          spaceId,
-                          id: desktop.id,
-                          beforeId: orderedDesktops[index - 1]?.id,
-                        })
-                      }
-                      moveDown={() =>
-                        void run({
-                          type: 'move-desktop',
-                          spaceId,
-                          id: desktop.id,
-                          beforeId: orderedDesktops[index + 2]?.id,
-                        })
-                      }
-                      tr={tr}
-                    />
-                    {space.desktops.length > 1 && desktop.id !== activeDesktopId && (
-                      <button
-                        className="manager-icon-button"
-                        aria-label={`${tr('删除桌面')} ${desktop.name}`}
-                        onClick={() => {
-                          if (!window.confirm(`${tr('确定删除桌面？')}\n${desktop.name}`)) return;
-                          void run({
-                            type: 'delete-desktop',
-                            spaceId,
-                            id: desktop.id,
-                            destinationDesktopId: activeDesktopId,
-                          });
-                        }}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isActive ? 'default' : 'outline'}
+                        className={cn(
+                          'h-7.5 px-3 text-xs rounded-lg cursor-pointer shrink-0 transition-all font-medium',
+                          isActive
+                            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
+                            : 'text-muted-foreground hover:text-foreground border-black/10 dark:border-white/15',
+                        )}
+                        aria-label={`${tr('选择')} ${desktop.name}`}
+                        onClick={() =>
+                          void run({ type: 'select-desktop', spaceId, desktopId: desktop.id })
+                        }
                       >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                ))}
+                        {isActive ? (
+                          <span className="flex items-center gap-1">
+                            <Check size={13} strokeWidth={2.5} />
+                            {tr('当前')}
+                          </span>
+                        ) : (
+                          tr('选择')
+                        )}
+                      </Button>
+                      <Input
+                        aria-label={`${tr('桌面名称')} ${desktop.name}`}
+                        defaultValue={desktop.name}
+                        maxLength={80}
+                        className="h-8 flex-1 min-w-0 text-xs rounded-lg border-black/10 dark:border-white/15 bg-transparent"
+                        onBlur={(event) => {
+                          if (event.currentTarget.value.trim() !== desktop.name)
+                            void run({
+                              type: 'save-desktop',
+                              spaceId,
+                              id: desktop.id,
+                              name: event.currentTarget.value,
+                              expected: desktop.updatedAt,
+                            });
+                        }}
+                      />
+                      <OrderButtons
+                        label={desktop.name}
+                        index={index}
+                        length={orderedDesktops.length}
+                        moveUp={() =>
+                          void run({
+                            type: 'move-desktop',
+                            spaceId,
+                            id: desktop.id,
+                            beforeId: orderedDesktops[index - 1]?.id,
+                          })
+                        }
+                        moveDown={() =>
+                          void run({
+                            type: 'move-desktop',
+                            spaceId,
+                            id: desktop.id,
+                            beforeId: orderedDesktops[index + 2]?.id,
+                          })
+                        }
+                        tr={tr}
+                      />
+                      {space.desktops.length > 1 && !isActive && (
+                        <button
+                          className="manager-icon-button hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                          aria-label={`${tr('删除桌面')} ${desktop.name}`}
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: tr('确定删除桌面？'),
+                              description: desktop.name,
+                              confirmText: tr('删除'),
+                              cancelText: tr('取消'),
+                              variant: 'destructive',
+                            });
+                            if (!ok) return;
+                            void run({
+                              type: 'delete-desktop',
+                              spaceId,
+                              id: desktop.id,
+                              destinationDesktopId: activeDesktopId,
+                            });
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <form className="manager-add flex gap-2 mt-2" onSubmit={addDesktop}>
                 <Input
@@ -718,19 +882,57 @@ function NavigationManager({
                   .filter((item) => item.desktopId === activeDesktopId)
                   .sort(byOrder)
                   .map((category, index, orderedCategories) => (
-                    <div key={category.id}>
-                      <span>
-                        <i style={{ background: category.color }} />
-                        {category.isDefault && <small>{tr('默认')}</small>}
-                      </span>
-                      {category.isDefault ? (
-                        <span>{category.name}</span>
-                      ) : (
-                        <>
+                    <div
+                      key={category.id}
+                      className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 p-2 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] transition-colors"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+                        <label
+                          className={cn(
+                            'relative flex items-center justify-center w-6 h-6 rounded-full shrink-0 overflow-hidden border border-black/15 dark:border-white/20 shadow-2xs transition-transform',
+                            !category.isDefault && 'cursor-pointer hover:scale-110',
+                          )}
+                          title={category.isDefault ? undefined : tr('更改颜色')}
+                        >
+                          {!category.isDefault && (
+                            <input
+                              type="color"
+                              defaultValue={category.color}
+                              onChange={(event) =>
+                                void run({
+                                  type: 'save-category',
+                                  spaceId,
+                                  id: category.id,
+                                  desktopId: category.desktopId,
+                                  name: category.name,
+                                  color: event.currentTarget.value,
+                                  showInAll: category.showInAll,
+                                  expected: category.updatedAt,
+                                })
+                              }
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                          )}
+                          <span
+                            className="block w-full h-full rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                        </label>
+                        {category.isDefault ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-xs font-semibold text-foreground">
+                              {category.name}
+                            </span>
+                            <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
+                              {tr('默认')}
+                            </span>
+                          </div>
+                        ) : (
                           <Input
                             aria-label={`${tr('分类名称')} ${category.name}`}
                             defaultValue={category.name}
                             maxLength={80}
+                            className="h-8 flex-1 min-w-0 text-xs rounded-lg border-black/10 dark:border-white/15 bg-transparent"
                             onBlur={(event) => {
                               if (event.currentTarget.value.trim() !== category.name)
                                 void run({
@@ -745,7 +947,14 @@ function NavigationManager({
                                 });
                             }}
                           />
-                          <select
+                        )}
+                      </div>
+
+                      {!category.isDefault && (
+                        <div className="flex items-center gap-2 shrink-0 ml-auto sm:ml-0">
+                          <Select
+                            containerClassName="w-28 shrink-0"
+                            className="h-8 text-xs py-1 pl-2.5 pr-7"
                             aria-label={`${tr('移动分类')} ${category.name}`}
                             value={category.desktopId}
                             onChange={(event) =>
@@ -762,8 +971,9 @@ function NavigationManager({
                                 {desktop.name}
                               </option>
                             ))}
-                          </select>
-                          <label className="manager-toggle">
+                          </Select>
+
+                          <label className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors select-none text-muted-foreground has-checked:text-foreground has-checked:border-primary/30 has-checked:bg-primary/5 shrink-0">
                             <input
                               type="checkbox"
                               checked={category.showInAll}
@@ -779,9 +989,11 @@ function NavigationManager({
                                   expected: category.updatedAt,
                                 })
                               }
+                              className="rounded accent-primary w-3.5 h-3.5 cursor-pointer"
                             />
-                            {tr('全部中显示')}
+                            <span>{tr('全部中显示')}</span>
                           </label>
+
                           <OrderButtons
                             label={category.name}
                             index={index}
@@ -806,20 +1018,25 @@ function NavigationManager({
                             }
                             tr={tr}
                           />
-                        </>
-                      )}
-                      {!category.isDefault && (
-                        <button
-                          className="manager-icon-button"
-                          aria-label={`${tr('删除分类')} ${category.name}`}
-                          onClick={() => {
-                            if (!window.confirm(`${tr('确定删除分类？')}\n${category.name}`))
-                              return;
-                            void run({ type: 'delete-category', spaceId, id: category.id });
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+
+                          <button
+                            className="manager-icon-button hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                            aria-label={`${tr('删除分类')} ${category.name}`}
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: tr('确定删除分类？'),
+                                description: category.name,
+                                confirmText: tr('删除'),
+                                cancelText: tr('取消'),
+                                variant: 'destructive',
+                              });
+                              if (!ok) return;
+                              void run({ type: 'delete-category', spaceId, id: category.id });
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -853,6 +1070,7 @@ function NavigationManager({
             </section>
           </div>
         </div>
+        {confirmDialog}
       </DialogContent>
     </Dialog>
   );
@@ -910,6 +1128,7 @@ function SiteEditor({
   onError: (message: string) => void;
   tr: Translator;
 }) {
+  const [confirm, confirmDialog] = useConfirm();
   const site = editor.site;
   const firstCategory = categories.find((item) => !item.isDefault) ?? categories[0];
   const [title, setTitle] = useState('');
@@ -947,7 +1166,7 @@ function SiteEditor({
     try {
       const metadata = await fetchSiteMetadata(url);
       setTitle(metadata.title);
-      setFetchedIcon(await fetchSiteIcon(metadata.iconUrl));
+      setFetchedIcon(await fetchSiteIcon(metadata.iconUrl, url));
     } catch (error) {
       onError((error as Error).message);
     } finally {
@@ -990,12 +1209,21 @@ function SiteEditor({
     color !== initialColor ||
     categoryId !== initialCategoryId ||
     Boolean(fetchedIcon || uploadedIcon);
-  const requestClose = () => {
-    if (isDirty && !window.confirm(tr('放弃未保存的更改？'))) return;
+  const requestClose = async () => {
+    if (isDirty) {
+      const ok = await confirm({
+        title: tr('放弃未保存的更改？'),
+        description: tr('当前所做的修改将不会被保存。'),
+        confirmText: tr('放弃更改'),
+        cancelText: tr('继续编辑'),
+        variant: 'destructive',
+      });
+      if (!ok) return;
+    }
     onClose();
   };
   return (
-    <Dialog open={editor.open} onOpenChange={(open) => !open && requestClose()}>
+    <Dialog open={editor.open} onOpenChange={(open) => !open && void requestClose()}>
       <DialogContent variant="workspace" className="site-editor-workspace" closeLabel={tr('关闭')}>
         <form className="site-editor-form" onSubmit={submit}>
           <DialogHeader className="site-editor-header">
@@ -1060,7 +1288,7 @@ function SiteEditor({
               </label>
               <label>
                 {tr('分类')}
-                <select
+                <Select
                   name="categoryId"
                   value={categoryId}
                   onChange={(event) => setCategoryId(event.currentTarget.value)}
@@ -1071,28 +1299,34 @@ function SiteEditor({
                       {item.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <div className="editor-appearance-fields">
                 <label className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                   {tr('标识颜色')}
-                  <div className="flex items-center gap-2 h-9 px-2 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5">
-                    <input
-                      name="color"
-                      type="color"
-                      value={color}
-                      onChange={(event) => setColor(event.currentTarget.value)}
-                      className="w-6 h-6 rounded-lg border-0 cursor-pointer bg-transparent p-0"
-                    />
-                    <span className="text-[11px] text-slate-500 font-mono">{tr('自定义颜色')}</span>
+                  <div className="relative flex items-center gap-2.5 h-9 px-3 rounded-xl border border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 hover:bg-black/[0.04] dark:hover:bg-white/[0.08] transition-colors cursor-pointer">
+                    <div className="relative w-5 h-5 rounded-full overflow-hidden shrink-0 shadow-2xs border border-black/10 dark:border-white/20">
+                      <input
+                        name="color"
+                        type="color"
+                        value={color}
+                        onChange={(event) => setColor(event.currentTarget.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full scale-150"
+                      />
+                      <div className="w-full h-full" style={{ backgroundColor: color }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground font-mono">
+                      {color.toUpperCase()}
+                    </span>
                   </div>
                 </label>
                 <label className="flex flex-col gap-1.5 text-xs text-slate-600 dark:text-slate-300">
                   {tr('自定义图标')}
-                  <div className="relative flex items-center h-9 px-2.5 rounded-xl border border-dashed border-black/15 dark:border-white/20 bg-black/[0.02] dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer overflow-hidden">
-                    <span className="text-[11px] text-slate-500 truncate">
-                      {tr('点击上传图片')}
+                  <div className="relative flex items-center justify-between h-9 px-3 rounded-xl border border-dashed border-black/15 dark:border-white/20 bg-black/[0.02] dark:bg-white/5 hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer overflow-hidden">
+                    <span className="text-xs text-muted-foreground truncate">
+                      {uploadedIcon ? uploadedIcon.name : tr('点击上传图片')}
                     </span>
+                    <Upload size={14} className="text-muted-foreground shrink-0 ml-2" />
                     <input
                       name="icon"
                       type="file"
@@ -1111,8 +1345,15 @@ function SiteEditor({
                 type="button"
                 variant="destructive"
                 className="rounded-xl px-4 py-2 cursor-pointer mr-auto"
-                onClick={() => {
-                  if (!window.confirm(`${tr('确定删除网站？')}\n${site.title}`)) return;
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: tr('确定删除网站？'),
+                    description: site.title,
+                    confirmText: tr('删除'),
+                    cancelText: tr('取消'),
+                    variant: 'destructive',
+                  });
+                  if (!ok) return;
                   void dispatch({ type: 'delete-site', spaceId, id: site.id })
                     .then(onClose)
                     .catch((error: Error) => onError(error.message));
@@ -1138,6 +1379,7 @@ function SiteEditor({
             </Button>
           </DialogFooter>
         </form>
+        {confirmDialog}
       </DialogContent>
     </Dialog>
   );

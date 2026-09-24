@@ -12,9 +12,12 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "pnpm run typecheck && node scripts/icons.mjs && node scripts/notices.mjs && wxt build",
+    "postbuild": "mkdir -p dist && cp -r .output/. dist/",
     "build:firefox": "pnpm run typecheck && node scripts/icons.mjs && node scripts/notices.mjs && wxt build -b firefox",
     "package": "pnpm run build && wxt zip",
+    "postpackage": "mkdir -p dist && cp -r .output/. dist/",
     "package:firefox": "pnpm run build:firefox && wxt zip -b firefox",
+    "postpackage:firefox": "mkdir -p dist && cp -r .output/. dist/",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
