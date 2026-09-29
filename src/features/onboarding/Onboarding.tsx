@@ -8,8 +8,12 @@ const content = {
     description: '先把每天会打开的网站放进来。布局、外观和同步方式都可以稍后在设置中调整。',
     action: '进入首页',
     items: [
-      { icon: Compass, title: '快速抵达', text: '集中管理网站、分类和桌面，搜索也随手可用。' },
-      { icon: Layers3, title: '按你的方式整理', text: '用桌面和分类梳理内容，拖动网站完成排序。' },
+      { icon: Compass, title: '快速抵达', text: '集中管理网站、分组和文件夹，搜索也随手可用。' },
+      {
+        icon: Layers3,
+        title: '按你的方式整理',
+        text: '用分组和文件夹梳理内容，拖动网站完成排序。',
+      },
       {
         icon: Shield,
         title: '数据由你掌控',
@@ -27,12 +31,12 @@ const content = {
       {
         icon: Compass,
         title: 'Get there quickly',
-        text: 'Keep sites, groups, pages, and search within easy reach.',
+        text: 'Keep sites, groups, folders, and search within easy reach.',
       },
       {
         icon: Layers3,
         title: 'Arrange it your way',
-        text: 'Organize with pages and categories, then drag sites into place.',
+        text: 'Organize with groups and folders, then drag sites into place.',
       },
       {
         icon: Shield,

@@ -28,16 +28,18 @@ export function resolveHomeTextColors(settings: SpaceSettings): HomeTextColors {
 }
 
 function estimatedBackgroundLuminance(settings: SpaceSettings) {
-  if (settings.background === 'color') return hexLuminance(settings.solidColor);
+  if (settings.background === 'color') return hexLuminance(settings.solidColor, settings.overlay);
   if (settings.background !== 'gradient') return 0;
   const colors = settings.gradient.match(/#[0-9a-f]{6}/gi);
   if (!colors?.length) return 0;
-  return colors.reduce((sum, color) => sum + hexLuminance(color), 0) / colors.length;
+  return (
+    colors.reduce((sum, color) => sum + hexLuminance(color, settings.overlay), 0) / colors.length
+  );
 }
 
-function hexLuminance(color: string) {
+function hexLuminance(color: string, overlay: number) {
   const channels = [1, 3, 5].map(
-    (index) => Number.parseInt(color.slice(index, index + 2), 16) / 255,
+    (index) => (Number.parseInt(color.slice(index, index + 2), 16) / 255) * (1 - overlay),
   );
   const linear = channels.map((value) =>
     value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,

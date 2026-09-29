@@ -1,12 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { createRepository } from '../src/storage/database';
 import {
-  createInitialState,
+  createInitialState as emptyState,
   effectiveSettings,
   rayStateSchema,
   searchEngineSchema,
 } from '../src/storage/model';
 import { applyCommand } from '../src/storage/operations';
+
+function createInitialState() {
+  const state = emptyState();
+  const groupId = state.local.activeGroup.normal;
+  applyCommand(state, {
+    type: 'save-folder',
+    spaceId: 'normal',
+    id: 'test-folder',
+    groupId,
+    name: '资料',
+  });
+  applyCommand(state, {
+    type: 'move-site',
+    spaceId: 'normal',
+    id: state.spaces.normal.sites[0].id,
+    groupId,
+    folderId: 'test-folder',
+  });
+  return state;
+}
 
 describe('navigation data model', () => {
   it('accepts safe search templates and requires a query placeholder', () => {
@@ -21,35 +41,37 @@ describe('navigation data model', () => {
       searchEngineSchema.safeParse({ id: 'bad', name: 'Bad', url: 'https://example.com/' }).success,
     ).toBe(false);
   });
-  it('starts with two isolated valid spaces and one default category per desktop', () => {
+  it('starts with two isolated valid spaces', () => {
     const state = createInitialState();
     expect(rayStateSchema.parse(state)).toEqual(state);
     expect(state.spaces.normal.sites.length).toBeGreaterThan(0);
     expect(state.spaces.private.sites).toHaveLength(0);
-    for (const space of Object.values(state.spaces))
-      for (const desktop of space.desktops)
-        expect(
-          space.categories.filter((item) => item.desktopId === desktop.id && item.isDefault),
-        ).toHaveLength(1);
   });
 
   it('adds, edits, moves and deletes a site without breaking references', () => {
     const state = createInitialState();
     const spaceId = 'normal';
-    const categories = state.spaces.normal.categories;
-    const source = categories.find((item) => !item.isDefault)!;
-    const target = categories.find((item) => item.isDefault)!;
+    const folders = state.spaces.normal.folders;
+    const source = folders[0];
+    const target = { id: null };
     applyCommand(state, {
       type: 'save-site',
       spaceId,
       id: 'new-site',
-      categoryId: source.id,
+      groupId: state.local.activeGroup.normal,
+      folderId: source.id,
       site: { title: 'Example', url: 'example.com', color: '#123456' },
     });
     const created = state.spaces.normal.sites.find((item) => item.id === 'new-site')!;
     expect(created.url).toBe('https://example.com/');
-    applyCommand(state, { type: 'move-site', spaceId, id: created.id, categoryId: target.id });
-    expect(created.categoryId).toBe(target.id);
+    applyCommand(state, {
+      type: 'move-site',
+      spaceId,
+      id: created.id,
+      groupId: state.local.activeGroup.normal,
+      folderId: target.id,
+    });
+    expect(created.folderId).toBe(target.id);
     applyCommand(state, { type: 'delete-site', spaceId, id: created.id });
     expect(state.spaces.normal.sites).not.toContainEqual(
       expect.objectContaining({ id: created.id }),
@@ -92,85 +114,87 @@ describe('navigation data model', () => {
     expect(state.spaces.normal.tombstones).toEqual([]);
   });
 
-  it('moves sites to the default category when deleting a category', () => {
+  it('moves sites to the default folder when deleting a folder', () => {
     const state = createInitialState();
-    const category = state.spaces.normal.categories.find((item) => !item.isDefault)!;
-    const fallback = state.spaces.normal.categories.find((item) => item.isDefault)!;
+    const folder = state.spaces.normal.folders[0];
+    const fallback = { id: null };
     const affectedIds = state.spaces.normal.sites
-      .filter((item) => item.categoryId === category.id)
+      .filter((item) => item.folderId === folder.id)
       .map((item) => item.id);
-    applyCommand(state, { type: 'delete-category', spaceId: 'normal', id: category.id });
+    applyCommand(state, { type: 'delete-folder', spaceId: 'normal', id: folder.id });
     expect(
       state.spaces.normal.sites
         .filter((item) => affectedIds.includes(item.id))
-        .every((item) => item.categoryId === fallback.id),
+        .every((item) => item.folderId === fallback.id),
     ).toBe(true);
     expect(rayStateSchema.safeParse(state).success).toBe(true);
   });
 
-  it('sorts sites deterministically within and across categories', () => {
+  it('sorts sites deterministically within and across folders', () => {
     const state = createInitialState();
-    const source = state.spaces.normal.categories.find((item) => !item.isDefault)!;
-    const target = state.spaces.normal.categories.find((item) => item.isDefault)!;
+    const source = state.spaces.normal.folders[0];
+    const target = { id: null };
     const [first, second] = state.spaces.normal.sites;
     applyCommand(state, {
       type: 'move-site',
       spaceId: 'normal',
       id: second.id,
-      categoryId: source.id,
+      groupId: state.local.activeGroup.normal,
+      folderId: source.id,
       beforeId: first.id,
     });
     expect(
       state.spaces.normal.sites
-        .filter((item) => item.categoryId === source.id)
+        .filter((item) => item.folderId === source.id)
         .sort((a, b) => a.order - b.order)[0].id,
     ).toBe(second.id);
     applyCommand(state, {
       type: 'move-site',
       spaceId: 'normal',
       id: first.id,
-      categoryId: target.id,
+      groupId: state.local.activeGroup.normal,
+      folderId: target.id,
     });
-    expect(first.categoryId).toBe(target.id);
+    expect(first.folderId).toBe(target.id);
     expect(rayStateSchema.safeParse(state).success).toBe(true);
   });
 
-  it('moves desktop content before deleting it and always retains one desktop', () => {
+  it('moves group content before deleting it and always retains one group', () => {
     const state = createInitialState();
-    applyCommand(state, { type: 'save-desktop', spaceId: 'normal', id: 'work', name: '工作' });
-    const oldDesktop = state.local.activeDesktop.normal;
+    applyCommand(state, { type: 'save-group', spaceId: 'normal', id: 'work', name: '工作' });
+    const oldGroup = state.local.activeGroup.normal;
     applyCommand(state, {
-      type: 'delete-desktop',
+      type: 'delete-group',
       spaceId: 'normal',
-      id: oldDesktop,
-      destinationDesktopId: 'work',
+      id: oldGroup,
+      destinationGroupId: 'work',
     });
-    expect(state.local.activeDesktop.normal).toBe('work');
+    expect(state.local.activeGroup.normal).toBe('work');
     expect(state.spaces.normal.sites).toHaveLength(5);
     expect(() =>
       applyCommand(state, {
-        type: 'delete-desktop',
+        type: 'delete-group',
         spaceId: 'normal',
         id: 'work',
-        destinationDesktopId: 'missing',
+        destinationGroupId: 'missing',
       }),
     ).toThrow('至少保留');
     expect(rayStateSchema.safeParse(state).success).toBe(true);
   });
 
-  it('reorders desktops and records every affected order change', () => {
+  it('reorders groups and records every affected order change', () => {
     const state = createInitialState();
-    applyCommand(state, { type: 'save-desktop', spaceId: 'normal', id: 'second', name: '第二页' });
-    applyCommand(state, { type: 'save-desktop', spaceId: 'normal', id: 'third', name: '第三页' });
-    const originalFirst = state.spaces.normal.desktops.find((item) => item.order === 0)!;
+    applyCommand(state, { type: 'save-group', spaceId: 'normal', id: 'second', name: '第二页' });
+    applyCommand(state, { type: 'save-group', spaceId: 'normal', id: 'third', name: '第三页' });
+    const originalFirst = state.spaces.normal.groups.find((item) => item.order === 0)!;
     const previousChange = originalFirst.changeId;
     applyCommand(state, {
-      type: 'move-desktop',
+      type: 'move-group',
       spaceId: 'normal',
       id: 'third',
       beforeId: originalFirst.id,
     });
-    const ordered = [...state.spaces.normal.desktops].sort((a, b) => a.order - b.order);
+    const ordered = [...state.spaces.normal.groups].sort((a, b) => a.order - b.order);
     expect(ordered.map((item) => item.id)).toEqual(['third', originalFirst.id, 'second']);
     expect(originalFirst.changeId).not.toBe(previousChange);
     expect(rayStateSchema.safeParse(state).success).toBe(true);
@@ -192,6 +216,36 @@ describe('navigation data model', () => {
 });
 
 describe('repository transactions', () => {
+  it('preserves URL parameters and fragments through saving, moving and reopening', async () => {
+    const name = crypto.randomUUID();
+    const repo = createRepository(name);
+    const url = 'https://example.com/Docs%2FPage?token=AbC%2B123&tag=One&tag=two&empty=#Section-2';
+    await repo.update((state) => {
+      const groups = state.spaces.normal.groups;
+      applyCommand(state, {
+        type: 'save-site',
+        spaceId: 'normal',
+        id: 'original-url',
+        groupId: groups[0].id,
+        folderId: null,
+        site: { title: 'Original', url, color: '#123456' },
+      });
+      applyCommand(state, {
+        type: 'move-site',
+        spaceId: 'normal',
+        id: 'original-url',
+        groupId: groups[0].id,
+        folderId: null,
+      });
+    });
+    await repo.close();
+    const reopened = createRepository(name);
+    expect(
+      (await reopened.read()).spaces.normal.sites.find((site) => site.id === 'original-url')?.url,
+    ).toBe(url);
+    await reopened.close();
+  });
+
   it('serializes writes from multiple tabs and rejects stale edits', async () => {
     const name = crypto.randomUUID();
     const first = createRepository(name);
@@ -203,7 +257,8 @@ describe('repository transactions', () => {
         type: 'save-site',
         spaceId: 'normal',
         id: site.id,
-        categoryId: site.categoryId,
+        groupId: site.groupId,
+        folderId: site.folderId,
         expected: site.updatedAt,
         site: { ...site, title: 'Fresh' },
       }),
@@ -214,7 +269,8 @@ describe('repository transactions', () => {
           type: 'save-site',
           spaceId: 'normal',
           id: site.id,
-          categoryId: site.categoryId,
+          groupId: site.groupId,
+          folderId: site.folderId,
           expected: site.updatedAt,
           site: { ...site, title: 'Stale' },
         }),
@@ -231,45 +287,41 @@ describe('repository transactions', () => {
     const name = crypto.randomUUID();
     const first = createRepository(name);
     const initial = await first.read();
-    const originalDesktop = initial.local.activeDesktop.normal;
+    const originalGroup = initial.local.activeGroup.normal;
     await first.update((state) => {
-      applyCommand(state, { type: 'save-desktop', spaceId: 'normal', id: 'work', name: 'Work' });
+      applyCommand(state, { type: 'save-group', spaceId: 'normal', id: 'work', name: 'Work' });
       applyCommand(state, {
-        type: 'save-category',
+        type: 'save-folder',
         spaceId: 'normal',
         id: 'research',
-        desktopId: 'work',
+        groupId: 'work',
         name: 'Research',
-        color: '#123456',
-        showInAll: true,
       });
       applyCommand(state, {
         type: 'save-site',
         spaceId: 'normal',
         id: 'docs',
-        categoryId: 'research',
+        groupId: 'work',
+        folderId: 'research',
         site: { title: 'Docs', url: 'docs.example.com', color: '#123456' },
       });
       applyCommand(state, {
         type: 'move-site',
         spaceId: 'normal',
         id: 'docs',
-        categoryId: state.spaces.normal.categories.find(
-          (item) => item.desktopId === originalDesktop && item.isDefault,
-        )!.id,
+        groupId: originalGroup,
+        folderId: null,
       });
-      applyCommand(state, { type: 'select-desktop', spaceId: 'normal', desktopId: 'work' });
+      applyCommand(state, { type: 'select-group', spaceId: 'normal', groupId: 'work' });
     });
     await first.close();
 
     const reopened = createRepository(name);
     const persisted = await reopened.read();
-    expect(persisted.local.activeDesktop.normal).toBe('work');
-    expect(persisted.spaces.normal.desktops).toContainEqual(
-      expect.objectContaining({ id: 'work' }),
-    );
-    expect(persisted.spaces.normal.categories).toContainEqual(
-      expect.objectContaining({ id: 'research', desktopId: 'work' }),
+    expect(persisted.local.activeGroup.normal).toBe('work');
+    expect(persisted.spaces.normal.groups).toContainEqual(expect.objectContaining({ id: 'work' }));
+    expect(persisted.spaces.normal.folders).toContainEqual(
+      expect.objectContaining({ id: 'research', groupId: 'work' }),
     );
     expect(persisted.spaces.normal.sites).toContainEqual(
       expect.objectContaining({ id: 'docs', url: 'https://docs.example.com/' }),
@@ -283,10 +335,10 @@ describe('repository transactions', () => {
     const repository = createRepository(name);
     const startedAt = performance.now();
     await repository.update((state) => {
-      const category = state.spaces.normal.categories.find((item) => !item.isDefault)!;
       state.spaces.normal.sites = Array.from({ length: 2_000 }, (_, order) => ({
         id: `site-${order}`,
-        categoryId: category.id,
+        groupId: state.local.activeGroup.normal,
+        folderId: null,
         title: `Site ${order}`,
         url: `https://example.com/${order}`,
         color: '#4f7c68',
@@ -306,4 +358,58 @@ describe('repository transactions', () => {
     expect(elapsed).toBeLessThan(2_000);
     await reopened.close();
   });
+});
+
+it('moves a selected batch atomically and preserves their relative order and URLs', () => {
+  const state = createInitialState();
+  state.spaces.normal.sites[0].folderId = null;
+  const original = structuredClone(state.spaces.normal.sites.slice(0, 2));
+  const destination = state.spaces.normal.folders[0];
+  expect(() =>
+    applyCommand(state, {
+      type: 'move-sites',
+      spaceId: 'normal',
+      ids: [original[0].id, 'missing'],
+      groupId: state.local.activeGroup.normal,
+      folderId: destination.id,
+    }),
+  ).toThrow('网站不存在');
+  expect(state.spaces.normal.sites.slice(0, 2)).toEqual(original);
+  applyCommand(state, {
+    type: 'move-sites',
+    spaceId: 'normal',
+    ids: original.map((s) => s.id),
+    groupId: state.local.activeGroup.normal,
+    folderId: destination.id,
+  });
+  expect(
+    state.spaces.normal.sites
+      .filter((s) => s.folderId === destination.id)
+      .sort((a, b) => a.order - b.order)
+      .map((s) => s.url),
+  ).toEqual(original.map((s) => s.url));
+});
+
+it('preserves folders when deleting a group and appends its loose links', () => {
+  const state = createInitialState();
+  const home = state.local.activeGroup.normal;
+  const folders = state.spaces.normal.folders.map((c) => c.id);
+  const links = state.spaces.normal.sites.map((s) => ({
+    id: s.id,
+    url: s.url,
+    folderId: s.folderId,
+  }));
+  applyCommand(state, { type: 'save-group', spaceId: 'normal', id: 'second', name: 'Second' });
+  applyCommand(state, {
+    type: 'delete-group',
+    spaceId: 'normal',
+    id: home,
+    destinationGroupId: 'second',
+  });
+  expect(state.spaces.normal.folders.map((c) => c.id)).toEqual(folders);
+  expect(state.spaces.normal.folders.every((c) => c.groupId === 'second')).toBe(true);
+  expect(
+    state.spaces.normal.sites.map((s) => ({ id: s.id, url: s.url, folderId: s.folderId })),
+  ).toEqual(links);
+  expect(rayStateSchema.safeParse(state).success).toBe(true);
 });

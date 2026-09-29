@@ -78,6 +78,73 @@ describe('sync engine', () => {
     expect(local['raytab-sync-baseline']).toMatchObject({ version: 'remote-v1' });
   });
 
+  it.each(['push', 'pull', 'auto'] as const)(
+    'keeps local and remote private spaces untouched during normal-only %s',
+    async (mode) => {
+      await repository.update((state) => {
+        state.privateSettingOverrides.showClock = false;
+      });
+      const before = await repository.read();
+      await repository.protectPrivate('local-vault-password');
+      const remote = await createBackup(createInitialState(), new Map(), 'all', 'remote-password');
+      let content = JSON.stringify(remote);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init: RequestInit = {}) => {
+          if (init.method === 'PUT') content = String(init.body);
+          return new Response(content, { status: 200, headers: { etag: 'v1' } });
+        }),
+      );
+      try {
+        await synchronize(mode);
+        expect((await repository.read()).privateSecurity.locked).toBe(true);
+        expect(JSON.parse(content).spaces.private).toEqual(remote.spaces.private);
+        const unlocked = await repository.unlockPrivate('local-vault-password');
+        expect(unlocked.spaces.private).toEqual(before.spaces.private);
+        expect(unlocked.privateSettingOverrides).toEqual(before.privateSettingOverrides);
+      } finally {
+        await repository.removePrivatePassword('local-vault-password');
+      }
+    },
+  );
+
+  it.each(['pull', 'auto'] as const)(
+    'preserves edits made while a %s request is in flight',
+    async (mode) => {
+      const remote = await createBackup(createInitialState(), new Map(), 'normal');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (_url: string, init: RequestInit = {}) => {
+          if (init.method !== 'PUT')
+            await repository.update((state) => {
+              state.spaces.normal.sites[0].title = 'New local edit';
+            });
+          return new Response(JSON.stringify(remote), { status: 200, headers: { etag: 'v1' } });
+        }),
+      );
+      await expect(synchronize(mode)).rejects.toThrow('本地数据发生变化');
+      expect((await repository.read()).spaces.normal.sites[0].title).toBe('New local edit');
+      expect(local['raytab-sync-baseline']).toBeUndefined();
+    },
+  );
+
+  it('keeps a local edit made during upload and leaves the baseline unchanged', async () => {
+    const remote = await createBackup(createInitialState(), new Map(), 'normal');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit = {}) => {
+        if (init.method === 'PUT')
+          await repository.update((state) => {
+            state.spaces.normal.sites[0].title = 'Edited during upload';
+          });
+        return new Response(JSON.stringify(remote), { status: 200, headers: { etag: 'v1' } });
+      }),
+    );
+    await expect(synchronize('auto')).rejects.toThrow('本地数据发生变化');
+    expect((await repository.read()).spaces.normal.sites[0].title).toBe('Edited during upload');
+    expect(local['raytab-sync-baseline']).toBeUndefined();
+  });
+
   it('records retry state after a network failure without advancing the baseline', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
@@ -113,7 +180,8 @@ describe('sync engine', () => {
         type: 'save-site',
         spaceId: 'normal',
         id: first.id,
-        categoryId: first.categoryId,
+        groupId: first.groupId,
+        folderId: null,
         expected: first.updatedAt,
         site: { ...first, title: 'Local edit' },
       }),
@@ -140,7 +208,8 @@ describe('sync engine', () => {
         type: 'save-site',
         spaceId: 'normal',
         id: first.id,
-        categoryId: first.categoryId,
+        groupId: first.groupId,
+        folderId: null,
         expected: currentFirst.updatedAt,
         site: { ...first, title: 'Second local edit' },
       }),
@@ -209,7 +278,8 @@ describe('sync engine', () => {
         type: 'save-site',
         spaceId: 'private',
         id: 'private-sync-site',
-        categoryId: initial.spaces.private.categories[0].id,
+        groupId: initial.spaces.private.groups[0].id,
+        folderId: null,
         site: {
           title: 'Private sync site',
           url: 'https://private-sync.example',
@@ -266,5 +336,6 @@ describe('sync engine', () => {
     await synchronize('auto');
     expect(remoteContent).not.toContain('private-sync.example');
     await expect(loadSyncStatus()).resolves.toMatchObject({ conflicts: [], retryCount: 0 });
+    await repository.removePrivatePassword('second-vault-password');
   });
 });

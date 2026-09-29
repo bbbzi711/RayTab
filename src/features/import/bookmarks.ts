@@ -3,7 +3,7 @@ import { normalizeUrl } from '@/storage/model';
 export type BookmarkCandidate = {
   title: string;
   url: string;
-  category: string;
+  folder?: string;
   path: string[];
 };
 
@@ -32,7 +32,7 @@ export function parseBookmarkHtml(html: string): BookmarkCandidate[] {
       result.push({
         title: text(link[2]) || new URL(link[1]).hostname,
         url: normalizeUrl(decodeEntities(link[1])),
-        category: stack.at(-1) || '导入书签',
+        folder: stack.length ? stack.join(' / ') : undefined,
         path: [...stack],
       });
     } catch {
@@ -55,7 +55,7 @@ export async function readBrowserBookmarks(): Promise<BookmarkCandidate[]> {
           result.push({
             title: node.title || new URL(node.url).hostname,
             url: normalizeUrl(node.url),
-            category: path.at(-1) || '浏览器书签',
+            folder: path.length ? path.join(' / ') : undefined,
             path,
           });
         } catch {
@@ -75,20 +75,15 @@ export function deduplicateBookmarks(
   mode: 'skip-url' | 'keep-all',
 ) {
   if (mode === 'keep-all') return candidates;
-  const seen = new Set(existingUrls.map(canonicalUrl));
+  const seen = new Set(existingUrls.map(normalizeUrl));
   return candidates.filter((item) => {
-    const key = canonicalUrl(item.url);
+    const key = normalizeUrl(item.url);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
-function canonicalUrl(value: string) {
-  const url = new URL(value);
-  url.hash = '';
-  return url.href.replace(/\/$/, '').toLowerCase();
-}
 function text(value: string) {
   return decodeEntities(value.replace(/<[^>]+>/g, '')).trim();
 }

@@ -18,6 +18,8 @@ function saveQuickCache(state: RayState) {
     if (safeState.privateSecurity.protected) {
       safeState.spaces.private = createLockedPrivateSpace();
       safeState.privateSettingOverrides = {};
+      safeState.local.activeGroup.private = safeState.spaces.private.groups[0].id;
+      safeState.local.selectedFolder.private = {};
       safeState.local.activeSpace = 'normal';
       safeState.privateSecurity.locked = true;
     }

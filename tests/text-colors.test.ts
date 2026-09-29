@@ -38,4 +38,15 @@ describe('home text colors', () => {
       }).clock,
     ).toBe('#ffffff');
   });
+  it('takes the dark overlay into account on bright backgrounds', () => {
+    expect(
+      resolveHomeTextColors({
+        ...defaultSettings,
+        textColorMode: 'auto',
+        background: 'color',
+        solidColor: '#ffffff',
+        overlay: 0.8,
+      }).clock,
+    ).toBe('#ffffff');
+  });
 });

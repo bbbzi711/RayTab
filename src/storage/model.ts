@@ -48,23 +48,21 @@ const recordMeta = {
   changeId: idSchema,
 };
 
-export const desktopSchema = z.object({
+export const groupSchema = z.object({
   ...recordMeta,
   name: titleSchema,
   order: z.number().int().nonnegative(),
 });
-export const categorySchema = z.object({
+export const folderSchema = z.object({
   ...recordMeta,
-  desktopId: idSchema,
+  groupId: idSchema,
   name: titleSchema,
-  color: colorSchema,
   order: z.number().int().nonnegative(),
-  isDefault: z.boolean(),
-  showInAll: z.boolean(),
 });
 export const siteSchema = z.object({
   ...recordMeta,
-  categoryId: idSchema,
+  groupId: idSchema,
+  folderId: idSchema.nullable(),
   title: titleSchema,
   url: z.url().refine((value) => {
     const url = new URL(value);
@@ -76,7 +74,7 @@ export const siteSchema = z.object({
 });
 export const tombstoneSchema = z.object({
   id: idSchema,
-  entity: z.enum(['desktop', 'category', 'site']),
+  entity: z.enum(['group', 'folder', 'site']),
   deletedAt: timestampSchema,
   changeId: idSchema,
 });
@@ -93,7 +91,7 @@ export const spaceSettingsSchema = z.object({
   showGreeting: z.boolean(),
   customGreetings: customGreetingsSchema.optional(),
   showSiteTitle: z.boolean(),
-  showCategories: z.boolean(),
+  showGroups: z.boolean(),
   hour12: z.boolean(),
   cardSize: z.number().int().min(80).max(160),
   iconSizeRatio: z.number().min(0.28).max(0.65),
@@ -108,47 +106,51 @@ export const spaceSettingsSchema = z.object({
   solidColor: colorSchema,
   wallpaperId: idSchema.optional(),
   onlineWallpaperUrl: z.url().optional(),
+  featuredPhotoUrl: z.url().optional(),
   overlay: z.number().min(0).max(0.8),
   textColorMode: z.enum(['auto', 'light', 'dark', 'custom']),
   textColors: homeTextColorsSchema,
 });
 
 const spaceDataBaseSchema = z.object({
-  desktops: z.array(desktopSchema).max(200),
-  categories: z.array(categorySchema).max(2000),
+  groups: z.array(groupSchema).max(200),
+  folders: z.array(folderSchema).max(2000),
   sites: z.array(siteSchema).max(10000),
   tombstones: z.array(tombstoneSchema).max(20000),
 });
 export const spaceDataSchema = spaceDataBaseSchema.superRefine((space, ctx) => {
-  const desktopIds = new Set(space.desktops.map((item) => item.id));
-  const categoryIds = new Set(space.categories.map((item) => item.id));
+  const groupIds = new Set(space.groups.map((item) => item.id));
+  const folderIds = new Set(space.folders.map((item) => item.id));
   const siteIds = new Set(space.sites.map((item) => item.id));
   const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
-  if (!space.desktops.length) issue('空间必须至少保留一个桌面');
-  if (desktopIds.size !== space.desktops.length) issue('桌面 ID 重复');
-  if (categoryIds.size !== space.categories.length) issue('分类 ID 重复');
+  if (!space.groups.length) issue('空间必须至少保留一个分组');
+  if (groupIds.size !== space.groups.length) issue('分组 ID 重复');
+  if (folderIds.size !== space.folders.length) issue('文件夹 ID 重复');
   if (siteIds.size !== space.sites.length) issue('网站 ID 重复');
-  for (const desktop of space.desktops) {
-    const defaults = space.categories.filter(
-      (category) => category.desktopId === desktop.id && category.isDefault,
-    );
-    if (defaults.length !== 1) issue(`桌面 ${desktop.id} 必须有且只有一个默认分类`);
+  if (space.sites.some((item) => folderIds.has(item.id))) issue('网站与文件夹 ID 重复');
+  for (const folder of space.folders)
+    if (!groupIds.has(folder.groupId)) issue(`文件夹 ${folder.id} 引用了不存在的分组`);
+  for (const site of space.sites) {
+    if (!groupIds.has(site.groupId)) issue(`网站 ${site.id} 引用了不存在的分组`);
+    if (
+      site.folderId !== null &&
+      !space.folders.some(
+        (folder) => folder.id === site.folderId && folder.groupId === site.groupId,
+      )
+    )
+      issue(`网站 ${site.id} 引用了不存在的文件夹`);
   }
-  for (const category of space.categories)
-    if (!desktopIds.has(category.desktopId)) issue(`分类 ${category.id} 引用了不存在的桌面`);
-  for (const site of space.sites)
-    if (!categoryIds.has(site.categoryId)) issue(`网站 ${site.id} 引用了不存在的分类`);
 });
 export const localStateSchema = z.object({
   activeSpace: spaceIdSchema,
-  activeDesktop: z.record(spaceIdSchema, idSchema),
-  selectedCategory: z.record(spaceIdSchema, z.record(idSchema, idSchema.nullable())),
+  activeGroup: z.record(spaceIdSchema, idSchema),
+  selectedFolder: z.record(spaceIdSchema, z.record(idSchema, idSchema.nullable())),
   homeMode: z.enum(['focus', 'navigation']).default('focus'),
   onboardingComplete: z.boolean(),
 });
 export const rayStateSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(4),
     revision: z.number().int().nonnegative(),
     spaces: z.object({ normal: spaceDataSchema, private: spaceDataSchema }),
     normalSettings: spaceSettingsSchema,
@@ -162,11 +164,9 @@ export const rayStateSchema = z
   .superRefine((state, ctx) => {
     for (const spaceId of spaceIdSchema.options) {
       if (
-        !state.spaces[spaceId].desktops.some(
-          (item) => item.id === state.local.activeDesktop[spaceId],
-        )
+        !state.spaces[spaceId].groups.some((item) => item.id === state.local.activeGroup[spaceId])
       )
-        ctx.addIssue({ code: 'custom', message: `${spaceId} 空间的当前桌面不存在` });
+        ctx.addIssue({ code: 'custom', message: `${spaceId} 空间的当前分组不存在` });
     }
     const validateEngines = (settings: SpaceSettings, label: string) => {
       const ids = settings.searchEngines.map((engine) => engine.id);
@@ -176,11 +176,11 @@ export const rayStateSchema = z
         ctx.addIssue({ code: 'custom', message: `${label}当前搜索引擎不存在` });
     };
     validateEngines(state.normalSettings, '普通空间');
-    validateEngines({ ...state.normalSettings, ...state.privateSettingOverrides }, '私密空间');
+    validateEngines(effectiveSettings(state, 'private'), '私密空间');
   });
 
-export type Desktop = z.infer<typeof desktopSchema>;
-export type Category = z.infer<typeof categorySchema>;
+export type Group = z.infer<typeof groupSchema>;
+export type Folder = z.infer<typeof folderSchema>;
 export type Site = z.infer<typeof siteSchema>;
 export type Tombstone = z.infer<typeof tombstoneSchema>;
 export type SpaceSettings = z.infer<typeof spaceSettingsSchema>;
@@ -206,7 +206,7 @@ export const defaultSettings: SpaceSettings = {
   showGreeting: true,
   customGreetings: undefined,
   showSiteTitle: true,
-  showCategories: true,
+  showGroups: true,
   hour12: false,
   cardSize: 110,
   iconSizeRatio: 0.55,
@@ -235,63 +235,22 @@ function meta(id: string, now = 0) {
   return { id, createdAt: now, updatedAt: now, changeId: `initial-${id}` };
 }
 function createSpace(prefix: SpaceId, withExamples: boolean): SpaceData {
-  const desktopId = `${prefix}-desktop-home`;
-  const defaultCategoryId = `${prefix}-category-default`;
-  const workId = `${prefix}-category-work`;
-  const toolsId = `${prefix}-category-tools`;
-  const designId = `${prefix}-category-design`;
-  const categories: Category[] = [
-    {
-      ...meta(defaultCategoryId),
-      desktopId,
-      name: '未分类',
-      color: '#718096',
-      order: 0,
-      isDefault: true,
-      showInAll: true,
-    },
-    {
-      ...meta(workId),
-      desktopId,
-      name: '工作与开发',
-      color: '#4f7c68',
-      order: 1,
-      isDefault: false,
-      showInAll: true,
-    },
-    {
-      ...meta(toolsId),
-      desktopId,
-      name: '常用工具',
-      color: '#718096',
-      order: 2,
-      isDefault: false,
-      showInAll: true,
-    },
-    {
-      ...meta(designId),
-      desktopId,
-      name: '设计与灵感',
-      color: '#c08b61',
-      order: 3,
-      isDefault: false,
-      showInAll: true,
-    },
-  ];
+  const groupId = `${prefix}-group-home`;
   const examples = [
-    ['GitHub', 'https://github.com', '#24292f', workId],
-    ['Google', 'https://www.google.com', '#4285f4', toolsId],
-    ['微博', 'https://weibo.com', '#e6162d', designId],
-    ['哔哩哔哩', 'https://www.bilibili.com', '#fb7299', designId],
-    ['YouTube', 'https://www.youtube.com', '#ff0033', designId],
+    ['GitHub', 'https://github.com', '#24292f'],
+    ['Google', 'https://www.google.com', '#4285f4'],
+    ['微博', 'https://weibo.com', '#e6162d'],
+    ['哔哩哔哩', 'https://www.bilibili.com', '#fb7299'],
+    ['YouTube', 'https://www.youtube.com', '#ff0033'],
   ];
   return {
-    desktops: [{ ...meta(desktopId), name: '主页', order: 0 }],
-    categories,
+    groups: [{ ...meta(groupId), name: '主页', order: 0 }],
+    folders: [],
     sites: withExamples
-      ? examples.map(([title, url, color, categoryId], order) => ({
+      ? examples.map(([title, url, color], order) => ({
           ...meta(`${prefix}-site-${order}`),
-          categoryId,
+          groupId,
+          folderId: null,
           title,
           url,
           color,
@@ -301,11 +260,12 @@ function createSpace(prefix: SpaceId, withExamples: boolean): SpaceData {
     tombstones: [],
   };
 }
+
 export function createInitialState(): RayState {
   const normal = createSpace('normal', true);
   const privateSpace = createSpace('private', false);
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     revision: 0,
     spaces: { normal, private: privateSpace },
     normalSettings: { ...defaultSettings },
@@ -313,8 +273,8 @@ export function createInitialState(): RayState {
     privateSecurity: { protected: false, locked: false },
     local: {
       activeSpace: 'normal',
-      activeDesktop: { normal: normal.desktops[0].id, private: privateSpace.desktops[0].id },
-      selectedCategory: { normal: {}, private: {} },
+      activeGroup: { normal: normal.groups[0].id, private: privateSpace.groups[0].id },
+      selectedFolder: { normal: {}, private: {} },
       homeMode: 'focus',
       onboardingComplete: false,
     },
@@ -323,10 +283,13 @@ export function createInitialState(): RayState {
 export function createLockedPrivateSpace() {
   return createSpace('private', false);
 }
-export function effectiveSettings(state: RayState, spaceId: SpaceId) {
-  return spaceId === 'normal'
-    ? state.normalSettings
-    : { ...state.normalSettings, ...state.privateSettingOverrides };
+export function effectiveSettings(state: RayState, spaceId: SpaceId): SpaceSettings {
+  const settings =
+    spaceId === 'normal'
+      ? state.normalSettings
+      : { ...state.normalSettings, ...state.privateSettingOverrides };
+  if (settings.searchEngines.some((engine) => engine.id === settings.searchEngine)) return settings;
+  return { ...settings, searchEngine: settings.searchEngines[0].id };
 }
 export function normalizeUrl(value: string) {
   const trimmed = value.trim();

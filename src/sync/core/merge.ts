@@ -1,7 +1,7 @@
 import { spaceDataSchema, type SpaceData } from '@/storage/model';
 
 export type SyncConflict = {
-  entity: 'desktop' | 'category' | 'site';
+  entity: 'group' | 'folder' | 'site';
   id: string;
   field: string;
   local: unknown;
@@ -12,37 +12,35 @@ export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, re
   const conflicts: SyncConflict[] = [];
   const deleted = mergeTombstones(base?.tombstones ?? [], local.tombstones, remote.tombstones);
   const deletedKeys = new Set(deleted.map((item) => `${item.entity}:${item.id}`));
-  const desktops = mergeRecords(
-    'desktop',
-    base?.desktops ?? [],
-    local.desktops,
-    remote.desktops,
+  const groups = mergeRecords(
+    'group',
+    base?.groups ?? [],
+    local.groups,
+    remote.groups,
     conflicts,
-  ).filter((item) => !deletedKeys.has(`desktop:${item.id}`));
-  const categories = mergeRecords(
-    'category',
-    base?.categories ?? [],
-    local.categories,
-    remote.categories,
-    conflicts,
-  ).filter(
-    (item) =>
-      !deletedKeys.has(`category:${item.id}`) &&
-      desktops.some((desktop) => desktop.id === item.desktopId),
-  );
-  const sites = mergeRecords(
-    'site',
-    base?.sites ?? [],
-    local.sites,
-    remote.sites,
+  ).filter((item) => !deletedKeys.has(`group:${item.id}`));
+  const folders = mergeRecords(
+    'folder',
+    base?.folders ?? [],
+    local.folders,
+    remote.folders,
     conflicts,
   ).filter(
     (item) =>
-      !deletedKeys.has(`site:${item.id}`) &&
-      categories.some((category) => category.id === item.categoryId),
+      !deletedKeys.has(`folder:${item.id}`) && groups.some((group) => group.id === item.groupId),
   );
+  const sites = mergeRecords('site', base?.sites ?? [], local.sites, remote.sites, conflicts)
+    .map((site) => {
+      const folder = folders.find((item) => item.id === site.folderId);
+      return { ...site, groupId: folder?.groupId ?? site.groupId, folderId: folder?.id ?? null };
+    })
+    .filter((item) => {
+      return (
+        !deletedKeys.has(`site:${item.id}`) && groups.some((group) => group.id === item.groupId)
+      );
+    });
   return {
-    data: spaceDataSchema.parse({ desktops, categories, sites, tombstones: deleted }),
+    data: spaceDataSchema.parse({ groups, folders, sites, tombstones: deleted }),
     conflicts,
   };
 }
@@ -88,17 +86,44 @@ function mergeRecords<T extends { id: string }>(
       continue;
     }
     const merged = { ...ancestor } as Record<string, unknown>;
-    for (const key of new Set([...Object.keys(left), ...Object.keys(right)])) {
-      const baseValue = (ancestor as Record<string, unknown>)[key];
-      const localValue = (left as Record<string, unknown>)[key];
-      const remoteValue = (right as Record<string, unknown>)[key];
-      if (same(localValue, baseValue)) merged[key] = remoteValue;
-      else if (same(remoteValue, baseValue) || same(localValue, remoteValue))
+    const fields = new Set([...Object.keys(left), ...Object.keys(right)]);
+    if (entity === 'site' || entity === 'folder') {
+      fields.delete('groupId');
+      fields.delete('folderId');
+      fields.delete('order');
+      fields.add('location');
+    }
+    for (const key of fields) {
+      const value = (record: T) => {
+        const fields = record as Record<string, unknown>;
+        return key === 'location'
+          ? {
+              groupId: fields.groupId,
+              order: fields.order,
+              ...(entity === 'site' ? { folderId: fields.folderId } : {}),
+            }
+          : fields[key];
+      };
+      const baseValue = value(ancestor);
+      const localValue = value(left);
+      const remoteValue = value(right);
+      if (key === 'updatedAt') {
+        merged[key] = Math.max(Number(localValue), Number(remoteValue));
+        continue;
+      }
+      if (key === 'changeId') {
         merged[key] = localValue;
+        continue;
+      }
+      let selected: unknown;
+      if (same(localValue, baseValue)) selected = remoteValue;
+      else if (same(remoteValue, baseValue) || same(localValue, remoteValue)) selected = localValue;
       else {
-        merged[key] = localValue;
+        selected = localValue;
         conflicts.push({ entity, id, field: key, local: localValue, remote: remoteValue });
       }
+      if (key === 'location') Object.assign(merged, selected);
+      else merged[key] = selected;
     }
     result.push(merged as T);
   }

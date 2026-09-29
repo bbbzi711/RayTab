@@ -29,9 +29,9 @@ export default function Popup() {
 
   const language = state.normalSettings.language;
   const tr = (text: string) => t(language, text);
-  const desktopId = state.local.activeDesktop.normal;
-  const categories = state.spaces.normal.categories.filter((item) => item.desktopId === desktopId);
-  const preferred = categories.find((item) => !item.isDefault) ?? categories[0];
+  const activeGroupId = state.local.activeGroup.normal;
+  const groups = [...state.spaces.normal.groups].sort((a, b) => a.order - b.order);
+  const folders = state.spaces.normal.folders;
 
   const domain = (() => {
     try {
@@ -46,17 +46,20 @@ export default function Popup() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    const category = categories.find((c) => c.id === String(data.get('categoryId')));
+    const locationStr = String(data.get('location'));
+    const { groupId, folderId } = JSON.parse(locationStr);
+
     try {
       await dispatch({
         type: 'save-site',
         spaceId: 'normal',
         id: crypto.randomUUID(),
-        categoryId: String(data.get('categoryId')),
+        groupId,
+        folderId,
         site: {
           title: String(data.get('title')).trim(),
           url: String(data.get('url')).trim(),
-          color: category?.color ?? '#3b82f6',
+          color: '#3b82f6',
         },
       });
       setSaved(true);
@@ -156,17 +159,30 @@ export default function Popup() {
             </div>
 
             <div className="popup-field">
-              <label htmlFor="categoryId">{tr('存入分类')}</label>
+              <label htmlFor="location">{tr('存入位置')}</label>
               <select
-                id="categoryId"
-                name="categoryId"
-                defaultValue={preferred?.id}
+                id="location"
+                name="location"
+                defaultValue={JSON.stringify({ groupId: activeGroupId, folderId: null })}
                 className="popup-select"
               >
-                {categories.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
+                {groups.map((group) => (
+                  <optgroup key={group.id} label={group.name}>
+                    <option value={JSON.stringify({ groupId: group.id, folderId: null })}>
+                      {tr('直接平铺')}
+                    </option>
+                    {folders
+                      .filter((f) => f.groupId === group.id)
+                      .sort((a, b) => a.order - b.order)
+                      .map((f) => (
+                        <option
+                          key={f.id}
+                          value={JSON.stringify({ groupId: group.id, folderId: f.id })}
+                        >
+                          {f.name}
+                        </option>
+                      ))}
+                  </optgroup>
                 ))}
               </select>
             </div>

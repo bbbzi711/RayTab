@@ -1,3 +1,4 @@
+import { upgradeLocalSpace, upgradeLocalState, upgradeSettings } from './upgrade-local';
 import { openDB, type DBSchema, type IDBPObjectStore } from 'idb';
 import { decryptJson, encryptJson, type EncryptedEnvelope } from '@/security/crypto';
 import {
@@ -5,9 +6,8 @@ import {
   createLockedPrivateSpace,
   rayStateSchema,
   resourceIds,
-  spaceDataSchema,
-  spaceSettingsSchema,
   type RayState,
+  type SpaceId,
 } from './model';
 
 type VaultSerialized = {
@@ -25,6 +25,7 @@ interface RayDatabase extends DBSchema {
 export function createRepository(name = 'raytab-v2', onCommit = () => {}) {
   let session: VaultSession | null = null;
   let sessionPassword: string | null = null;
+  let sessionGeneration = 0;
   const dbPromise = openDB<RayDatabase>(name, 2, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('state')) db.createObjectStore('state');
@@ -33,16 +34,49 @@ export function createRepository(name = 'raytab-v2', onCommit = () => {}) {
     },
   });
 
-  async function readRaw() {
+  type Stored = { state: RayState; envelope?: EncryptedEnvelope };
+  let sessionEnvelope: string | undefined;
+
+  async function readStored(): Promise<Stored> {
     const db = await dbPromise;
-    const tx = db.transaction('state', 'readwrite');
-    let state = await tx.store.get('current');
+    const tx = db.transaction(['state', 'vault'], 'readwrite');
+    let state = await tx.objectStore('state').get('current');
     if (!state) {
       state = createInitialState();
-      await tx.store.put(state, 'current');
+      await tx.objectStore('state').put(state, 'current');
     }
+    const upgraded = upgradeLocalState(state);
+    if (state.schemaVersion !== upgraded.schemaVersion)
+      await tx.objectStore('state').put(upgraded, 'current');
+    const envelope = await tx.objectStore('vault').get('private');
     await tx.done;
-    return rayStateSchema.parse(state);
+    return { state: upgraded, envelope };
+  }
+  function clearSession() {
+    sessionGeneration++;
+    session = null;
+    sessionPassword = null;
+    sessionEnvelope = undefined;
+  }
+  async function refreshSession(stored: Stored) {
+    if (!stored.state.privateSecurity.protected || !stored.envelope) {
+      clearSession();
+      return;
+    }
+    if (!session || !sessionPassword || sessionEnvelope === stored.envelope.ciphertext) return;
+    const previous = session;
+    const password = sessionPassword;
+    try {
+      const next = await deserializeSession(
+        await decryptJson<VaultSerialized>(stored.envelope, password),
+      );
+      if (session === previous) {
+        session = next;
+        sessionEnvelope = stored.envelope.ciphertext;
+      }
+    } catch {
+      if (session === previous) clearSession();
+    }
   }
   function materialize(raw: RayState) {
     const state = structuredClone(raw);
@@ -50,68 +84,48 @@ export function createRepository(name = 'raytab-v2', onCommit = () => {}) {
       state.spaces.private = structuredClone(session.space);
       state.privateSettingOverrides = structuredClone(session.overrides);
       state.privateSecurity.locked = false;
-      if (
-        !state.spaces.private.desktops.some((item) => item.id === state.local.activeDesktop.private)
-      )
-        state.local.activeDesktop.private = state.spaces.private.desktops[0].id;
+      if (!state.spaces.private.groups.some((item) => item.id === state.local.activeGroup.private))
+        state.local.activeGroup.private = state.spaces.private.groups[0].id;
     } else if (state.privateSecurity.protected) {
       state.local.activeSpace = 'normal';
     }
     return rayStateSchema.parse(state);
   }
   async function read() {
-    return materialize(await readRaw());
+    const stored = await readStored();
+    await refreshSession(stored);
+    return materialize(stored.state);
   }
-  async function update(change: (draft: RayState) => void, assets: Map<string, Blob> = new Map()) {
+  async function persist(
+    stored: Stored,
+    state: RayState,
+    assets: Map<string, Blob>,
+    envelope = stored.envelope,
+  ) {
     const db = await dbPromise;
-    const raw = rayStateSchema.parse((await db.get('state', 'current')) ?? createInitialState());
-    const draft = materialize(raw);
-    change(draft);
-    draft.revision++;
-    const valid = rayStateSchema.parse(draft);
-    let envelope: EncryptedEnvelope | undefined;
-    if (valid.privateSecurity.protected && session && sessionPassword) {
-      session.space = structuredClone(valid.spaces.private);
-      session.overrides = structuredClone(valid.privateSettingOverrides);
-      for (const [id, blob] of assets) session.resources.set(id, blob);
-      for (const id of privateResourceIds(valid)) {
-        const blob = session.resources.get(id) ?? (await db.get('resources', id));
-        if (!blob) throw new Error('私密空间图片缺失，未保存任何修改');
-        session.resources.set(id, blob);
-      }
-      envelope = await encryptJson(await serializeSession(session), sessionPassword);
-    } else if (
-      valid.privateSecurity.protected &&
-      (JSON.stringify(valid.spaces.private) !== JSON.stringify(raw.spaces.private) ||
-        JSON.stringify(valid.privateSettingOverrides) !==
-          JSON.stringify(raw.privateSettingOverrides))
-    ) {
-      throw new Error('请先解锁私密空间');
-    }
     const tx = db.transaction(['state', 'resources', 'vault'], 'readwrite');
     try {
       const latest = await tx.objectStore('state').get('current');
-      if (latest && latest.revision !== raw.revision)
+      const latestEnvelope = await tx.objectStore('vault').get('private');
+      if (
+        latest?.revision !== stored.state.revision ||
+        latestEnvelope?.ciphertext !== stored.envelope?.ciphertext
+      )
         throw new Error('数据刚刚在另一个页面发生变化，请重试');
       for (const [key, blob] of assets) await tx.objectStore('resources').put(blob, key);
-
-      if (valid.privateSecurity.protected) {
-        if (envelope) {
-          await tx.objectStore('vault').put(envelope, 'private');
-          await removePrivateOnlyResources(valid, tx.objectStore('resources'));
-        }
-        const persisted = scrubPrivate(valid);
-        await validateResources(persisted, tx.objectStore('resources'));
-        await tx.objectStore('state').put(persisted, 'current');
+      const persisted = state.privateSecurity.protected ? scrubPrivate(state) : state;
+      if (state.privateSecurity.protected) {
+        if (envelope) await tx.objectStore('vault').put(envelope, 'private');
+        await removePrivateOnlyResources(state, tx.objectStore('resources'));
       } else {
-        await validateResources(valid, tx.objectStore('resources'));
+        await tx.objectStore('vault').delete('private');
+        const ids = resourceIds(state);
         for (const key of await tx.objectStore('resources').getAllKeys())
-          if (!resourceIds(valid).has(key)) await tx.objectStore('resources').delete(key);
-        await tx.objectStore('state').put(valid, 'current');
+          if (!ids.has(key)) await tx.objectStore('resources').delete(key);
       }
+      await validateResources(persisted, tx.objectStore('resources'));
+      await tx.objectStore('state').put(persisted, 'current');
       await tx.done;
-      onCommit();
-      return valid;
     } catch (error) {
       try {
         tx.abort();
@@ -122,6 +136,57 @@ export function createRepository(name = 'raytab-v2', onCommit = () => {}) {
       throw error;
     }
   }
+  async function update(
+    change: (draft: RayState) => void,
+    assets: Map<string, Blob> = new Map(),
+    expectedRevision?: number,
+  ) {
+    const db = await dbPromise;
+    const stored = await readStored();
+    if (expectedRevision !== undefined && stored.state.revision !== expectedRevision)
+      throw new Error('操作期间本地数据发生变化，请重试');
+    await refreshSession(stored);
+    const raw = stored.state;
+    const startingSession = session;
+    const draft = materialize(raw);
+    change(draft);
+    draft.revision++;
+    const valid = rayStateSchema.parse(draft);
+    let envelope = stored.envelope;
+    let nextSession: VaultSession | undefined;
+    if (valid.privateSecurity.protected && session && sessionPassword) {
+      const password = sessionPassword;
+      nextSession = {
+        space: structuredClone(valid.spaces.private),
+        overrides: structuredClone(valid.privateSettingOverrides),
+        resources: new Map(session.resources),
+      };
+      for (const [id, blob] of assets) nextSession.resources.set(id, blob);
+      for (const id of privateResourceIds(valid)) {
+        const blob = nextSession.resources.get(id) ?? (await db.get('resources', id));
+        if (!blob) throw new Error('私密空间图片缺失，未保存任何修改');
+        nextSession.resources.set(id, blob);
+      }
+      envelope = await encryptJson(await serializeSession(nextSession), password);
+    } else if (
+      valid.privateSecurity.protected &&
+      (JSON.stringify(valid.spaces.private) !== JSON.stringify(raw.spaces.private) ||
+        JSON.stringify(valid.privateSettingOverrides) !==
+          JSON.stringify(raw.privateSettingOverrides))
+    ) {
+      throw new Error('请先解锁私密空间');
+    }
+    if (nextSession && session !== startingSession)
+      throw new Error('私密空间状态已变化，请重新操作');
+    await persist(stored, valid, assets, envelope);
+    const sessionChanged = nextSession && session !== startingSession;
+    if (nextSession && !sessionChanged) {
+      session = nextSession;
+      sessionEnvelope = envelope?.ciphertext;
+    }
+    onCommit();
+    return sessionChanged ? read() : valid;
+  }
 
   return {
     read,
@@ -130,7 +195,8 @@ export function createRepository(name = 'raytab-v2', onCommit = () => {}) {
       return session?.resources.get(key) ?? (await dbPromise).get('resources', key);
     },
     async protectPrivate(password: string) {
-      const state = await read();
+      const stored = await readStored();
+      const state = stored.state;
       if (state.privateSecurity.protected) throw new Error('私密空间已经设置密码');
       const resources = new Map<string, Blob>();
       const db = await dbPromise;
@@ -145,82 +211,109 @@ export function createRepository(name = 'raytab-v2', onCommit = () => {}) {
         resources,
       };
       const envelope = await encryptJson(await serializeSession(payload), password);
-      const tx = db.transaction(['state', 'resources', 'vault'], 'readwrite');
-      state.privateSecurity = { protected: true, locked: true };
-      state.local.activeSpace = 'normal';
-      await tx.objectStore('state').put(scrubPrivate(state), 'current');
-      await tx.objectStore('vault').put(envelope, 'private');
-      await removePrivateOnlyResources(state, tx.objectStore('resources'));
-      await tx.done;
-      session = null;
-      sessionPassword = null;
+      const next = structuredClone(state);
+      next.privateSecurity = { protected: true, locked: true };
+      next.local.activeSpace = 'normal';
+      next.revision++;
+      await persist(stored, next, new Map(), envelope);
+      clearSession();
       onCommit();
       return read();
     },
     async unlockPrivate(password: string) {
-      const envelope = await (await dbPromise).get('vault', 'private');
+      const generation = ++sessionGeneration;
+      const { envelope } = await readStored();
       if (!envelope) throw new Error('私密空间没有加密数据');
-      session = await deserializeSession(await decryptJson<VaultSerialized>(envelope, password));
+      const unlocked = await deserializeSession(
+        await decryptJson<VaultSerialized>(envelope, password),
+      );
+      if (generation !== sessionGeneration) throw new Error('私密空间状态已变化，请重新操作');
+      session = unlocked;
       sessionPassword = password;
+      sessionEnvelope = envelope.ciphertext;
       const state = await read();
       onCommit();
       return state;
     },
     async lockPrivate() {
-      session = null;
-      sessionPassword = null;
+      clearSession();
       onCommit();
       return read();
     },
     async changePrivatePassword(currentPassword: string, nextPassword: string) {
-      const db = await dbPromise;
-      const envelope = await db.get('vault', 'private');
-      if (!envelope) throw new Error('私密空间尚未设置密码');
-      const payload = await decryptJson<VaultSerialized>(envelope, currentPassword);
-      await db.put('vault', await encryptJson(payload, nextPassword), 'private');
-      session = null;
-      sessionPassword = null;
+      const stored = await readStored();
+      if (!stored.envelope) throw new Error('私密空间尚未设置密码');
+      const payload = await decryptJson<VaultSerialized>(stored.envelope, currentPassword);
+      const envelope = await encryptJson(payload, nextPassword);
+      const next = { ...stored.state, revision: stored.state.revision + 1 };
+      await persist(stored, next, new Map(), envelope);
+      clearSession();
       onCommit();
     },
     async removePrivatePassword(password: string) {
-      const db = await dbPromise;
-      const envelope = await db.get('vault', 'private');
-      if (!envelope) throw new Error('私密空间尚未设置密码');
+      const stored = await readStored();
+      if (!stored.envelope) throw new Error('私密空间尚未设置密码');
       const payload = await deserializeSession(
-        await decryptJson<VaultSerialized>(envelope, password),
+        await decryptJson<VaultSerialized>(stored.envelope, password),
       );
-      const raw = await readRaw();
-      raw.spaces.private = payload.space;
-      raw.privateSettingOverrides = payload.overrides;
-      raw.privateSecurity = { protected: false, locked: false };
-      const tx = db.transaction(['state', 'resources', 'vault'], 'readwrite');
-      for (const [id, blob] of payload.resources) await tx.objectStore('resources').put(blob, id);
-      await tx.objectStore('state').put(rayStateSchema.parse(raw), 'current');
-      await tx.objectStore('vault').delete('private');
-      await tx.done;
-      session = null;
-      sessionPassword = null;
+      const next = structuredClone(stored.state);
+      next.spaces.private = payload.space;
+      next.privateSettingOverrides = payload.overrides;
+      next.privateSecurity = { protected: false, locked: false };
+      next.local.activeGroup.private = payload.space.groups[0].id;
+      next.revision++;
+      await persist(stored, rayStateSchema.parse(next), payload.resources);
+      clearSession();
       onCommit();
       return read();
     },
-    async snapshot() {
+    async snapshot(range: SpaceId | 'all' = 'all') {
       const state = await read();
-      if (state.privateSecurity.protected && state.privateSecurity.locked)
+      if (range !== 'normal' && state.privateSecurity.protected && state.privateSecurity.locked)
         throw new Error('请先解锁私密空间再生成包含私密空间的备份');
       const resources = new Map<string, Blob>();
-      for (const key of resourceIds(state)) {
+      const ids = new Set<string>();
+      for (const spaceId of ['normal', 'private'] as const) {
+        if (range !== 'all' && range !== spaceId) continue;
+        for (const site of state.spaces[spaceId].sites) if (site.iconId) ids.add(site.iconId);
+        const wallpaperId =
+          spaceId === 'normal'
+            ? state.normalSettings.wallpaperId
+            : (state.privateSettingOverrides.wallpaperId ?? state.normalSettings.wallpaperId);
+        if (wallpaperId) ids.add(wallpaperId);
+      }
+      for (const key of ids) {
         const blob = await this.resource(key);
         if (!blob) throw new Error('本地图片缺失，无法生成完整备份');
         resources.set(key, blob);
       }
       return { state, resources };
     },
-    async restore(state: RayState, assets: Map<string, Blob>) {
+    async restore(
+      state: RayState,
+      assets: Map<string, Blob>,
+      {
+        expectedRevision,
+        range = 'all',
+      }: { expectedRevision?: number; range?: SpaceId | 'all' } = {},
+    ) {
       const valid = rayStateSchema.parse(state);
-      return update((draft) => {
-        const revision = draft.revision;
-        Object.assign(draft, valid, { revision });
-      }, assets);
+      return update(
+        (draft) => {
+          if (range !== 'normal' && draft.privateSecurity.protected && draft.privateSecurity.locked)
+            throw new Error('请先解锁私密空间');
+          for (const spaceId of ['normal', 'private'] as const) {
+            if (range !== 'all' && range !== spaceId) continue;
+            draft.spaces[spaceId] = valid.spaces[spaceId];
+            draft.local.activeGroup[spaceId] = valid.local.activeGroup[spaceId];
+            draft.local.selectedFolder[spaceId] = valid.local.selectedFolder[spaceId];
+          }
+          if (range !== 'private') draft.normalSettings = valid.normalSettings;
+          if (range !== 'normal') draft.privateSettingOverrides = valid.privateSettingOverrides;
+        },
+        assets,
+        expectedRevision,
+      );
     },
     async close() {
       (await dbPromise).close();
@@ -233,8 +326,8 @@ function scrubPrivate(state: RayState) {
   persisted.spaces.private = createLockedPrivateSpace();
   persisted.privateSettingOverrides = {};
   persisted.privateSecurity.locked = true;
-  persisted.local.activeDesktop.private = persisted.spaces.private.desktops[0].id;
-  persisted.local.selectedCategory.private = {};
+  persisted.local.activeGroup.private = persisted.spaces.private.groups[0].id;
+  persisted.local.selectedFolder.private = {};
   return rayStateSchema.parse(persisted);
 }
 function privateResourceIds(state: RayState) {
@@ -273,8 +366,10 @@ async function serializeSession(session: VaultSession): Promise<VaultSerialized>
   return { space: session.space, overrides: session.overrides, resources };
 }
 async function deserializeSession(value: VaultSerialized): Promise<VaultSession> {
-  const space = spaceDataSchema.parse(value.space);
-  const overrides = spaceSettingsSchema.partial().parse(value.overrides);
+  const space = upgradeLocalSpace(value.space);
+  const overrides = rayStateSchema.shape.privateSettingOverrides.parse(
+    upgradeSettings(value.overrides),
+  );
   const resources = new Map<string, Blob>();
   for (const item of value.resources)
     resources.set(item.id, new Blob([fromBase64(item.data)], { type: item.type }));

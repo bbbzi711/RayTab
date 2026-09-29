@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
-  Globe2,
-  Grid2X2,
   LayoutGrid,
   LockKeyhole,
   Minimize2,
-  MoreHorizontal,
   PanelLeft,
-  Pin,
-  PinOff,
-  Plus,
   Settings,
   ShieldCheck,
   Sun,
@@ -42,8 +36,6 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [unlockOpen, setUnlockOpen] = useState(false);
-  const [addRequested, setAddRequested] = useState(0);
-  const [manageRequested, setManageRequested] = useState(0);
   const rootTheme = state ? effectiveSettings(state, state.local.activeSpace).theme : undefined;
   const rootHomeMode = state?.local.homeMode;
   useEffect(() => {
@@ -58,25 +50,25 @@ export default function App() {
     document.documentElement.dataset.theme = rootTheme;
     document.documentElement.dataset.homeMode = rootHomeMode;
   }, [rootHomeMode, rootTheme]);
-  if (!state)
-    return (
-      <main className="loading">
-        <Sun size={32} />
-        <h1>RayTab</h1>
-        <p>{error ?? '正在打开你的空间…'}</p>
-        {error && <button onClick={() => void refresh()}>重试</button>}
-      </main>
-    );
-
-  const spaceId = state.local.activeSpace;
-  const homeMode = state.local.homeMode;
-  const settings = effectiveSettings(state, spaceId);
-  const textColors = resolveHomeTextColors(settings);
-  const tr = (text: string) => t(settings.language, text);
-  const sidebarMode = settings.sidebarMode ?? 'always';
+  const spaceId = state?.local.activeSpace;
+  const homeMode = state?.local.homeMode;
+  const sidebarMode = state
+    ? (effectiveSettings(state, state.local.activeSpace).sidebarMode ?? 'always')
+    : undefined;
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [isSidebarPinnedOpen, setIsSidebarPinnedOpen] = useState(false);
   const hoverLeaveTimerRef = useRef<number | null>(null);
+
+  const [groupsPortalNode, setGroupsPortalNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setIsSidebarHovered(false);
+    setIsSidebarPinnedOpen(false);
+    if (hoverLeaveTimerRef.current) window.clearTimeout(hoverLeaveTimerRef.current);
+    return () => {
+      if (hoverLeaveTimerRef.current) window.clearTimeout(hoverLeaveTimerRef.current);
+    };
+  }, [sidebarMode, spaceId, homeMode]);
 
   const handleMouseEnterSidebar = () => {
     if (hoverLeaveTimerRef.current) {
@@ -97,9 +89,12 @@ export default function App() {
 
   const isSidebarVisible =
     homeMode === 'navigation' &&
-    (sidebarMode === 'always' || isSidebarHovered || isSidebarPinnedOpen);
+    (sidebarMode === 'always' ||
+      (sidebarMode === 'auto' && isSidebarHovered) ||
+      isSidebarPinnedOpen);
 
   useEffect(() => {
+    if (!spaceId) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (
         e.target instanceof HTMLInputElement ||
@@ -126,6 +121,19 @@ export default function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [homeMode, sidebarMode, spaceId]);
+  if (!state || !spaceId)
+    return (
+      <main className="loading">
+        <Sun size={32} />
+        <h1>RayTab</h1>
+        <p>{error ?? '正在打开你的空间…'}</p>
+        {error && <button onClick={() => void refresh()}>重试</button>}
+      </main>
+    );
+
+  const settings = effectiveSettings(state, state.local.activeSpace);
+  const textColors = resolveHomeTextColors(settings);
+  const tr = (text: string) => t(settings.language, text);
   const switchSpace = (next: SpaceId) => {
     if (next === 'private' && state.privateSecurity.protected && state.privateSecurity.locked) {
       setUnlockOpen(true);
@@ -159,15 +167,16 @@ export default function App() {
             '--home-clock-color': textColors.clock,
             '--home-date-color': textColors.date,
             '--home-greeting-color': textColors.greeting,
-            '--home-search-color': textColors.search,
+            '--home-search-color':
+              settings.textColorMode === 'auto' ? undefined : textColors.search,
             '--home-tabs-color': textColors.tabs,
             '--home-cards-color': textColors.cards,
           } as React.CSSProperties
         }
       >
-        <Background settings={settings} />
+        <Background key={spaceId} settings={settings} onError={setNotice} />
 
-        {/* 右上角模式切换（带柔和磨砂底色与动态图标） */}
+        {/* 右上角模式切换 */}
         <div className="fixed top-4 right-4 z-40">
           <Tooltip content={homeMode === 'focus' ? tr('展开导航') : tr('进入简洁模式')} side="left">
             <button
@@ -185,8 +194,8 @@ export default function App() {
           </Tooltip>
         </div>
 
-        {/* 边缘悬停滑出热区与微光指示条（学习 iTab 的边缘悬停呼出体验） */}
-        {homeMode === 'navigation' && sidebarMode !== 'always' && (
+        {/* 边缘悬停滑出热区与微光指示条 */}
+        {homeMode === 'navigation' && sidebarMode === 'auto' && (
           <div
             className="fixed left-0 top-0 bottom-0 w-3.5 z-40 flex items-center group pointer-events-auto cursor-pointer select-none"
             onMouseEnter={handleMouseEnterSidebar}
@@ -218,156 +227,110 @@ export default function App() {
           </Tooltip>
         )}
 
-        {/* 左侧贴边极简侧边栏（支持常驻显示、自动隐藏与完全隐藏） */}
+        {/* 左侧贴边极简侧边栏 */}
         <aside
           onMouseEnter={handleMouseEnterSidebar}
           onMouseLeave={handleMouseLeaveSidebar}
           className={cn(
-            'fixed left-2.5 right-2.5 bottom-2.5 h-[60px] flex flex-row items-center px-2 py-2 z-30 bg-black/30 hover:bg-black/40 backdrop-blur-2xl border border-white/15 rounded-2xl transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) select-none sm:left-0 sm:right-auto sm:top-0 sm:bottom-0 sm:h-auto sm:w-14 sm:flex-col sm:px-0 sm:py-3.5 sm:rounded-none sm:border-y-0 sm:border-l-0 sm:border-r sm:border-white/10',
+            'fixed left-0 top-0 bottom-0 z-30 flex flex-col items-center py-4 sm:py-[22px] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] select-none',
+            'w-[56px] sm:w-[76px]',
+            'bg-black/20 hover:bg-black/30 border-r border-white/10 backdrop-blur-2xl',
             !isSidebarVisible
-              ? 'translate-y-24 opacity-0 pointer-events-none sm:translate-y-0 sm:-translate-x-full'
-              : 'translate-y-0 opacity-100 sm:translate-x-0 shadow-2xl',
+              ? '-translate-x-full opacity-0 pointer-events-none'
+              : 'translate-x-0 opacity-100 shadow-2xl',
           )}
-          aria-label={tr('空间')}
+          aria-label={tr('分组栏')}
           aria-hidden={!isSidebarVisible}
           inert={!isSidebarVisible}
         >
           <div
-            className="hidden sm:flex w-8 h-8 rounded-xl bg-gradient-to-br from-white/90 to-white/60 text-slate-900 font-bold text-xs items-center justify-center shadow-md select-none mb-4"
+            className="text-[21px] tracking-[-2px] font-medium leading-[32px] text-white/90 mb-[18px] shrink-0"
             aria-label="RayTab"
-            title="RayTab"
           >
-            R
+            R.
           </div>
-          <nav className="flex gap-2 sm:flex-col sm:gap-2.5" aria-label={tr('空间')}>
-            <Tooltip content={tr('普通空间')} side="right">
-              <button
-                className={cn(
-                  'relative flex flex-col items-center justify-center w-10 h-11 rounded-xl transition-all duration-150 cursor-pointer',
-                  spaceId === 'normal'
-                    ? 'bg-white/25 text-white shadow-xs font-semibold'
-                    : 'text-white/75 hover:text-white hover:bg-white/15',
-                )}
-                aria-label={tr('普通空间')}
-                aria-pressed={spaceId === 'normal'}
-                onClick={() => switchSpace('normal')}
-              >
-                <Globe2 size={16} />
-                <span className="text-[10px] font-medium leading-none mt-1">{tr('普通')}</span>
-              </button>
-            </Tooltip>
-            <Tooltip content={tr('私密空间')} side="right">
-              <button
-                className={cn(
-                  'relative flex flex-col items-center justify-center w-10 h-11 rounded-xl transition-all duration-150 cursor-pointer',
-                  spaceId === 'private'
-                    ? 'bg-purple-500/35 text-purple-100 border border-purple-400/40 shadow-xs font-semibold'
-                    : 'text-white/75 hover:text-white hover:bg-white/15',
-                )}
-                aria-label={tr('私密空间')}
-                aria-pressed={spaceId === 'private'}
-                onClick={() => switchSpace('private')}
-              >
-                <LockKeyhole size={15} />
-                <span className="text-[10px] font-medium leading-none mt-1">{tr('私密')}</span>
-              </button>
-            </Tooltip>
-          </nav>
-          <div className="flex gap-2 ml-auto pl-2 border-l border-white/15 sm:flex-col sm:mt-auto sm:ml-0 sm:pl-0 sm:border-l-0">
-            <Tooltip content={tr('添加网站')} side="right">
-              <button
-                className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
-                aria-label={tr('添加网站')}
-                onClick={() => setAddRequested((value) => value + 1)}
-              >
-                <Plus size={16} />
-                <span className="text-[10px] font-medium leading-none mt-1">{tr('添加')}</span>
-              </button>
-            </Tooltip>
-            <Tooltip content={tr('管理')} side="right">
-              <button
-                className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
-                aria-label={tr('管理')}
-                onClick={() => setManageRequested((value) => value + 1)}
-              >
-                <MoreHorizontal size={16} />
-                <span className="text-[10px] font-medium leading-none mt-1">{tr('管理')}</span>
-              </button>
-            </Tooltip>
+
+          {/* Groups Portal */}
+          <div
+            ref={setGroupsPortalNode}
+            role="navigation"
+            aria-label={tr('分组导航')}
+            className="flex-1 w-full min-h-0 flex flex-col gap-[7px] items-center overflow-y-auto no-scrollbar px-1 sm:px-2"
+          />
+
+          <div className="flex flex-col gap-[3px] shrink-0 w-full px-1 sm:px-2 mt-auto pt-2">
             <Tooltip
-              content={sidebarMode === 'always' ? tr('自动隐藏侧边栏') : tr('固定侧边栏')}
+              content={tr(spaceId === 'normal' ? '切换私密空间' : '切换普通空间')}
               side="right"
             >
               <button
-                className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
-                aria-label={sidebarMode === 'always' ? tr('自动隐藏侧边栏') : tr('固定侧边栏')}
-                onClick={() => {
-                  const nextMode = sidebarMode === 'always' ? 'auto' : 'always';
-                  void dispatch({
-                    type: 'settings',
-                    spaceId,
-                    patch: { sidebarMode: nextMode },
-                  }).catch((reason: Error) => setNotice(reason.message));
-                }}
+                className="relative flex flex-col items-center justify-center w-full min-h-[50px] sm:min-h-[54px] rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
+                onClick={() => switchSpace(spaceId === 'normal' ? 'private' : 'normal')}
               >
-                {sidebarMode === 'always' ? <PinOff size={15} /> : <Pin size={15} />}
-                <span className="text-[10px] font-medium leading-none mt-1">
-                  {sidebarMode === 'always' ? tr('自动') : tr('固定')}
+                <LockKeyhole size={19} strokeWidth={1.6} />
+                <span className="text-[11px] font-medium leading-none mt-[5px]">
+                  {tr(spaceId === 'normal' ? '私密空间' : '普通空间')}
                 </span>
               </button>
             </Tooltip>
-            <Tooltip content={tr('打开设置')} side="right">
+            <Tooltip content={tr('设置')} side="right">
               <button
-                className="flex flex-col items-center justify-center w-10 h-11 rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
-                aria-label={tr('打开设置')}
+                className="flex flex-col items-center justify-center w-full min-h-[50px] sm:min-h-[54px] rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
+                aria-label={tr('设置')}
                 onClick={() => {
                   setSettingsOpen(true);
                   setIsSidebarPinnedOpen(false);
                 }}
               >
-                <Settings size={15} />
-                <span className="text-[10px] font-medium leading-none mt-1">{tr('设置')}</span>
+                <Settings size={19} strokeWidth={1.6} />
+                <span className="text-[11px] font-medium leading-none mt-[5px]">{tr('设置')}</span>
               </button>
             </Tooltip>
           </div>
         </aside>
 
-        {/* 主工作区（时钟、搜索框与卡片网格持久渲染，位置与缩放通过 CSS 动画平滑过渡） */}
+        {/* 主工作区 */}
         <div
-          onClick={() => {
-            if (isSidebarPinnedOpen) setIsSidebarPinnedOpen(false);
+          onClick={(event) => {
+            if (isSidebarPinnedOpen && event.currentTarget.contains(event.target as Node))
+              setIsSidebarPinnedOpen(false);
           }}
           className={cn(
-            'relative w-full min-h-screen flex flex-col items-center justify-between transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
+            'relative w-full min-h-screen flex flex-col items-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
             homeMode === 'focus'
-              ? 'pt-[16vh] sm:pt-[18vh] px-4 pb-8'
-              : 'pt-5 px-4 pb-24 sm:pt-6 sm:px-16 sm:pb-8',
+              ? 'pt-[118px] px-4 pb-8'
+              : 'pt-[70px] sm:pt-[57px] px-[68px] sm:px-[92px] pb-[88px]',
           )}
         >
-          <div className="w-full max-w-6xl mx-auto flex flex-col items-center transition-all duration-500">
-            {settings.showClock && (
+          <div className="w-full mx-auto flex flex-col transition-all duration-500">
+            {(settings.showClock ||
+              settings.showDate ||
+              settings.showLunar ||
+              settings.showGreeting) && (
               <Clock
                 language={settings.language}
                 hour12={settings.hour12}
+                showClock={settings.showClock}
                 showDate={settings.showDate}
                 showLunar={settings.showLunar}
-                showGreeting={false}
+                showGreeting={settings.showGreeting}
+                customGreetings={settings.customGreetings}
                 compact={homeMode === 'navigation'}
               />
             )}
             {settings.showSearch && (
-              <div className="relative z-30 w-full flex justify-center">
+              <div className="relative z-30 w-full flex justify-center mt-[29px]">
                 <SearchBar settings={settings} spaceId={spaceId} onError={setNotice} />
               </div>
             )}
 
-            {/* 导航卡片区域（在简洁模式下平滑淡出，在导航模式下展开） */}
+            {/* 导航卡片区域 */}
             <div
               className={cn(
-                'relative z-10 w-full transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)',
+                'relative z-10 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
                 homeMode === 'focus'
                   ? 'opacity-0 max-h-0 pointer-events-none overflow-hidden translate-y-6 scale-[0.98]'
-                  : 'opacity-100 max-h-[10000px] translate-y-0 scale-100',
+                  : 'opacity-100 max-h-[10000px] translate-y-0 scale-100 mt-[51px]',
               )}
               aria-hidden={homeMode === 'focus'}
               inert={homeMode === 'focus'}
@@ -375,24 +338,12 @@ export default function App() {
               <NavigationPage
                 state={state}
                 spaceId={spaceId}
-                addRequested={addRequested}
-                manageRequested={manageRequested}
                 onError={setNotice}
+                groupsPortal={groupsPortalNode}
+                onOpenSettings={() => setSettingsOpen(true)}
               />
             </div>
           </div>
-
-          {/* 底部名言金句 */}
-          <footer
-            className={cn(
-              'text-center text-[12px] text-white/55 font-normal tracking-wider drop-shadow-[0_1px_4px_rgba(0,0,0,0.3)] px-4 select-none transition-all duration-500',
-              homeMode === 'focus' ? 'mt-auto pt-8' : 'mt-6 pb-2',
-            )}
-          >
-            {tr(
-              '「要始终记得自己是一个可以不断生长的人，始终对生活、生命有敬畏，有期待，有相信，有开创。」',
-            )}
-          </footer>
         </div>
 
         {(notice || error) && (

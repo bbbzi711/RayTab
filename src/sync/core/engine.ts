@@ -6,7 +6,8 @@ import {
   type BackupDocument,
 } from '@/features/backup/backup';
 import { repository } from '@/storage/repository';
-import { spaceSettingsSchema } from '@/storage/model';
+import { folderSchema, siteSchema, spaceSettingsSchema } from '@/storage/model';
+import { applyCommand } from '@/storage/operations';
 import { mergeSpaceData, type SyncConflict } from './merge';
 import { createProvider, type SyncConnection } from '../providers';
 
@@ -64,46 +65,60 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
   const config = await loadSyncConfig();
   if (!config) throw new Error('请先保存同步连接');
   const provider = createProvider(config.connection);
-  const snapshot = await repository.snapshot();
+  const range = config.includePrivate ? 'all' : 'normal';
+  const snapshot = await repository.snapshot(range);
   if (config.includePrivate && snapshot.state.privateSecurity.protected && !config.privatePassword)
     throw new Error('同步受密码保护的私密空间需要填写同步加密密码');
   const local = await createBackup(
     snapshot.state,
     snapshot.resources,
-    config.includePrivate ? 'all' : 'normal',
+    range,
     config.privatePassword,
   );
   try {
     const remoteFile = await provider.read();
-    if (mode === 'push' || !remoteFile) {
-      const version = await provider.write(JSON.stringify(local), remoteFile?.version ?? null);
-      await saveSuccess(local, version);
-      return { document: local, conflicts: [] };
+    if (!remoteFile && mode === 'pull') throw new Error('远端没有可恢复的备份');
+    const remote = remoteFile ? await parseBackup(remoteFile.content) : undefined;
+    if (mode === 'push' || !remote) {
+      const document = structuredClone(local);
+      if (!config.includePrivate && remote?.spaces.private)
+        document.spaces.private = remote.spaces.private;
+      await assertLocalRevision(snapshot.state.revision);
+      const version = await provider.write(JSON.stringify(document), remoteFile?.version ?? null);
+      await saveSuccess(document, version);
+      return { document, conflicts: [] };
     }
-    const remote = await parseBackup(remoteFile.content);
+    if (!config.includePrivate && !remote.spaces.normal) throw new Error('远端备份不包含普通空间');
     if (mode === 'pull') {
       const restored = await restoreBackup(
         snapshot.state,
-        remote,
+        config.includePrivate ? remote : normalOnly(remote),
         'replace',
         config.privatePassword,
       );
-      await repository.restore(restored.state, restored.resources);
-      await saveSuccess(remote, remoteFile.version);
+      await repository.restore(restored.state, restored.resources, {
+        expectedRevision: snapshot.state.revision,
+        range,
+      });
+      await saveSuccess(remote, remoteFile?.version ?? null);
       return { document: remote, conflicts: [] };
     }
     const stored = (await browser.storage.local.get(BASELINE_KEY))[BASELINE_KEY] as
       { document?: unknown } | undefined;
     const baseline = stored?.document ? backupSchema.parse(stored.document) : undefined;
     const { document, conflicts } = mergeDocuments(baseline, local, remote);
-    const version = await provider.write(JSON.stringify(document), remoteFile.version);
     const restored = await restoreBackup(
       snapshot.state,
-      document,
+      config.includePrivate ? document : normalOnly(document),
       'replace',
       config.privatePassword,
     );
-    await repository.restore(restored.state, restored.resources);
+    await assertLocalRevision(snapshot.state.revision);
+    const version = await provider.write(JSON.stringify(document), remoteFile?.version ?? null);
+    await repository.restore(restored.state, restored.resources, {
+      expectedRevision: snapshot.state.revision,
+      range,
+    });
     await saveSuccess(document, version, conflicts);
     return { document, conflicts };
   } catch (error) {
@@ -119,6 +134,15 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
     });
     throw error;
   }
+}
+
+function normalOnly(document: BackupDocument): BackupDocument {
+  return { ...document, spaces: { normal: document.spaces.normal } };
+}
+
+async function assertLocalRevision(revision: number) {
+  if ((await repository.read()).revision !== revision)
+    throw new Error('同步期间本地数据发生变化，请重试');
 }
 
 async function withSyncLease<T>(task: () => Promise<T>) {
@@ -144,22 +168,67 @@ export async function resolveSyncConflict(index: number, choice: 'local' | 'remo
   const conflict = status.conflicts[index];
   if (!conflict) throw new Error('冲突记录不存在');
   if (choice === 'remote') {
-    const snapshot = await repository.snapshot();
+    const snapshot = await repository.snapshot('normal');
     const state = snapshot.state;
     if (conflict.id === 'settings') {
       state.normalSettings = spaceSettingsSchema.parse(conflict.remote);
     } else if (conflict.id === 'private-space') {
       throw new Error('私密空间版本请使用本机覆盖或云端恢复处理');
     } else {
-      const collection = `${conflict.entity}s` as 'desktops' | 'categories' | 'sites';
+      const collection = `${conflict.entity}s` as 'groups' | 'folders' | 'sites';
       const record = state.spaces.normal[collection].find((item) => item.id === conflict.id);
       if (!record) throw new Error('冲突对象已不存在');
-      if (conflict.field === '*') Object.assign(record, conflict.remote);
+      if (
+        (conflict.entity === 'site' || conflict.entity === 'folder') &&
+        conflict.field === 'location'
+      ) {
+        const destination =
+          conflict.entity === 'site'
+            ? siteSchema.pick({ groupId: true, folderId: true, order: true }).parse(conflict.remote)
+            : {
+                ...folderSchema.pick({ groupId: true, order: true }).parse(conflict.remote),
+                folderId: null,
+              };
+        const candidates = [
+          ...state.spaces.normal.sites.filter(
+            (item) =>
+              item.groupId === destination.groupId && item.folderId === destination.folderId,
+          ),
+          ...(destination.folderId === null
+            ? state.spaces.normal.folders.filter((item) => item.groupId === destination.groupId)
+            : []),
+        ]
+          .filter((item) => item.id !== record.id)
+          .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+        const beforeId = candidates.find((item) => item.order >= destination.order)?.id;
+        applyCommand(
+          state,
+          conflict.entity === 'site'
+            ? {
+                type: 'move-site',
+                spaceId: 'normal',
+                id: record.id,
+                groupId: destination.groupId,
+                folderId: destination.folderId,
+                beforeId,
+              }
+            : {
+                type: 'move-folder',
+                spaceId: 'normal',
+                id: record.id,
+                groupId: destination.groupId,
+                beforeId,
+              },
+        );
+      } else if (conflict.field === '*') Object.assign(record, conflict.remote);
       else (record as unknown as Record<string, unknown>)[conflict.field] = conflict.remote;
       record.updatedAt = Date.now();
       record.changeId = crypto.randomUUID();
     }
-    await repository.restore(state, snapshot.resources);
+    await repository.restore(state, snapshot.resources, {
+      expectedRevision: snapshot.state.revision,
+      range: 'normal',
+    });
   }
   status.conflicts.splice(index, 1);
   await browser.storage.local.set({ [STATUS_KEY]: status });
@@ -195,7 +264,7 @@ function mergeDocuments(
       JSON.stringify(remote.spaces.normal.settings) !== JSON.stringify(local.spaces.normal.settings)
     )
       conflicts.push({
-        entity: 'desktop',
+        entity: 'group',
         id: 'settings',
         field: '*',
         local: local.spaces.normal.settings,
@@ -215,7 +284,7 @@ function mergeDocuments(
       document.spaces.private = remote.spaces.private;
     else if (JSON.stringify(remote.spaces.private) !== basePrivate)
       conflicts.push({
-        entity: 'desktop',
+        entity: 'group',
         id: 'private-space',
         field: '*',
         local: '本机私密版本',

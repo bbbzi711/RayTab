@@ -36,15 +36,17 @@ export function DataSettings({
   const [confirm, confirmDialog] = useConfirm();
   const [sourceCandidates, setSourceCandidates] = useState<BookmarkCandidate[]>([]);
   const [duplicateMode, setDuplicateMode] = useState<'skip-url' | 'keep-all'>('skip-url');
-  const [organizeMode, setOrganizeMode] = useState<'folders' | 'flat'>('folders');
-  const [targetDesktopId, setTargetDesktopId] = useState(state.local.activeDesktop[spaceId]);
+  const [organizeMode, setOrganizeMode] = useState<'folders' | 'flat'>('flat');
+  const [targetGroupId, setTargetGroupId] = useState(state.local.activeGroup[spaceId]);
   const [document, setDocument] = useState<BackupDocument>();
   const [password, setPassword] = useState('');
+  const [restorePassword, setRestorePassword] = useState('');
+  const [busy, setBusy] = useState(false);
   const [backupRange, setBackupRange] = useState<SpaceId | 'all'>('all');
   const candidates = useMemo(() => {
     const organized =
       organizeMode === 'flat'
-        ? sourceCandidates.map((item) => ({ ...item, category: tr('导入书签') }))
+        ? sourceCandidates.map(({ folder, ...item }) => item)
         : sourceCandidates;
     return deduplicateBookmarks(
       organized,
@@ -54,26 +56,32 @@ export function DataSettings({
   }, [duplicateMode, organizeMode, sourceCandidates, spaceId, state.spaces]);
   const preview = (items: BookmarkCandidate[]) => setSourceCandidates(items);
   const importNow = async () => {
+    if (busy || !candidates.length) return;
+    setBusy(true);
     try {
       await dispatch({
         type: 'import-bookmarks',
         spaceId,
-        desktopId: targetDesktopId,
+        groupId: targetGroupId,
         items: candidates,
       });
       setSourceCandidates([]);
     } catch (error) {
       onError((error as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
   const exportBackup = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
-      const snapshot = await repository.snapshot();
+      const snapshot = await repository.snapshot(backupRange);
       const backup = await createBackup(
         snapshot.state,
         snapshot.resources,
         backupRange,
-        state.privateSecurity.protected && backupRange !== 'normal' ? password : undefined,
+        snapshot.state.privateSecurity.protected && backupRange !== 'normal' ? password : undefined,
       );
       download(
         `raytab-${backupRange}-backup-${new Date().toISOString().slice(0, 10)}.json`,
@@ -81,10 +89,12 @@ export function DataSettings({
       );
     } catch (error) {
       onError((error as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
   const restore = async (mode: 'merge' | 'replace') => {
-    if (!document) return;
+    if (!document || busy) return;
     if (mode === 'replace') {
       const ok = await confirm({
         title: tr('确定要替换恢复？'),
@@ -95,13 +105,21 @@ export function DataSettings({
       });
       if (!ok) return;
     }
+    setBusy(true);
     try {
-      const result = await restoreBackup(state, document, mode, password || undefined);
-      await repository.restore(result.state, result.resources);
+      const current = await repository.read();
+      const result = await restoreBackup(current, document, mode, restorePassword || undefined);
+      await repository.restore(result.state, result.resources, {
+        expectedRevision: current.revision,
+        range: document.spaces.private ? (document.spaces.normal ? 'all' : 'private') : 'normal',
+      });
       await refresh();
       setDocument(undefined);
+      setRestorePassword('');
     } catch (error) {
       onError((error as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -113,13 +131,15 @@ export function DataSettings({
           </span>
           <div>
             <h3>{tr('导入书签')}</h3>
-            <p>{tr('先预览并按书签文件夹建立分类，重复网址默认跳过。')}</p>
+            <p>{tr('先预览网站，默认平铺导入并跳过重复网址。')}</p>
           </div>
         </div>
         <div className="data-actions">
           <Button
             variant="outline"
             size="sm"
+            disabled={busy || typeof browser === 'undefined' || !browser.bookmarks?.getTree}
+            title={tr('请在扩展中读取浏览器书签；预览中可导入 HTML 文件。')}
             onClick={() =>
               void readBrowserBookmarks()
                 .then(preview)
@@ -135,6 +155,7 @@ export function DataSettings({
               accept="text/html,.html"
               onChange={(event) => {
                 const file = event.target.files?.[0];
+                event.target.value = '';
                 if (file)
                   void file
                     .text()
@@ -154,8 +175,8 @@ export function DataSettings({
                   value={organizeMode}
                   onChange={(event) => setOrganizeMode(event.target.value as typeof organizeMode)}
                 >
-                  <option value="folders">{tr('按书签文件夹建立分类')}</option>
-                  <option value="flat">{tr('全部放入“导入书签”')}</option>
+                  <option value="folders">{tr('保留书签文件夹')}</option>
+                  <option value="flat">{tr('直接平铺')}</option>
                 </Select>
               </label>
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -169,16 +190,16 @@ export function DataSettings({
                 </Select>
               </label>
               <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                {tr('目标桌面')}
+                {tr('目标分组')}
                 <Select
-                  value={targetDesktopId}
-                  onChange={(event) => setTargetDesktopId(event.target.value)}
+                  value={targetGroupId}
+                  onChange={(event) => setTargetGroupId(event.target.value)}
                 >
-                  {[...state.spaces[spaceId].desktops]
+                  {[...state.spaces[spaceId].groups]
                     .sort((a, b) => a.order - b.order)
-                    .map((desktop) => (
-                      <option key={desktop.id} value={desktop.id}>
-                        {desktop.name}
+                    .map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
                       </option>
                     ))}
                 </Select>
@@ -197,14 +218,15 @@ export function DataSettings({
                     </span>
                   )}
                   <span>
-                    {new Set(candidates.map((item) => item.category)).size}{' '}
-                    {tr('个分类，将保存到所选桌面')}
+                    {new Set(candidates.map((item) => item.folder).filter(Boolean)).size}{' '}
+                    {tr('个文件夹，将保存到所选分组')}
                   </span>
                 </div>
               </div>
               <Button
                 size="sm"
                 className="rounded-xl px-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs"
+                disabled={busy || !candidates.length}
                 onClick={() => void importNow()}
               >
                 {tr('确认导入')}
@@ -242,15 +264,20 @@ export function DataSettings({
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               minLength={6}
+              aria-label={tr('私密空间备份密码')}
               placeholder={tr('私密空间备份密码')}
               className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
+          )}
+          {backupRange !== 'normal' && state.privateSecurity.locked && (
+            <p className="settings-help">{tr('请先解锁私密空间，或仅导出普通空间。')}</p>
           )}
           <div className="data-actions">
             <Button
               variant="outline"
               size="sm"
               className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer font-medium"
+              disabled={busy || (backupRange !== 'normal' && state.privateSecurity.locked)}
               onClick={() => void exportBackup()}
             >
               {tr('导出所选备份')}
@@ -262,11 +289,15 @@ export function DataSettings({
                 accept="application/json,.json"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
+                  event.target.value = '';
                   if (file)
                     void file
                       .text()
                       .then(parseBackup)
-                      .then(setDocument)
+                      .then((backup) => {
+                        setDocument(backup);
+                        setRestorePassword('');
+                      })
                       .catch((error: Error) => onError(error.message));
                 }}
               />
@@ -285,8 +316,8 @@ export function DataSettings({
                   {summary.normal && (
                     <div>
                       <span className="font-medium text-foreground">{tr('普通空间')}</span>：
-                      {summary.normal.desktops} {tr('个桌面')} · {summary.normal.categories}{' '}
-                      {tr('个分类')} · {summary.normal.sites} {tr('个网站')}
+                      {summary.normal.groups} {tr('个分组')} · {summary.normal.folders}{' '}
+                      {tr('个文件夹')} · {summary.normal.sites} {tr('个网站')}
                     </div>
                   )}
                   {summary.private && (
@@ -294,18 +325,28 @@ export function DataSettings({
                       <span className="font-medium text-foreground">{tr('私密空间')}</span>：
                       {'protected' in summary.private
                         ? tr('已受密码加密保护')
-                        : `${summary.private.desktops} ${tr('个桌面')} · ${summary.private.categories} ${tr('个分类')} · ${summary.private.sites} ${tr('个网站')}`}
+                        : `${summary.private.groups} ${tr('个分组')} · ${summary.private.folders} ${tr('个文件夹')} · ${summary.private.sites} ${tr('个网站')}`}
                     </div>
                   )}
                 </div>
                 <span className="text-[11px] text-muted-foreground block">
                   {tr('合并会保留较新的记录；替换会覆盖备份包含的空间。')}
                 </span>
+                {document.spaces.private?.protected && (
+                  <Input
+                    type="password"
+                    value={restorePassword}
+                    onChange={(event) => setRestorePassword(event.target.value)}
+                    aria-label={tr('备份解密密码')}
+                    placeholder={tr('备份解密密码')}
+                  />
+                )}
                 <div className="data-actions pt-1">
                   <Button
                     size="sm"
                     variant="outline"
                     className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer"
+                    disabled={busy || (document.spaces.private?.protected && !restorePassword)}
                     onClick={() => void restore('merge')}
                   >
                     {tr('合并恢复')}
@@ -314,6 +355,7 @@ export function DataSettings({
                     size="sm"
                     variant="destructive"
                     className="rounded-xl cursor-pointer"
+                    disabled={busy || (document.spaces.private?.protected && !restorePassword)}
                     onClick={() => void restore('replace')}
                   >
                     {tr('替换恢复')}

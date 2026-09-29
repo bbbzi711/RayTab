@@ -147,23 +147,23 @@ body {
 
 .search-engine-list > div {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) 24px;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto 24px;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgb(255 255 255 / 10%);
+  border: 1px solid var(--dialog-inner-border);
   border-radius: 9px;
   padding: 7px 8px;
 }
 
 .search-engine-list button.active {
-  color: #fff;
+  color: var(--dialog-text);
   font-weight: 600;
 }
 
 .search-engine-list code {
   overflow: hidden;
-  color: rgb(255 255 255 / 42%);
-  font-size: 9px;
+  color: var(--dialog-muted);
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -176,6 +176,26 @@ body {
 
 .search-engine-add input {
   min-width: 0;
+  border: 1px solid var(--dialog-inner-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--dialog-control-surface);
+}
+.search-engine-list button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+@media (max-width: 640px) {
+  .search-engine-add {
+    grid-template-columns: 1fr;
+  }
+  .search-engine-list > div {
+    grid-template-columns: minmax(0, 1fr) auto 24px;
+  }
+  .search-engine-list code {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 
 .import-options {

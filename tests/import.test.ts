@@ -19,15 +19,15 @@ describe('bookmark import', () => {
 
   it('extracts folders and ignores unsupported links', () => {
     expect(parseBookmarkHtml(html)).toEqual([
-      { title: 'GitHub', url: 'https://github.com/', category: '开发', path: ['开发'] },
-      { title: 'Example', url: 'https://example.com/path', category: '导入书签', path: [] },
+      { title: 'GitHub', url: 'https://github.com/', folder: '开发', path: ['开发'] },
+      { title: 'Example', url: 'https://example.com/path', folder: undefined, path: [] },
     ]);
   });
 
   it('deduplicates canonical URLs while preserving the first item', () => {
     const items = parseBookmarkHtml(html);
     expect(
-      deduplicateBookmarks(items, ['https://github.com/#readme'], 'skip-url').map(
+      deduplicateBookmarks(items, ['https://GITHUB.com:443/'], 'skip-url').map(
         (item) => item.title,
       ),
     ).toEqual(['Example']);
@@ -67,7 +67,7 @@ describe('bookmark import', () => {
       {
         title: 'Docs',
         url: 'https://example.com/docs',
-        category: '浏览器书签',
+        folder: undefined,
         path: [],
       },
     ]);
@@ -76,8 +76,8 @@ describe('bookmark import', () => {
   it('removes duplicates from the file as well as existing navigation', () => {
     const duplicate = {
       title: 'Duplicate',
-      url: 'https://example.com/path#second',
-      category: 'Other',
+      url: 'https://example.com/path',
+      folder: 'Other',
       path: ['Other'],
     };
     expect(
@@ -85,10 +85,25 @@ describe('bookmark import', () => {
     ).toHaveLength(2);
   });
 
+  it('keeps distinct paths, queries and fragments when skipping duplicate URLs', () => {
+    const urls = [
+      'https://example.com/Docs?token=AbC#first',
+      'https://example.com/docs?token=AbC#first',
+      'https://example.com/Docs?token=abc#first',
+      'https://example.com/Docs?token=AbC#second',
+      'https://example.com/Docs/?token=AbC#first',
+      'https://example.com/Docs?token=AbC#first',
+    ];
+    const items = urls.map((url) => ({ title: 'Page', url, folder: 'Links', path: [] }));
+    expect(deduplicateBookmarks(items, [], 'skip-url').map((item) => item.url)).toEqual(
+      urls.slice(0, 5),
+    );
+  });
+
   it('imports nested bookmark results into the selected desktop with valid references', () => {
     const state = createInitialState();
     applyCommand(state, {
-      type: 'save-desktop',
+      type: 'save-group',
       spaceId: 'normal',
       id: 'imports',
       name: 'Imports',
@@ -96,19 +111,15 @@ describe('bookmark import', () => {
     applyCommand(state, {
       type: 'import-bookmarks',
       spaceId: 'normal',
-      desktopId: 'imports',
+      groupId: 'imports',
       items: parseBookmarkHtml(html),
     });
 
-    const importedCategories = state.spaces.normal.categories.filter(
-      (item) => item.desktopId === 'imports' && !item.isDefault,
+    const importedCategories = state.spaces.normal.folders.filter(
+      (item) => item.groupId === 'imports',
     );
-    expect(importedCategories.map((item) => item.name).sort()).toEqual(['导入书签', '开发']);
-    expect(
-      state.spaces.normal.sites.filter((site) =>
-        importedCategories.some((category) => category.id === site.categoryId),
-      ),
-    ).toHaveLength(2);
+    expect(importedCategories.map((item) => item.name).sort()).toEqual(['开发']);
+    expect(state.spaces.normal.sites.filter((site) => site.groupId === 'imports')).toHaveLength(2);
     expect(rayStateSchema.safeParse(state).success).toBe(true);
   });
 });

@@ -1,25 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useResourceUrl } from '@/hooks/useResourceUrl';
 import type { SpaceSettings } from '@/storage/model';
-import { DEFAULT_WALLPAPER_URL } from './wallpapers';
+import { DEFAULT_WALLPAPER_URL, bingDailyUrl } from './wallpapers';
+import { t } from '@/locales';
 import { cn } from '@/lib/utils';
 
-export function Background({ settings }: { settings: SpaceSettings }) {
+export function Background({
+  settings,
+  onError,
+}: {
+  settings: SpaceSettings;
+  onError: (message: string) => void;
+}) {
   const image = useResourceUrl(settings.background === 'custom' ? settings.wallpaperId : undefined);
-  const remoteImage = ['bing', 'unsplash', 'custom'].includes(settings.background)
-    ? settings.onlineWallpaperUrl
-    : undefined;
   const requestedImage =
-    image ?? remoteImage ?? (settings.background === 'custom' ? DEFAULT_WALLPAPER_URL : undefined);
+    settings.background === 'bing'
+      ? bingDailyUrl
+      : settings.background === 'unsplash'
+        ? (settings.featuredPhotoUrl ?? DEFAULT_WALLPAPER_URL)
+        : settings.background === 'custom'
+          ? settings.wallpaperId
+            ? image
+            : (settings.onlineWallpaperUrl ?? DEFAULT_WALLPAPER_URL)
+          : undefined;
   const [loadedImage, setLoadedImage] = useState<string>();
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (!requestedImage) {
-      setLoadedImage(undefined);
-      setIsReady(false);
-      return;
-    }
+    setLoadedImage(undefined);
+    setIsReady(false);
+    if (!requestedImage) return;
     let cancelled = false;
     const preload = new Image();
     preload.onload = () => {
@@ -30,11 +40,14 @@ export function Background({ settings }: { settings: SpaceSettings }) {
         });
       }
     };
+    preload.onerror = () => {
+      if (!cancelled) onError(t(settings.language, '壁纸加载失败，请检查图片地址或网络。'));
+    };
     preload.src = requestedImage;
     return () => {
       cancelled = true;
     };
-  }, [requestedImage]);
+  }, [requestedImage, settings.language, onError]);
 
   const isLegacyGreen = settings.solidColor === '#193540';
   const effectiveBgColor =

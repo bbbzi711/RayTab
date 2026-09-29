@@ -32,4 +32,47 @@ describe('three-way sync merge', () => {
     const merged = mergeSpaceData(base, initial.spaces.normal, structuredClone(base));
     expect(merged.data.sites.some((item) => item.id === base.sites[0].id)).toBe(false);
   });
+
+  it('merges location atomically instead of mixing a group with an unrelated folder', () => {
+    const initial = createInitialState();
+    const groupId = initial.local.activeGroup.normal;
+    applyCommand(initial, { type: 'save-group', spaceId: 'normal', id: 'target', name: 'Target' });
+    applyCommand(initial, {
+      type: 'save-folder',
+      spaceId: 'normal',
+      id: 'folder',
+      groupId,
+      name: 'Folder',
+    });
+    const base = structuredClone(initial.spaces.normal);
+    const local = structuredClone(initial);
+    const remote = structuredClone(initial);
+    const id = base.sites[0].id;
+    applyCommand(local, {
+      type: 'move-site',
+      spaceId: 'normal',
+      id,
+      groupId: 'target',
+      folderId: null,
+    });
+    applyCommand(remote, { type: 'move-site', spaceId: 'normal', id, groupId, folderId: 'folder' });
+    const merged = mergeSpaceData(base, local.spaces.normal, remote.spaces.normal);
+    expect(merged.data.sites.find((item) => item.id === id)).toMatchObject({
+      groupId: 'target',
+      folderId: null,
+      order: 0,
+    });
+    expect(merged.conflicts).toContainEqual(
+      expect.objectContaining({
+        id,
+        field: 'location',
+        remote: { groupId, folderId: 'folder', order: 0 },
+      }),
+    );
+    expect(
+      merged.conflicts.some((item) =>
+        ['groupId', 'folderId', 'order', 'changeId', 'updatedAt'].includes(item.field),
+      ),
+    ).toBe(false);
+  });
 });

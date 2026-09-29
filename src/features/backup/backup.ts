@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { decryptJson, encryptJson, encryptedEnvelopeSchema } from '@/security/crypto';
 import {
   rayStateSchema,
+  effectiveSettings,
   spaceDataSchema,
   spaceIdSchema,
   spaceSettingsSchema,
@@ -26,7 +27,7 @@ const privatePayloadSchema = z.discriminatedUnion('protected', [
 ]);
 export const backupSchema = z.object({
   format: z.literal('raytab-backup'),
-  version: z.literal(1),
+  version: z.literal(2),
   createdAt: z.string().datetime(),
   spaces: z.object({
     normal: spacePayloadSchema.optional(),
@@ -41,9 +42,13 @@ export async function createBackup(
   range: SpaceId | 'all',
   privatePassword?: string,
 ): Promise<BackupDocument> {
+  if (range !== 'normal' && state.privateSecurity.protected) {
+    if (state.privateSecurity.locked) throw new Error('请先解锁私密空间');
+    if (!privatePassword) throw new Error('请填写备份加密密码');
+  }
   const document: BackupDocument = {
     format: 'raytab-backup',
-    version: 1,
+    version: 2,
     createdAt: new Date().toISOString(),
     spaces: {},
   };
@@ -76,6 +81,12 @@ export async function restoreBackup(
   mode: 'merge' | 'replace',
   privatePassword?: string,
 ) {
+  if (
+    document.spaces.private &&
+    current.privateSecurity.protected &&
+    current.privateSecurity.locked
+  )
+    throw new Error('请先解锁私密空间');
   const next = rayStateSchema.parse(structuredClone(current));
   const resources = new Map<string, Blob>();
   if (document.spaces.normal) {
@@ -100,10 +111,8 @@ export async function restoreBackup(
     await decodeResources(valid.resources, resources);
   }
   for (const spaceId of spaceIdSchema.options) {
-    if (
-      !next.spaces[spaceId].desktops.some((item) => item.id === next.local.activeDesktop[spaceId])
-    )
-      next.local.activeDesktop[spaceId] = next.spaces[spaceId].desktops[0].id;
+    if (!next.spaces[spaceId].groups.some((item) => item.id === next.local.activeGroup[spaceId]))
+      next.local.activeGroup[spaceId] = next.spaces[spaceId].groups[0].id;
   }
   return { state: rayStateSchema.parse(next), resources };
 }
@@ -112,8 +121,8 @@ export function backupSummary(document: BackupDocument) {
   const count = (payload?: z.infer<typeof spacePayloadSchema>) =>
     payload
       ? {
-          desktops: payload.data.desktops.length,
-          categories: payload.data.categories.length,
+          groups: payload.data.groups.length,
+          folders: payload.data.folders.length,
           sites: payload.data.sites.length,
           resources: payload.resources.length,
         }
@@ -131,10 +140,7 @@ async function payloadFor(state: RayState, resources: Map<string, Blob>, spaceId
   const ids = new Set(
     space.sites.map((item) => item.iconId).filter((id): id is string => Boolean(id)),
   );
-  const settings =
-    spaceId === 'normal'
-      ? state.normalSettings
-      : { ...state.normalSettings, ...state.privateSettingOverrides };
+  const settings = effectiveSettings(state, spaceId);
   if (settings.wallpaperId) ids.add(settings.wallpaperId);
   const encoded = [];
   for (const id of ids) {
@@ -163,11 +169,9 @@ function mergeSpace(local: SpaceData, incoming: SpaceData): SpaceData {
   ).map(({ updatedAt: _, ...item }) => item);
   const deleted = new Set(tombstones.map((item) => `${item.entity}:${item.id}`));
   return spaceDataSchema.parse({
-    desktops: merge(local.desktops, incoming.desktops).filter(
-      (item) => !deleted.has(`desktop:${item.id}`),
-    ),
-    categories: merge(local.categories, incoming.categories).filter(
-      (item) => !deleted.has(`category:${item.id}`),
+    groups: merge(local.groups, incoming.groups).filter((item) => !deleted.has(`group:${item.id}`)),
+    folders: merge(local.folders, incoming.folders).filter(
+      (item) => !deleted.has(`folder:${item.id}`),
     ),
     sites: merge(local.sites, incoming.sites).filter((item) => !deleted.has(`site:${item.id}`)),
     tombstones,

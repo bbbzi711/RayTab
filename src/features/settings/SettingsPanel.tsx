@@ -10,11 +10,12 @@ import {
 } from '@/components/ui/dialog';
 import { dispatch, privateVault } from '@/storage/store';
 import { prepareImage } from '@/lib/images';
-import { bingDailyUrl, gradientPresets, nextFeaturedPhoto } from '@/features/appearance/wallpapers';
+import { gradientPresets, nextFeaturedPhoto } from '@/features/appearance/wallpapers';
 import { DataSettings } from './DataSettings';
 import { SyncSettings } from './SyncSettings';
 import {
   customGreetingsSchema,
+  effectiveSettings,
   searchEngineSchema,
   type RayState,
   type SpaceId,
@@ -38,14 +39,18 @@ export default function SettingsPanel({
   const [activeTab, setActiveTab] = useState<'appearance' | 'preferences' | 'sync' | 'backup'>(
     'appearance',
   );
-  const inherited = state.normalSettings;
   const overrides = state.privateSettingOverrides;
-  const settings = spaceId === 'normal' ? inherited : { ...inherited, ...overrides };
+  const settings = effectiveSettings(state, spaceId);
   const tr = (text: string) => t(settings.language, text);
-  const update = (patch: Partial<SpaceSettings>) =>
-    void dispatch({ type: 'settings', spaceId, patch }).catch((error: Error) =>
-      onError(error.message),
-    );
+  const update = async (patch: Partial<SpaceSettings>) => {
+    try {
+      await dispatch({ type: 'settings', spaceId, patch });
+      return true;
+    } catch (error) {
+      onError((error as Error).message);
+      return false;
+    }
+  };
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent variant="workspace" className="settings-workspace" closeLabel={tr('关闭')}>
@@ -89,11 +94,7 @@ export default function SettingsPanel({
                     ['en', tr('英文')],
                   ]}
                   onChange={(language) =>
-                    void dispatch({
-                      type: 'settings',
-                      spaceId: 'normal',
-                      patch: { language: language as SpaceSettings['language'] },
-                    }).catch((error: Error) => onError(error.message))
+                    update({ language: language as SpaceSettings['language'] })
                   }
                 />
               </SettingsSection>
@@ -153,16 +154,11 @@ export default function SettingsPanel({
                       onChange={(cardOpacity) => update({ cardOpacity })}
                     />
                   )}
-                  <Toggle
-                    label={tr('折叠分类导航')}
-                    checked={settings.navigationCollapsed}
-                    onChange={(navigationCollapsed) => update({ navigationCollapsed })}
-                  />
                 </SettingsSection>
                 <SettingsSection title={tr('侧边栏')}>
                   <Segmented
                     label={tr('侧边栏显示')}
-                    value={settings.sidebarMode ?? 'always'}
+                    value={settings.sidebarMode}
                     options={[
                       ['always', tr('常驻显示')],
                       ['auto', tr('自动隐藏')],
@@ -202,16 +198,6 @@ export default function SettingsPanel({
                           onClick={() =>
                             update({
                               background,
-                              ...(background === 'bing'
-                                ? { onlineWallpaperUrl: bingDailyUrl }
-                                : {}),
-                              ...(background === 'unsplash'
-                                ? {
-                                    onlineWallpaperUrl: nextFeaturedPhoto(
-                                      settings.onlineWallpaperUrl,
-                                    ),
-                                  }
-                                : {}),
                             })
                           }
                         >
@@ -251,7 +237,7 @@ export default function SettingsPanel({
                       size="sm"
                       onClick={() =>
                         update({
-                          onlineWallpaperUrl: nextFeaturedPhoto(settings.onlineWallpaperUrl),
+                          featuredPhotoUrl: nextFeaturedPhoto(settings.featuredPhotoUrl),
                         })
                       }
                     >
@@ -287,6 +273,7 @@ export default function SettingsPanel({
                         accept="image/png,image/jpeg,image/webp"
                         onChange={(event) => {
                           const file = event.target.files?.[0];
+                          event.target.value = '';
                           if (!file) return;
                           void prepareImage(file, 'wallpaper')
                             .then(({ id, blob }) =>
@@ -315,7 +302,8 @@ export default function SettingsPanel({
                         event.preventDefault();
                         const url = String(new FormData(event.currentTarget).get('url')).trim();
                         try {
-                          new URL(url);
+                          if (!['https:', 'http:'].includes(new URL(url).protocol))
+                            throw new Error();
                           update({
                             background: 'custom',
                             onlineWallpaperUrl: url,
@@ -327,8 +315,10 @@ export default function SettingsPanel({
                       }}
                     >
                       <input
+                        key={settings.onlineWallpaperUrl ?? ''}
                         name="url"
                         type="url"
+                        required
                         aria-label={tr('在线壁纸地址')}
                         defaultValue={settings.onlineWallpaperUrl}
                         placeholder="https://example.com/wallpaper.jpg"
@@ -381,6 +371,7 @@ export default function SettingsPanel({
                             accept="application/json,.json"
                             onChange={(event) => {
                               const file = event.target.files?.[0];
+                              event.target.value = '';
                               if (!file) return;
                               void file
                                 .text()
@@ -420,11 +411,6 @@ export default function SettingsPanel({
                     label={tr('新标签页打开网站')}
                     checked={settings.openInNewTab}
                     onChange={(openInNewTab) => update({ openInNewTab })}
-                  />
-                  <Toggle
-                    label={tr('显示分类导航')}
-                    checked={settings.showCategories}
-                    onChange={(showCategories) => update({ showCategories })}
                   />
                   <Toggle
                     label={tr('显示网站标题')}
@@ -528,6 +514,7 @@ export default function SettingsPanel({
                 <SyncSettings language={settings.language} onError={onError} />
               </SettingsSection>
             )}
+            <p className="settings-help">{tr('外观与偏好修改后自动保存。')}</p>
             <p className="settings-about">{tr('RayTab 0.1 · 数据默认保存在当前浏览器')}</p>
           </div>
         </div>
@@ -608,7 +595,7 @@ function TextColorSettings({
     ['date', '日期'],
     ['greeting', '问候语'],
     ['search', '搜索栏'],
-    ['tabs', '分类标签'],
+    ['tabs', '分组标签'],
     ['cards', '网站卡片'],
   ];
   return (
@@ -695,20 +682,29 @@ function SearchEngineSettings({
   tr,
 }: {
   settings: SpaceSettings;
-  update: (patch: Partial<SpaceSettings>) => void;
+  update: (patch: Partial<SpaceSettings>) => Promise<boolean>;
   onError: (message: string) => void;
   tr: (text: string) => string;
 }) {
-  const remove = (id: string) => {
-    if (settings.searchEngines.length === 1) {
-      onError(tr('至少保留一个搜索引擎'));
-      return;
-    }
+  const [editingId, setEditingId] = useState<string>();
+  const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+  const reset = () => {
+    setEditingId(undefined);
+    setName('');
+    setUrl('');
+  };
+  const remove = async (id: string) => {
+    if (settings.searchEngines.length === 1) return;
+    setSaving(true);
     const searchEngines = settings.searchEngines.filter((engine) => engine.id !== id);
-    update({
+    const saved = await update({
       searchEngines,
       searchEngine: settings.searchEngine === id ? searchEngines[0].id : settings.searchEngine,
     });
+    if (saved && editingId === id) reset();
+    setSaving(false);
   };
   return (
     <div className="search-engine-settings">
@@ -718,6 +714,8 @@ function SearchEngineSettings({
             <button
               type="button"
               className={settings.searchEngine === engine.id ? 'active' : ''}
+              aria-pressed={settings.searchEngine === engine.id}
+              disabled={saving}
               onClick={() => update({ searchEngine: engine.id })}
             >
               {engine.name}
@@ -725,8 +723,21 @@ function SearchEngineSettings({
             <code>{engine.url}</code>
             <button
               type="button"
+              aria-label={`${tr('编辑')} ${engine.name}`}
+              disabled={saving}
+              onClick={() => {
+                setEditingId(engine.id);
+                setName(engine.name);
+                setUrl(engine.url);
+              }}
+            >
+              {tr('编辑')}
+            </button>
+            <button
+              type="button"
               aria-label={`${tr('删除')} ${engine.name}`}
-              onClick={() => remove(engine.id)}
+              disabled={saving || settings.searchEngines.length === 1}
+              onClick={() => void remove(engine.id)}
             >
               ×
             </button>
@@ -735,42 +746,63 @@ function SearchEngineSettings({
       </div>
       <form
         className="search-engine-add"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
-          const form = event.currentTarget;
-          const data = new FormData(form);
+          if (saving) return;
           const parsed = searchEngineSchema.safeParse({
-            id: crypto.randomUUID(),
-            name: String(data.get('name')),
-            url: String(data.get('url')),
+            id: editingId ?? crypto.randomUUID(),
+            name,
+            url,
           });
           if (!parsed.success) {
             onError(tr(parsed.error.issues[0]?.message ?? '搜索引擎格式不正确'));
             return;
           }
-          update({
-            searchEngines: [...settings.searchEngines, parsed.data],
-            searchEngine: parsed.data.id,
+          setSaving(true);
+          const saved = await update({
+            searchEngines: editingId
+              ? settings.searchEngines.map((engine) =>
+                  engine.id === editingId ? parsed.data : engine,
+                )
+              : [...settings.searchEngines, parsed.data],
+            searchEngine: editingId ? settings.searchEngine : parsed.data.id,
           });
-          form.reset();
+          if (saved) reset();
+          setSaving(false);
         }}
       >
         <input
           name="name"
           required
           maxLength={80}
+          value={name}
+          disabled={saving}
+          onChange={(event) => setName(event.target.value)}
           aria-label={tr('搜索引擎名称')}
           placeholder={tr('名称')}
         />
         <input
           name="url"
           required
+          value={url}
+          disabled={saving}
+          onChange={(event) => setUrl(event.target.value)}
           aria-label={tr('搜索引擎地址')}
           placeholder="https://example.com/search?q=%s"
         />
-        <Button type="submit" variant="outline" size="sm">
-          {tr('添加')}
+        <Button
+          type="submit"
+          variant="outline"
+          size="sm"
+          disabled={saving || (!editingId && settings.searchEngines.length >= 20)}
+        >
+          {editingId ? tr('保存') : tr('添加')}
         </Button>
+        {editingId && (
+          <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={reset}>
+            {tr('取消')}
+          </Button>
+        )}
       </form>
       <p className="settings-help">
         {tr('使用')} <code>%s</code> {tr('表示搜索关键词。')}
@@ -850,6 +882,7 @@ function PasswordForm({
   );
 }
 const settingLabels: Partial<Record<keyof SpaceSettings, string>> = {
+  language: '语言',
   theme: '主题',
   searchEngine: '搜索引擎',
   searchEngines: '搜索引擎列表',
@@ -861,7 +894,7 @@ const settingLabels: Partial<Record<keyof SpaceSettings, string>> = {
   showGreeting: '问候语',
   customGreetings: '自定义问候语',
   showSiteTitle: '网站标题',
-  showCategories: '分类导航',
+  showGroups: '分组导航',
   hour12: '时间制式',
   cardSize: '卡片大小',
   iconSizeRatio: '图标比例',
@@ -869,13 +902,14 @@ const settingLabels: Partial<Record<keyof SpaceSettings, string>> = {
   iconSpacing: '图标间距',
   showCardBackground: '卡片背景',
   cardOpacity: '卡片透明度',
-  navigationCollapsed: '分类导航',
+  navigationCollapsed: '分组导航',
   sidebarMode: '侧边栏',
   background: '背景',
   gradient: '渐变',
   solidColor: '纯色',
   wallpaperId: '壁纸',
   onlineWallpaperUrl: '在线壁纸',
+  featuredPhotoUrl: '精选摄影',
   overlay: '遮罩',
   textColorMode: '主页文字',
   textColors: '自定义文字颜色',

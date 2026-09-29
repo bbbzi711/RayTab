@@ -81,31 +81,47 @@ export function SyncSettings({
   onError: (message: string) => void;
 }) {
   const tr = (text: string) => t(language, text);
+  const available =
+    typeof browser !== 'undefined' &&
+    Boolean(browser.storage?.local && browser.permissions?.request);
   const [confirm, confirmDialog] = useConfirm();
   const [draft, setDraft] = useState<SyncDraft>(emptyDraft);
   const [connected, setConnected] = useState(false);
+  const [savedDraft, setSavedDraft] = useState<SyncDraft>();
+  const [loading, setLoading] = useState(true);
+  const dirty = Boolean(savedDraft && JSON.stringify(savedDraft) !== JSON.stringify(draft));
   const [status, setStatus] = useState<SyncStatus>({ conflicts: [] });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
+    if (!available) {
+      setLoading(false);
+      return;
+    }
     let mounted = true;
     void Promise.all([loadSyncConfig(), loadSyncStatus()])
       .then(([config, nextStatus]) => {
         if (!mounted) return;
         setConnected(Boolean(config));
         setDraft(draftFromConfig(config));
+        setSavedDraft(config ? draftFromConfig(config) : undefined);
         setStatus(nextStatus);
       })
       .catch((error: Error) => {
         if (mounted) onError(error.message);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
       });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [available]);
   const update = <K extends keyof SyncDraft>(key: K, value: SyncDraft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (busy || loading) return;
+    setBusy(true);
     const common = {
       token: draft.token,
       owner: draft.owner,
@@ -140,9 +156,12 @@ export function SyncSettings({
         automatic: draft.automatic,
       });
       setConnected(true);
+      setSavedDraft(draft);
       await run('auto');
     } catch (error) {
       onError((error as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
   const disconnect = async () => {
@@ -159,6 +178,7 @@ export function SyncSettings({
       await clearSyncConfig();
       setDraft(emptyDraft);
       setConnected(false);
+      setSavedDraft(undefined);
       setStatus({ conflicts: [] });
     } catch (error) {
       onError((error as Error).message);
@@ -193,259 +213,266 @@ export function SyncSettings({
   };
   return (
     <form className="sync-settings" onSubmit={save}>
-      <div className="sync-intro">
-        <span aria-hidden="true">
-          <CloudCog size={19} />
-        </span>
-        <div>
-          <strong>{tr('同步')}</strong>
-          <p>{tr('同步核心与服务适配器分离，连接信息只保存在本机。')}</p>
-        </div>
-      </div>
-      <label className="sync-provider">
-        <span>
-          {draft.type === 'webdav' ? <Server size={16} /> : <GitBranch size={16} />}
-          {tr('服务')}
-        </span>
-        <Select
-          containerClassName="w-48"
-          value={draft.type}
-          onChange={(event) => update('type', event.target.value as SyncConnection['type'])}
-        >
-          <option value="webdav">WebDAV</option>
-          <option value="github">GitHub {tr('仓库')}</option>
-          <option value="gitee">Gitee {tr('仓库')}</option>
-        </Select>
-      </label>
-      {draft.type === 'webdav' ? (
-        <>
-          <label>
-            {tr('文件地址')}
-            <Input
-              name="url"
-              type="url"
-              required
-              placeholder="https://dav.example.com/raytab.json"
-              value={draft.url}
-              onChange={(event) => update('url', event.target.value)}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          </label>
-          <label>
-            {tr('用户名')}
-            <Input
-              name="username"
-              autoComplete="username"
-              value={draft.username}
-              onChange={(event) => update('username', event.target.value)}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          </label>
-          <label>
-            {tr('密码')}
-            <Input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={draft.password}
-              onChange={(event) => update('password', event.target.value)}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          </label>
-        </>
-      ) : (
-        <>
-          <label>
-            {tr('访问令牌')}
-            <Input
-              name="token"
-              type="password"
-              required
-              value={draft.token}
-              onChange={(event) => update('token', event.target.value)}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          </label>
-          <div className="sync-pair">
-            <label>
-              {tr('所有者')}
-              <Input
-                name="owner"
-                required
-                value={draft.owner}
-                onChange={(event) => update('owner', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-            <label>
-              {tr('仓库')}
-              <Input
-                name="repo"
-                required
-                value={draft.repo}
-                onChange={(event) => update('repo', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
+      {!available && <p className="settings-help">{tr('云同步仅在已安装的浏览器扩展中可用。')}</p>}
+      <fieldset className="contents" disabled={busy || loading || !available}>
+        <div className="sync-intro">
+          <span aria-hidden="true">
+            <CloudCog size={19} />
+          </span>
+          <div>
+            <strong>{tr('同步')}</strong>
+            <p>{tr('将网站和设置同步到你自己的云端，连接信息只保存在本机。')}</p>
           </div>
+        </div>
+        <label className="sync-provider">
+          <span>
+            {draft.type === 'webdav' ? <Server size={16} /> : <GitBranch size={16} />}
+            {tr('服务')}
+          </span>
+          <Select
+            containerClassName="w-48"
+            value={draft.type}
+            onChange={(event) => update('type', event.target.value as SyncConnection['type'])}
+          >
+            <option value="webdav">WebDAV</option>
+            <option value="github">GitHub {tr('仓库')}</option>
+            <option value="gitee">Gitee {tr('仓库')}</option>
+          </Select>
+        </label>
+        {draft.type === 'webdav' ? (
+          <>
+            <label>
+              {tr('文件地址')}
+              <Input
+                name="url"
+                type="url"
+                required
+                placeholder="https://dav.example.com/raytab.json"
+                value={draft.url}
+                onChange={(event) => update('url', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+            </label>
+            <label>
+              {tr('用户名')}
+              <Input
+                name="username"
+                autoComplete="username"
+                value={draft.username}
+                onChange={(event) => update('username', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+            </label>
+            <label>
+              {tr('密码')}
+              <Input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={draft.password}
+                onChange={(event) => update('password', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <label>
+              {tr('访问令牌')}
+              <Input
+                name="token"
+                type="password"
+                required
+                value={draft.token}
+                onChange={(event) => update('token', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+            </label>
+            <div className="sync-pair">
+              <label>
+                {tr('所有者')}
+                <Input
+                  name="owner"
+                  required
+                  value={draft.owner}
+                  onChange={(event) => update('owner', event.target.value)}
+                  className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+                />
+              </label>
+              <label>
+                {tr('仓库')}
+                <Input
+                  name="repo"
+                  required
+                  value={draft.repo}
+                  onChange={(event) => update('repo', event.target.value)}
+                  className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+                />
+              </label>
+            </div>
+            <label>
+              {tr('文件路径')}
+              <Input
+                name="path"
+                value={draft.path}
+                onChange={(event) => update('path', event.target.value)}
+                required
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+            </label>
+            <label>
+              {tr('分支（可选）')}
+              <Input
+                name="branch"
+                value={draft.branch}
+                onChange={(event) => update('branch', event.target.value)}
+                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
+              />
+            </label>
+          </>
+        )}
+        <label className="setting-row">
+          <span>{tr('自动双向同步')}</span>
+          <input
+            name="automatic"
+            type="checkbox"
+            checked={draft.automatic}
+            onChange={(event) => update('automatic', event.target.checked)}
+          />
+        </label>
+        <label className="setting-row">
+          <span>{tr('同步私密空间')}</span>
+          <input
+            name="includePrivate"
+            type="checkbox"
+            checked={draft.includePrivate}
+            onChange={(event) => update('includePrivate', event.target.checked)}
+          />
+        </label>
+        {draft.includePrivate && (
           <label>
-            {tr('文件路径')}
+            {tr('私密同步密码（启用私密空间时）')}
             <Input
-              name="path"
-              value={draft.path}
-              onChange={(event) => update('path', event.target.value)}
+              name="privatePassword"
+              type="password"
               required
+              minLength={6}
+              value={draft.privatePassword}
+              onChange={(event) => update('privatePassword', event.target.value)}
               className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
             />
           </label>
-          <label>
-            {tr('分支（可选）')}
-            <Input
-              name="branch"
-              value={draft.branch}
-              onChange={(event) => update('branch', event.target.value)}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          </label>
-        </>
-      )}
-      <label className="setting-row">
-        <span>{tr('自动双向同步')}</span>
-        <input
-          name="automatic"
-          type="checkbox"
-          checked={draft.automatic}
-          onChange={(event) => update('automatic', event.target.checked)}
-        />
-      </label>
-      <label className="setting-row">
-        <span>{tr('同步私密空间')}</span>
-        <input
-          name="includePrivate"
-          type="checkbox"
-          checked={draft.includePrivate}
-          onChange={(event) => update('includePrivate', event.target.checked)}
-        />
-      </label>
-      <label>
-        {tr('私密同步密码（启用私密空间时）')}
-        <Input
-          name="privatePassword"
-          type="password"
-          minLength={6}
-          value={draft.privatePassword}
-          onChange={(event) => update('privatePassword', event.target.value)}
-          className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-        />
-      </label>
-      <Button
-        type="submit"
-        size="sm"
-        disabled={busy}
-        className="w-full h-9 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs transition-all"
-      >
-        {busy ? tr('同步中…') : tr('保存并同步')}
-      </Button>
-      <div className="flex flex-wrap items-center gap-2 pt-1">
+        )}
         <Button
-          type="button"
+          type="submit"
           size="sm"
-          variant="outline"
           disabled={busy}
-          className="rounded-xl border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground cursor-pointer font-medium"
-          onClick={() => void run('auto')}
+          className="w-full h-9 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs transition-all"
         >
-          <RefreshCw size={13} className={busy ? 'spin' : ''} />
-          {tr('双向同步')}
+          {busy ? tr('同步中…') : tr('保存并同步')}
         </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
-          onClick={() => void run('push')}
-        >
-          {tr('本机覆盖云端')}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
-          onClick={() => void run('pull')}
-        >
-          {tr('云端恢复本机')}
-        </Button>
-        {connected && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button
             type="button"
             size="sm"
-            variant="ghost"
-            disabled={busy}
-            className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer ml-auto text-xs"
-            onClick={() => void disconnect()}
+            variant="outline"
+            disabled={busy || !connected || dirty}
+            className="rounded-xl border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground cursor-pointer font-medium"
+            onClick={() => void run('auto')}
           >
-            {tr('清除连接')}
+            <RefreshCw size={13} className={busy ? 'spin' : ''} />
+            {tr('双向同步')}
           </Button>
-        )}
-      </div>
-      {status.lastSuccess && (
-        <p className="settings-help">
-          {tr('上次成功：')}
-          {new Date(status.lastSuccess).toLocaleString()} · {tr('冲突')} {status.conflicts.length}
-        </p>
-      )}
-      {status.lastError && <p className="sync-error">{status.lastError}</p>}
-      {status.nextRetryAt && status.retryCount ? (
-        <p className="settings-help">
-          {tr('自动重试')} {status.retryCount} {tr('次 · 下次不早于')}{' '}
-          {new Date(status.nextRetryAt).toLocaleString()}
-        </p>
-      ) : null}
-      {status.conflicts.length > 0 && (
-        <section className="sync-conflicts" aria-label={tr('同步冲突')}>
-          <h4>{tr('待处理冲突')}</h4>
-          {status.conflicts.map((conflict, index) => (
-            <div
-              className="sync-conflict"
-              key={`${conflict.entity}-${conflict.id}-${conflict.field}`}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy || !connected || dirty}
+            className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
+            onClick={() => void run('push')}
+          >
+            {tr('本机覆盖云端')}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy || !connected || dirty}
+            className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
+            onClick={() => void run('pull')}
+          >
+            {tr('云端恢复本机')}
+          </Button>
+          {connected && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer ml-auto text-xs"
+              onClick={() => void disconnect()}
             >
-              <p>
-                <strong>{conflict.entity}</strong> · {conflict.field}
-              </p>
-              <small>
-                {tr('本机：')}
-                {summarize(conflict.local)}
-              </small>
-              <small>
-                {tr('远端：')}
-                {summarize(conflict.remote)}
-              </small>
-              <div className="data-actions">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => void resolve(index, 'local')}
-                >
-                  {tr('保留本机')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void resolve(index, 'remote')}
-                >
-                  {tr('采用远端')}
-                </Button>
+              {tr('清除连接')}
+            </Button>
+          )}
+        </div>
+        {dirty && <p className="settings-help">{tr('连接修改后请先保存，再执行同步。')}</p>}
+        {status.lastSuccess && (
+          <p className="settings-help">
+            {tr('上次成功：')}
+            {new Date(status.lastSuccess).toLocaleString()} · {tr('冲突')} {status.conflicts.length}
+          </p>
+        )}
+        {status.lastError && <p className="sync-error">{status.lastError}</p>}
+        {status.nextRetryAt && status.retryCount ? (
+          <p className="settings-help">
+            {tr('自动重试')} {status.retryCount} {tr('次 · 下次不早于')}{' '}
+            {new Date(status.nextRetryAt).toLocaleString()}
+          </p>
+        ) : null}
+        {status.conflicts.length > 0 && (
+          <section className="sync-conflicts" aria-label={tr('同步冲突')}>
+            <h4>{tr('待处理冲突')}</h4>
+            {status.conflicts.map((conflict, index) => (
+              <div
+                className="sync-conflict"
+                key={`${conflict.entity}-${conflict.id}-${conflict.field}`}
+              >
+                <p>
+                  <strong>{conflict.entity}</strong> · {conflict.field}
+                </p>
+                <small>
+                  {tr('本机：')}
+                  {summarize(conflict.local)}
+                </small>
+                <small>
+                  {tr('远端：')}
+                  {summarize(conflict.remote)}
+                </small>
+                <div className="data-actions">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => void resolve(index, 'local')}
+                  >
+                    {tr('保留本机')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void resolve(index, 'remote')}
+                  >
+                    {tr('采用远端')}
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
-        </section>
-      )}
+            ))}
+          </section>
+        )}
+      </fieldset>
       {confirmDialog}
     </form>
   );
