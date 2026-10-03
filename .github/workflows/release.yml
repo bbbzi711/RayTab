@@ -41,6 +41,15 @@ jobs:
       - run: pnpm run format:check
       - run: pnpm test
       - run: pnpm run package
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-release-failure-artifacts
+          path: artifacts/playwright/
+          if-no-files-found: ignore
+          retention-days: 7
       - run: pnpm run package:firefox
       - name: Publish release
         env:
