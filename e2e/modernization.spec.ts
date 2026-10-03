@@ -418,6 +418,7 @@ test('常用底色色板保留品牌原色，Gemini 使用独立图形，保存�
   await palette.getByRole('button', { name: '绿色', exact: true }).click();
   await expect(editor.locator('.site-edit-preview svg')).toHaveAttribute('fill', '#ff0033');
   await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(editor).not.toBeVisible();
   await newTab.reload();
   await expect(youtube.locator('svg')).toHaveAttribute('fill', '#ff0033');
   await expect(youtube.locator('.site-icon-frame')).toHaveCSS(
@@ -436,6 +437,7 @@ test('常用底色色板保留品牌原色，Gemini 使用独立图形，保存�
     path: 'artifacts/acceptance/common-icon-palette.png',
   });
   await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(editor).not.toBeVisible();
   await newTab.reload();
   await expect(youtube.locator('.site-icon-frame')).toHaveCSS(
     'background-color',
@@ -521,6 +523,7 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
     ]);
     await expect(editor.getByRole('button', { name: '透明', exact: true })).toHaveCount(0);
     await editor.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(editor).not.toBeVisible();
     await newTab.reload();
     const site = newTab.getByRole('link', { name: '高清测试', exact: true });
     await expect(site.locator('img')).toBeVisible();
@@ -541,6 +544,7 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
     await expect(editor.getByLabel('名称', { exact: true })).toHaveValue('矢量测试');
     await expect(editor.locator('.site-edit-preview img')).toBeVisible();
     await editor.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(editor).not.toBeVisible();
     await newTab.reload();
     const vector = newTab.getByRole('link', { name: '矢量测试', exact: true }).locator('img');
     await expect(vector).toBeVisible();
@@ -692,6 +696,7 @@ test('上传图片无额外留白，文字图标和背景选择重载后保留',
   await edit.getByRole('radio', { name: '文字图标', exact: true }).click();
   await edit.getByLabel('图标文字', { exact: true }).fill('🙂AB');
   await edit.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(edit).not.toBeVisible();
   await newTab.reload();
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
