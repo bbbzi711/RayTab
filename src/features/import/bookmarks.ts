@@ -1,3 +1,4 @@
+import { AppError } from '@/lib/errors';
 import { normalizeUrl } from '@/storage/model';
 
 export type BookmarkCandidate = {
@@ -8,7 +9,7 @@ export type BookmarkCandidate = {
 };
 
 export function parseBookmarkHtml(html: string): BookmarkCandidate[] {
-  if (!/<a\s/i.test(html)) throw new Error('没有找到可导入的书签');
+  if (!/<a\s/i.test(html)) throw new AppError('messages.noImportableBookmarksWereFound');
   const tokens =
     html.match(/<DT>\s*<H3[^>]*>[\s\S]*?<\/H3>|<DT>\s*<A\s[^>]*>[\s\S]*?<\/A>|<\/DL>/gi) ?? [];
   const stack: string[] = [];
@@ -39,13 +40,13 @@ export function parseBookmarkHtml(html: string): BookmarkCandidate[] {
       /* Ignore browser-internal and malformed URLs. */
     }
   }
-  if (!result.length) throw new Error('没有找到可导入的 http 或 https 书签');
+  if (!result.length) throw new AppError('messages.noImportableHttpOrHttpsBookmarksWereFound');
   return result;
 }
 
 export async function readBrowserBookmarks(): Promise<BookmarkCandidate[]> {
   const allowed = await browser.permissions.request({ permissions: ['bookmarks'] });
-  if (!allowed) throw new Error('未授予读取浏览器书签的权限');
+  if (!allowed) throw new AppError('messages.browserBookmarkAccessWasNotGranted');
   const roots = await browser.bookmarks.getTree();
   const result: BookmarkCandidate[] = [];
   const visit = (nodes: Browser.bookmarks.BookmarkTreeNode[], path: string[]) => {

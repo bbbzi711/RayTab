@@ -1,10 +1,13 @@
+import { AppError, type ErrorValues } from '@/lib/errors';
+
 export type RemoteFile = { content: string; version: string | null };
-export class SyncProviderError extends Error {
+export class SyncProviderError extends AppError {
   constructor(
     message: string,
     public readonly code: 'auth' | 'not-found' | 'conflict' | 'network' | 'invalid',
+    values: ErrorValues = {},
   ) {
-    super(message);
+    super(message, values);
   }
 }
 export interface SyncProvider {

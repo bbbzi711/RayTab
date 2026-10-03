@@ -1,0 +1,5049 @@
+[
+  {
+    "title": "铁路12306",
+    "hostname": "12306.cn",
+    "pathname": "/",
+    "light": "ab630cfa5e1a1c76f858c6c3354b57cd7f6278afdce225df8ff7d123ad5580a0.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "1Password",
+    "hostname": "1password.com",
+    "pathname": "/",
+    "light": "36ef31dc8e1ea5a2a7f4a1a53dc874c61170056bdacacd24ea4fa4c8cd050af8.svg",
+    "dark": "ad593cc8ca4fb8e3ae066fdd4dd3d86cb9084cad8b9092275e3ecd27fb35cc65.svg",
+    "tile": false
+  },
+  {
+    "title": "AbacatePay",
+    "hostname": "abacatepay.com",
+    "pathname": "/",
+    "light": "8031757cd3ccaded1838a048302e4a0897322a939149e986aca78d41fd5ea457.svg",
+    "tile": false
+  },
+  {
+    "title": "Meta",
+    "hostname": "about.meta.com",
+    "pathname": "/es",
+    "light": "de8f359748d51c76357157fad55cda7f0cae59aa9f1d45b8230ba7646c4370cf.svg",
+    "tile": false
+  },
+  {
+    "title": "Cody",
+    "hostname": "about.sourcegraph.com",
+    "pathname": "/",
+    "light": "75fb3cadc7bc93d83386f58959b03e44c0e757b897e0fadf979133364020ce06.svg",
+    "tile": false
+  },
+  {
+    "title": "Sourcegraph",
+    "hostname": "about.sourcegraph.com",
+    "pathname": "/",
+    "light": "7c26c4df05457bf41d939756136bfca800f2145d412137cc99b93b7ad0912f2d.svg",
+    "tile": false
+  },
+  {
+    "title": "Substance 3D Designer",
+    "hostname": "adobe.com",
+    "pathname": "/products/substance3d/apps/designer.html",
+    "light": "001476515b09da780644c399a833ec1a809d1655d6e5f80ade33a56777a58f4a.svg",
+    "tile": false
+  },
+  {
+    "title": "Substance 3D Painter",
+    "hostname": "adobe.com",
+    "pathname": "/products/substance3d/apps/painter.html",
+    "light": "204326d3fe7f5fd8431c1d5b21cd2bf2f6e80fd2f06438e70b675f6274206b30.svg",
+    "tile": false
+  },
+  {
+    "title": "Substance 3D Sampler",
+    "hostname": "adobe.com",
+    "pathname": "/products/substance3d/apps/sampler.html",
+    "light": "32014135ae1a88ff1477836a1f4e58f7ad17e3d46c09917356bd8b6a9c1e7bbf.svg",
+    "tile": false
+  },
+  {
+    "title": "Substance 3D Stager",
+    "hostname": "adobe.com",
+    "pathname": "/products/substance3d/apps/stager.html",
+    "light": "1b3a694d387b1b6847409dd5fdc0f5a862d2a4bcec8faf9b333b5bd919a2de0e.svg",
+    "tile": false
+  },
+  {
+    "title": "Lightroom Classic",
+    "hostname": "adobe.com",
+    "pathname": "/products/photoshop-lightroom-classic",
+    "light": "c04dacd13c99a3fbdbd68adf032c4ea75ba36a56e26db4014502499172e38037.svg",
+    "tile": false
+  },
+  {
+    "title": "Technical Communication Suite",
+    "hostname": "adobe.com",
+    "pathname": "/products/technicalcommunicationsuite",
+    "light": "18d9ce6dd195de5b42446e709d4d7f8b243f8ecf71137d4975ab4e686e2c65c3.svg",
+    "tile": false
+  },
+  {
+    "title": "Portfolio",
+    "hostname": "adobe.com",
+    "pathname": "/creativecloud/photography/portfolio",
+    "light": "6fd9a14b49a780c033c64c6d2781612c781529b61fc1be8b5f3a088ce79f89f2.svg",
+    "tile": false
+  },
+  {
+    "title": "Fontfolio",
+    "hostname": "adobe.com",
+    "pathname": "/creativecloud/services-fonts.html",
+    "light": "49e9126b0443d4dfdf9b9a336d78be35ecafa44ebfe238cb3b963e436008dde6.svg",
+    "tile": false
+  },
+  {
+    "title": "Acrobat Scan",
+    "hostname": "adobe.com",
+    "pathname": "/acrobat/mobile/acrobat-scan.html",
+    "light": "c19cba982ab0658da9faf72ccc572d6e8502e593658070e3a265f2c9196c6960.svg",
+    "tile": false
+  },
+  {
+    "title": "Digital Editions",
+    "hostname": "adobe.com",
+    "pathname": "/solutions/ebook/digital-editions",
+    "light": "116e2620b3f6d6e5d61569e395ad80977a4387c903435366390233bedca9a927.svg",
+    "tile": false
+  },
+  {
+    "title": "Captivate Prime",
+    "hostname": "adobe.com",
+    "pathname": "/learning/learningmanager.html",
+    "light": "9a4afefe5ef25b1f4fb30a83fd5e4cbbab18e28e82769d3c2f57388ac5374fd7.svg",
+    "tile": false
+  },
+  {
+    "title": "Lightroom",
+    "hostname": "adobe.com",
+    "pathname": "/products/photoshop-lightroom",
+    "light": "dbccfffd14130ef3293885996fa346c0676759e71ba33a62526d0372f1fbff4a.svg",
+    "tile": false
+  },
+  {
+    "title": "Character Animator",
+    "hostname": "adobe.com",
+    "pathname": "/products/character-animator",
+    "light": "89654d85eb0cf4f4f2d01f3ee22d6b9c788781c9c446496c351cd0c171ddfe70.svg",
+    "tile": false
+  },
+  {
+    "title": "Photoshop Elements",
+    "hostname": "adobe.com",
+    "pathname": "/products/photoshop-elements",
+    "light": "3d41092c3c68118b50e31afa18bedd1d8d15b69048eba383ce341a913b627c2c.svg",
+    "tile": false
+  },
+  {
+    "title": "Premiere Elements",
+    "hostname": "adobe.com",
+    "pathname": "/products/premiere-elements",
+    "light": "80c8e66c57b73e1e296fcc704bd0c0cc8fe72bac6d9447cfc7b6d6b0bbce856b.svg",
+    "tile": false
+  },
+  {
+    "title": "Dreamweaver",
+    "hostname": "adobe.com",
+    "pathname": "/products/dreamweaver.html",
+    "light": "b7ba271c770125bc259a56dec77761d896e23975d3739e2bb4a9d74c2b0f733a.svg",
+    "tile": false
+  },
+  {
+    "title": "Media Server",
+    "hostname": "adobe.com",
+    "pathname": "/products/flashmediaserver",
+    "light": "a8d9d12b9a7223f2565b095145a0954de429ef5c5bef0805b80b1c7a882bb8ee.svg",
+    "tile": false
+  },
+  {
+    "title": "Photoshop Camera",
+    "hostname": "adobe.com",
+    "pathname": "/products/photoshop-camera",
+    "light": "a56fd14a710c230828500244f11bab6cbe066b5b6157684db71afca5459bd7d9.svg",
+    "tile": false
+  },
+  {
+    "title": "Acrobat Reader",
+    "hostname": "adobe.com",
+    "pathname": "/acrobat/pdf-reader.html",
+    "light": "42f7d4cf93f9bdeb863f683c621364747f4a385df2ef4b3fe4c7a6d64e1ed633.svg",
+    "tile": false
+  },
+  {
+    "title": "Acrobat Reader",
+    "hostname": "adobe.com",
+    "pathname": "/acrobat/pdf-reader.html",
+    "light": "97322f0c06271b36d2c52875c36deecfd95c1359e60ee1f5b17d19b0a555b71a.svg",
+    "tile": false
+  },
+  {
+    "title": "Fill and Sign",
+    "hostname": "adobe.com",
+    "pathname": "/acrobat/online/fill-pdf",
+    "light": "f609be62e7b79189d47122e9196d0d3bb724e9e31d6ed0e87eb71c7a87731326.svg",
+    "tile": false
+  },
+  {
+    "title": "Presenter Video Express",
+    "hostname": "adobe.com",
+    "pathname": "/products/presenter.html",
+    "light": "6c56c6a863ccc854a631d96d9a830617afb8ffd18d1f47aeaa8c2baca4af9235.svg",
+    "tile": false
+  },
+  {
+    "title": "Connect",
+    "hostname": "adobe.com",
+    "pathname": "/products/adobe-connect",
+    "light": "0041cbc049e5eab19996906dd633caccdc81a474539d349547644eac72438482.svg",
+    "tile": false
+  },
+  {
+    "title": "Media Encoder",
+    "hostname": "adobe.com",
+    "pathname": "/products/media-encoder",
+    "light": "376f745d95270372e181632662b1e93c45491c84047e369fb6e7ab3f4aca6dcf.svg",
+    "tile": false
+  },
+  {
+    "title": "Premiere Rush",
+    "hostname": "adobe.com",
+    "pathname": "/products/premiere-rush",
+    "light": "7c5cfd01bd60659d659e97b0956600d99b3af501d957e85bf7138d39ab34a5b2.svg",
+    "tile": false
+  },
+  {
+    "title": "After Effects",
+    "hostname": "adobe.com",
+    "pathname": "/products/aftereffects",
+    "light": "7254a8626d1003463416fe9c7a27829f00b4917b6338c7f317f34bd2e1e5004f.svg",
+    "tile": false
+  },
+  {
+    "title": "HTTP Dynamic Streaming",
+    "hostname": "adobe.com",
+    "pathname": "/flash/technology.html",
+    "light": "57845c05210f17da286ab3f11548dd8044117e72304528d43413682a1e6ed950.svg",
+    "tile": false
+  },
+  {
+    "title": "Illustrator",
+    "hostname": "adobe.com",
+    "pathname": "/products/illustrator",
+    "light": "3c7463627491c7dee2123d53019e869fc6be9c7fee2633a772772d987078a3ad.svg",
+    "tile": false
+  },
+  {
+    "title": "Illustrator",
+    "hostname": "adobe.com",
+    "pathname": "/products/illustrator",
+    "light": "5750b8ce837842e9b9ecbd86ad9c4f667c37cbadeff0f558c7a1afc1fc9d7e9f.svg",
+    "tile": false
+  },
+  {
+    "title": "ColdFusion",
+    "hostname": "adobe.com",
+    "pathname": "/products/coldfusion",
+    "light": "63c6cd9a8759429c6946f8256b57b2b9f55c56a24e53f3555dd47b43f0da68dc.svg",
+    "tile": false
+  },
+  {
+    "title": "ColdFusion Builder",
+    "hostname": "adobe.com",
+    "pathname": "/products/coldfusion",
+    "light": "a03c6eb82ce3286b7e2e2886358a5980fb3005b3392bf1a71869c0b953d51b67.svg",
+    "tile": false
+  },
+  {
+    "title": "FrameMaker",
+    "hostname": "adobe.com",
+    "pathname": "/products/framemaker",
+    "light": "96d113292008ba8bcb8fedb7116b0b727bcb4f7c2c86ec59ce04b3f03787485b.svg",
+    "tile": false
+  },
+  {
+    "title": "FrameMaker Server",
+    "hostname": "adobe.com",
+    "pathname": "/products/framemaker",
+    "light": "068a2dcd2c930a9c3b6fa44f1a4826bf18930de39ff51803a679b654ab4fee34.svg",
+    "tile": false
+  },
+  {
+    "title": "Captivate",
+    "hostname": "adobe.com",
+    "pathname": "/products/captivate",
+    "light": "0b98785a9c0df56286326068dc58b8b13ec73e0c1cf12e3c332621a2285a658c.svg",
+    "tile": false
+  },
+  {
+    "title": "Photoshop",
+    "hostname": "adobe.com",
+    "pathname": "/products/photoshop",
+    "light": "896d9e3c7053a376f8d2c6381fe8f847b47c98b4b50180a934e693f5124e5354.svg",
+    "tile": false
+  },
+  {
+    "title": "Photoshop",
+    "hostname": "adobe.com",
+    "pathname": "/products/photoshop",
+    "light": "307ebd518bed8da7d41531561e7aa662474b7351a144b3785d57a3f719e10e33.svg",
+    "tile": false
+  },
+  {
+    "title": "Audition",
+    "hostname": "adobe.com",
+    "pathname": "/products/audition",
+    "light": "041ea3b7d882913c6168410b13eee9ec25d645b7e85d5974e4d0fb7b35d261c6.svg",
+    "tile": false
+  },
+  {
+    "title": "InDesign",
+    "hostname": "adobe.com",
+    "pathname": "/products/indesign",
+    "light": "93b4df6c05d9d6f97dfddc84bf680bc756154225700d5c6311c90205539b41b5.svg",
+    "tile": false
+  },
+  {
+    "title": "InDesign Server",
+    "hostname": "adobe.com",
+    "pathname": "/products/indesign",
+    "light": "701062118fe8d1f31c5705d16bdefebf9cfddf9741eed38a01eaa9e3c0c29143.svg",
+    "tile": false
+  },
+  {
+    "title": "Photoshop Express",
+    "hostname": "adobe.com",
+    "pathname": "/express/photoshop",
+    "light": "c071d6efc15b9a4a71657ad23148269f4b82df757cc85a4dc07458d7807970c7.svg",
+    "tile": false
+  },
+  {
+    "title": "Premiere",
+    "hostname": "adobe.com",
+    "pathname": "/products/premiere",
+    "light": "413f9606d03c6a4bdc3f9da47ba1d68355d909411e89c336c4e82f5b09d3f70e.svg",
+    "tile": false
+  },
+  {
+    "title": "RoboHelp",
+    "hostname": "adobe.com",
+    "pathname": "/products/robohelp",
+    "light": "f2f6411cb3bb7d60a36acc44e2612594679bb62f9f5567df395a1243353d9066.svg",
+    "tile": false
+  },
+  {
+    "title": "RoboHelp Server",
+    "hostname": "adobe.com",
+    "pathname": "/products/robohelp",
+    "light": "02f4116274cb5e70787fbef762ee7ee6182d462631e58625e4e1190250bba5fa.svg",
+    "tile": false
+  },
+  {
+    "title": "Animate",
+    "hostname": "adobe.com",
+    "pathname": "/products/animate",
+    "light": "8358e003d54fcb59bd5bd70140eb4ba6603689874a5751485ebfd6db7fba4221.svg",
+    "tile": false
+  },
+  {
+    "title": "Capture",
+    "hostname": "adobe.com",
+    "pathname": "/products/capture",
+    "light": "12e790dca2b620f1a1f798791804edf31a6546032cf31119c95d05fbf5e5baf4.svg",
+    "tile": false
+  },
+  {
+    "title": "Bridge",
+    "hostname": "adobe.com",
+    "pathname": "/products/bridge",
+    "light": "966f0071aa8639cda70d55ff0807d7d2ec32cf5be2d74beaa0c11db4588143da.svg",
+    "tile": false
+  },
+  {
+    "title": "Fresco",
+    "hostname": "adobe.com",
+    "pathname": "/products/fresco",
+    "light": "d1306c0dd2ead18ba09fe2b44d4aaf743f302424a6ee0ecfd58037baefe06fa3.svg",
+    "tile": false
+  },
+  {
+    "title": "InCopy",
+    "hostname": "adobe.com",
+    "pathname": "/products/incopy",
+    "light": "22cd99f1c0e2f9478cdce662e364c6e18a0ce88b122df650b98c8eba057ee5f6.svg",
+    "tile": false
+  },
+  {
+    "title": "Adobe Aero",
+    "hostname": "adobe.com",
+    "pathname": "/products/aero",
+    "light": "5c5323570b42964d14f65bf4d54a35b0435a0b2a693ebda191d1f5dba13a88e5.svg",
+    "tile": false
+  },
+  {
+    "title": "PDF",
+    "hostname": "adobe.com",
+    "pathname": "/acrobat.html",
+    "light": "3bf9487beaa660805d74e783749b34a9c0415c6f3d145ff7a78eb8102728f003.svg",
+    "tile": false
+  },
+  {
+    "title": "XD",
+    "hostname": "adobe.com",
+    "pathname": "/products/xd",
+    "light": "aaf373ca75f4acc1f33a221b1afee151165e359039aedea3244d643c75c430c8.svg",
+    "tile": false
+  },
+  {
+    "title": "Adobe Sign",
+    "hostname": "adobe.com",
+    "pathname": "/sign",
+    "light": "59ab8b1aab2cdf52b8359733c0900df2903b9f37a52273a8e07e1fe6810c8fdb.svg",
+    "tile": false
+  },
+  {
+    "title": "Adobe",
+    "hostname": "adobe.com",
+    "pathname": "/",
+    "light": "b99b41710adc839b62ac81e85ab769fd1433526b4270b11f6bf96a8f93184542.svg",
+    "tile": false
+  },
+  {
+    "title": "Affinity Publisher",
+    "hostname": "affinity.serif.com",
+    "pathname": "/en-us/publisher",
+    "light": "5d5f9d36cdccbafebfe30c8948075bb893471aae4f38ba085e8892262019aaf4.svg",
+    "tile": false
+  },
+  {
+    "title": "Affinity Designer",
+    "hostname": "affinity.serif.com",
+    "pathname": "/en-us/designer",
+    "light": "2c569b49171de77d83a2fc8f5f319bdb420781834a869601574c310b4d2b4982.svg",
+    "tile": false
+  },
+  {
+    "title": "Affinity Photo",
+    "hostname": "affinity.serif.com",
+    "pathname": "/en-us/photo",
+    "light": "9c29dfec6b87608e90901ab1be74091137f8edd0cbcfcfc8f4197b452a01a8c2.svg",
+    "tile": false
+  },
+  {
+    "title": "ahooks",
+    "hostname": "ahooks.js.org",
+    "pathname": "/",
+    "light": "1307cfab9f2cd21a3f3ad1d57f8b1a65f8cf00c55800cfedd5eb2673e3c8eb23.svg",
+    "tile": false
+  },
+  {
+    "title": "Ahrefs",
+    "hostname": "ahrefs.com",
+    "pathname": "/",
+    "light": "c01708558ad4e085750f4af83f0c5e747e16c0a65d018e5b01bb7746ab6e3d65.svg",
+    "tile": false
+  },
+  {
+    "title": "Google PaLM",
+    "hostname": "ai.google",
+    "pathname": "/discover/palm2",
+    "light": "c990c0d5396d717ac501021629477d1fe9ed20c9539c906a98ed4560cb4274e5.svg",
+    "tile": false
+  },
+  {
+    "title": "Airbnb",
+    "hostname": "airbnb.com",
+    "pathname": "/",
+    "light": "f595b932530217d33adc8110fed4b962ce83727deeb02267faa7a6300905b93c.svg",
+    "tile": false
+  },
+  {
+    "title": "Alacritty",
+    "hostname": "alacritty.org",
+    "pathname": "/",
+    "light": "98e8e1b3dc8df4b94c4d9859408a712267e161b84003f388c899450a6b470357.svg",
+    "tile": false
+  },
+  {
+    "title": "Algolia",
+    "hostname": "algolia.com",
+    "pathname": "/",
+    "light": "7506f246284289374de589dfecc5106fa989e21e4d18afd669721a244aee3bce.svg",
+    "tile": false
+  },
+  {
+    "title": "Algorand",
+    "hostname": "algorand.org",
+    "pathname": "/",
+    "light": "ca0b4fe27487649baa1f1a552d9269bb6c751465164fd797556680fab3e48321.svg",
+    "tile": false
+  },
+  {
+    "title": "Aliexpress",
+    "hostname": "aliexpress.com",
+    "pathname": "/",
+    "light": "c8608730d7cf1cdda379be162e581e06eed843b58b01c4db2b491d64f2eddb0a.svg",
+    "tile": false
+  },
+  {
+    "title": "阿里云盘",
+    "hostname": "alipan.com",
+    "pathname": "/",
+    "light": "72d0b9dce04f0d0dc6c8e871f36088f85e715a377d0544dbf0c7d3027c295ec4.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "阿里云盘",
+    "hostname": "aliyundrive.com",
+    "pathname": "/",
+    "light": "72d0b9dce04f0d0dc6c8e871f36088f85e715a377d0544dbf0c7d3027c295ec4.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "AMP",
+    "hostname": "amp.dev",
+    "pathname": "/",
+    "light": "0b65357649841703e710628ef1b7cef388860bfd7b9ddfae1f4aa16d15888746.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Analytics",
+    "hostname": "analytics.google.com",
+    "pathname": "/",
+    "light": "3fb3b91c7ec7adaa6be9589e68338b3d07322a2eafe03565c130e5e29a2b5f9c.svg",
+    "tile": false
+  },
+  {
+    "title": "Android",
+    "hostname": "android.com",
+    "pathname": "/",
+    "light": "f94c0bd4465701e7eb708fae6f3ee69dbdf6b363901f44e1a3d5d5410f4adb14.svg",
+    "tile": false
+  },
+  {
+    "title": "Angular",
+    "hostname": "angular.dev",
+    "pathname": "/",
+    "light": "223465023552bb0ff435a878dab4737fe810132d5d98f3f845266ad73064ddf5.svg",
+    "tile": false
+  },
+  {
+    "title": "Ant Design",
+    "hostname": "ant.design",
+    "pathname": "/",
+    "light": "72b680102dde2f939add0a75b7e494e1d3703c6e1817c3ce8e7ae58c0aa0f1c1.svg",
+    "tile": false
+  },
+  {
+    "title": "Anthropic",
+    "hostname": "anthropic.com",
+    "pathname": "/",
+    "light": "51635844d2ae983077bb8c81f46b10d142542da4c23a06e9c2faf9154cc20af4.svg",
+    "dark": "7fea3100bfc2a9480e181fc615d4791cab014f54674b83953785abb86dc293f0.svg",
+    "tile": false
+  },
+  {
+    "title": "Apidog",
+    "hostname": "apidog.com",
+    "pathname": "/",
+    "light": "a31120264f0e364446225324b1fea86cf222bacc4daf2f255b65b9b219942d3f.svg",
+    "tile": false
+  },
+  {
+    "title": "Apollo.io",
+    "hostname": "apollo.io",
+    "pathname": "/",
+    "light": "a91ff800b027365e5f83373578e10c39e03ab94ff531f9b5db01d112e8d0f2c0.svg",
+    "tile": false
+  },
+  {
+    "title": "App Store",
+    "hostname": "apple.com",
+    "pathname": "/app-store",
+    "light": "f4dfeda553590877fc5d2b47d2e902b51b033035a263ae811943a413ea6ed0be.svg",
+    "tile": false
+  },
+  {
+    "title": "Safari",
+    "hostname": "apple.com",
+    "pathname": "/safari",
+    "light": "07e28cf4b39de197861debb8a6ae44904cd4aaa485bb3a7cec66c01bde1a9243.svg",
+    "tile": false
+  },
+  {
+    "title": "Apple",
+    "hostname": "apple.com",
+    "pathname": "/",
+    "light": "0b8ffab7955ccdd02e8a3a8cfc0091abb1ddb2d1e9eb0861a4c6ee3bad7d3582.svg",
+    "dark": "7834279835bdfb4d48a56e4daae398938cd81272c82874b4ea9f67c091fe5698.svg",
+    "tile": false
+  },
+  {
+    "title": "Appwrite",
+    "hostname": "appwrite.io",
+    "pathname": "/",
+    "light": "fff96e40f8a078b63f92eaaf30ec1e145d97c282015057c66eed048c204cd2d0.svg",
+    "tile": false
+  },
+  {
+    "title": "Arc",
+    "hostname": "arc.dev",
+    "pathname": "/",
+    "light": "1edc5af6439dbfdf23231c96d5597eb1fdb537bc4accd5b07bffec9cb099ded2.svg",
+    "dark": "86a09f136134be8372a2fd4ae42002a4c85c9960217396ed3a5353db60031391.svg",
+    "tile": false
+  },
+  {
+    "title": "Arc",
+    "hostname": "arc.net",
+    "pathname": "/",
+    "light": "604ef79ed79c2f17a23e34f1c640c166b3c8ab39a8ba29c59e1261c244c9e9e1.svg",
+    "tile": false
+  },
+  {
+    "title": "Arc",
+    "hostname": "arc.tech",
+    "pathname": "/",
+    "light": "65d2283518fd897f536fd0bafa153610a6e14b98f1f87a77225fc90bdbf242da.svg",
+    "dark": "4882b3bf3d5551faf06059d5559587b0664a969074aab887e560aa487548e71e.svg",
+    "tile": false
+  },
+  {
+    "title": "Ark UI",
+    "hostname": "ark-ui.com",
+    "pathname": "/",
+    "light": "f1e3b7f8facd5d013b8e1204625535a0c2808e6824c2ad897490b5b9ee8dc604.svg",
+    "tile": false
+  },
+  {
+    "title": "Asana",
+    "hostname": "asana.com",
+    "pathname": "/",
+    "light": "f1a2bf6a5b20d6f369657f56a9abe3231e4201a4c7238b1b72be846c646368cc.svg",
+    "tile": false
+  },
+  {
+    "title": "Astro",
+    "hostname": "astro.build",
+    "pathname": "/",
+    "light": "1089398d62aa6db4dd34f01169fa13ca9c3fd8d647cfdb57de427637b56e2fd9.svg",
+    "dark": "d5f28ecf126a025acd3692c3ec4e35d66674a3574da02fb91534a84f3cac4632.svg",
+    "tile": false
+  },
+  {
+    "title": "Atlassian",
+    "hostname": "atlassian.com",
+    "pathname": "/",
+    "light": "5360084587bad58c225a3e988fc51adc8470df5240e6abc54836da8276a0203d.svg",
+    "tile": false
+  },
+  {
+    "title": "Atom",
+    "hostname": "atom.io",
+    "pathname": "/",
+    "light": "fed5e404845225bc6a4cd569a953fc730068263a336d7822d14c83ed37101e18.svg",
+    "tile": false
+  },
+  {
+    "title": "Auth0",
+    "hostname": "auth0.com",
+    "pathname": "/",
+    "light": "b7cc3f0d713d27679388cbc815f751eb7154ef15fcb0d0d7be7d38427a7e7359.svg",
+    "tile": false
+  },
+  {
+    "title": "Auth.js",
+    "hostname": "authjs.dev",
+    "pathname": "/",
+    "light": "25e796039625e22cf4bd938fc715b805fca19a2f71a27411ddffd667a0fc7610.svg",
+    "tile": false
+  },
+  {
+    "title": "Authy",
+    "hostname": "authy.com",
+    "pathname": "/",
+    "light": "fe77d7d1ca1169a02e3c8d5daeb687e897bbbe392f934c87aee8f242cce6c73d.svg",
+    "tile": false
+  },
+  {
+    "title": "Amazon Q",
+    "hostname": "aws.amazon.com",
+    "pathname": "/q",
+    "light": "34a8a8210520e4ed0eadbe88176ea5401523e44845eb5d63c28d0cddbf26cea2.svg",
+    "tile": false
+  },
+  {
+    "title": "Amazon Web Services",
+    "hostname": "aws.amazon.com",
+    "pathname": "/",
+    "light": "c1fb8aee6d30937b2dfd3282d74a1e509f8ff15ce948107dd31f891cd2e6d890.svg",
+    "dark": "413381b8958578c3e32e5c3fb3e851ed782bdeddec824f22e35d50328cce1bdb.svg",
+    "tile": false
+  },
+  {
+    "title": "Axiom",
+    "hostname": "axiom.co",
+    "pathname": "/",
+    "light": "05d7df20953e98af10cb0bc513efeef16ed0152947928f1bcd288637bdc82387.svg",
+    "dark": "4b4eb272562ad0043242e74ed6a5eb5344ae2f785c96bed20f3a1917b2e40e5c.svg",
+    "tile": false
+  },
+  {
+    "title": "Axure",
+    "hostname": "axure.com",
+    "pathname": "/",
+    "light": "66ef139e6752f050b7052d8dda48194c98bc3d93ab730e3f5f8bdc17122632c9.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Azure",
+    "hostname": "azure.microsoft.com",
+    "pathname": "/",
+    "light": "942a851dff182edca939226bbac4d2de98c36806db466ef008699cfce22478c1.svg",
+    "tile": false
+  },
+  {
+    "title": "Babel",
+    "hostname": "babeljs.io",
+    "pathname": "/",
+    "light": "7cd1239bc8f462a34c3926a870407a5ba040e386188d42c020074c5434d2eac3.svg",
+    "tile": false
+  },
+  {
+    "title": "Base UI",
+    "hostname": "base-ui.com",
+    "pathname": "/",
+    "light": "5a439c9e6c265a77b24bce666d28c23f68e7f4a71dcc1fe439f4db005843b6b7.svg",
+    "dark": "d278dc6d5b0eb86cea9c48043e9a39b29ab20631b4a7f66f0c584c27a66662e6.svg",
+    "tile": false
+  },
+  {
+    "title": "Basewell",
+    "hostname": "basewell.com",
+    "pathname": "/",
+    "light": "ed8ced472e2181aca1d7bc9f796dae9fcc7af1a23d6f79fffc82916465d01609.svg",
+    "tile": false
+  },
+  {
+    "title": "Beacon",
+    "hostname": "beacon.com",
+    "pathname": "/",
+    "light": "76471f2d36f4d864a16a2b23a596d37426a1f9019e991a044df1304286ae7a54.svg",
+    "tile": false
+  },
+  {
+    "title": "Behance",
+    "hostname": "behance.net",
+    "pathname": "/",
+    "light": "afd66de12e75c4dd7d801c55989f058dbd6b23cb10a93266746c1a422269cd19.svg",
+    "tile": false
+  },
+  {
+    "title": "Bento",
+    "hostname": "bento.me",
+    "pathname": "/home",
+    "light": "9e3037f47cbf7a23427c67aeaee1a64e660edfc98f9c80600c9d31fc1d59839b.svg",
+    "tile": false
+  },
+  {
+    "title": "Better Auth",
+    "hostname": "better-auth.com",
+    "pathname": "/",
+    "light": "b02520d041ef83a5e1a6bd99622cc61e9915ecbe65dabf91b3996cd447460665.svg",
+    "dark": "e18ef264abb7a7dc93381fb4843c9cc0dbf64703ab2741b7235b8016b40b5285.svg",
+    "tile": false
+  },
+  {
+    "title": "Binance",
+    "hostname": "binance.com",
+    "pathname": "/",
+    "light": "3aebe73135860203ab7a72d842d824999d868d0c630ce6dea868bf699f336a31.svg",
+    "tile": false
+  },
+  {
+    "title": "Bing",
+    "hostname": "bing.com",
+    "pathname": "/",
+    "light": "192d4671a23e40c7deb8fb16c48970e27f116a6ca5cc648eb6e3b366f5c8dd6d.svg",
+    "tile": false
+  },
+  {
+    "title": "Biomejs",
+    "hostname": "biomejs.dev",
+    "pathname": "/",
+    "light": "0639a0265dec3d6d878adf65bc79916322e9909f525edda200e2ce4948417447.svg",
+    "tile": false
+  },
+  {
+    "title": "Bitcoin",
+    "hostname": "bitcoin.org",
+    "pathname": "/",
+    "light": "25796ed7e93f94946b7e0e4839b9502c8cc01e8a804fb150ce0cc1163f900201.svg",
+    "tile": false
+  },
+  {
+    "title": "Bitwarden",
+    "hostname": "bitwarden.com",
+    "pathname": "/",
+    "light": "d697f12d6722e586ab64a5f24d593914b232e0e51e5e5ff3a51010105a22fd26.svg",
+    "tile": false
+  },
+  {
+    "title": "Bklit",
+    "hostname": "bklit.com",
+    "pathname": "/",
+    "light": "446a10872dbb84d191ade07179cfa7917f069be12263eaee2c39c9c47318b2b3.svg",
+    "dark": "991b5093bafd4b48ef24826f761bba7a9caa737dbf4c06e46e1eea5fbaeee3ad.svg",
+    "tile": false
+  },
+  {
+    "title": "Blender",
+    "hostname": "blender.org",
+    "pathname": "/",
+    "light": "60a4c31343f8356ecbaaee324bd6253deacd8a6c27c3fe33f06ecc59ed4bd164.svg",
+    "tile": false
+  },
+  {
+    "title": "Blitz",
+    "hostname": "blitzjs.com",
+    "pathname": "/",
+    "light": "5101cb9d44da26a681eee3b1ffaaea494e55f5e86908dfe2e56680a4fa241549.svg",
+    "tile": false
+  },
+  {
+    "title": "Bluesky",
+    "hostname": "blueskyweb.xyz",
+    "pathname": "/",
+    "light": "3725a15b74fc14d493ab680ccd87ebf1025e7f02c486b7cc75db644427d856ab.svg",
+    "tile": false
+  },
+  {
+    "title": "BNB",
+    "hostname": "bnbchain.org",
+    "pathname": "/",
+    "light": "1eb633587d13af06d20e4d1289ac0ac061d4226bd36e32004d5672f7d32715d6.svg",
+    "tile": false
+  },
+  {
+    "title": "bolt",
+    "hostname": "bolt.new",
+    "pathname": "/",
+    "light": "70fc51f1e9fe587b309a2532f7a5b5098da7e5dfd0a42a15f115b80cc0b7019f.svg",
+    "dark": "6bb0ff5b421c1c313763d5db7580117eaa3c447d69ad47b176019d16f27c9fbf.svg",
+    "tile": false
+  },
+  {
+    "title": "Brave Browser",
+    "hostname": "brave.com",
+    "pathname": "/",
+    "light": "a2169bfffd1f5fadcfb0ec708cf21d08227f9cb5890c3bcd5d3832d417802efc.svg",
+    "tile": false
+  },
+  {
+    "title": "Homebrew",
+    "hostname": "brew.sh",
+    "pathname": "/",
+    "light": "81baf508e9a37de65d31ccbcf7510e074951decda884bd0a9dd56933df635f64.svg",
+    "tile": false
+  },
+  {
+    "title": "Builder",
+    "hostname": "builder.io",
+    "pathname": "/",
+    "light": "c0b003d3aac3968fa342898888445094c946bb47bf8578d36adaf7a3a22d23a9.svg",
+    "tile": false
+  },
+  {
+    "title": "BuildShip",
+    "hostname": "buildship.com",
+    "pathname": "/",
+    "light": "a16b6d3876de4824701ba76d06546b49777cf4dab4fc8540dca4a040d2ec35a6.svg",
+    "tile": false
+  },
+  {
+    "title": "Bun",
+    "hostname": "bun.sh",
+    "pathname": "/",
+    "light": "8d28d9adf8bcda380ac9fdd1418453d451ec61942ed6661f5360846ac36f521a.svg",
+    "tile": false
+  },
+  {
+    "title": "Experience Platform",
+    "hostname": "business.adobe.com",
+    "pathname": "/products/adobe-experience-platform",
+    "light": "362ee046ba8d525a87857f2852cf0edc96602c374b64e2cf0309f0beb21ddb38.svg",
+    "tile": false
+  },
+  {
+    "title": "Buy Me a Coffee",
+    "hostname": "buymeacoffee.com",
+    "pathname": "/",
+    "light": "94c3b0f6e002f33ee9dc742cd48d5e767eef84ca876fac27573519e40e3b7bba.svg",
+    "tile": false
+  },
+  {
+    "title": "Cal.com",
+    "hostname": "cal.com",
+    "pathname": "/",
+    "light": "449335d3618b314f15b07225057e44721697c0b22c89769f794c55249e1ac2ef.svg",
+    "dark": "6cfe5b8f6b1b3e55746083abe53035f70872977b4fc3b25ac72dfaedf1633eae.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Calendar",
+    "hostname": "calendar.google.com",
+    "pathname": "/",
+    "light": "643e0b6b34b278cf062bedcf798f894b7e8fa7b665793736664c5cf57f9f7873.svg",
+    "tile": false
+  },
+  {
+    "title": "Calendly",
+    "hostname": "calendly.com",
+    "pathname": "/",
+    "light": "a00cc90b2986d31c828af2c93fa3099857f89a5788a0a68bb3a4584a74cc283f.svg",
+    "tile": false
+  },
+  {
+    "title": "Canva",
+    "hostname": "canva.com",
+    "pathname": "/",
+    "light": "242bb82ed2be97ce4213a3197bbeee558c49d268552372a85b5b9b40bf73b049.svg",
+    "tile": false
+  },
+  {
+    "title": "Carrd",
+    "hostname": "carrd.co",
+    "pathname": "/",
+    "light": "c1bf4d255d186380d9dafdbbaae26b28539561dba99c39dba392de123ce0f1b4.svg",
+    "tile": false
+  },
+  {
+    "title": "Cerebras",
+    "hostname": "cerebras.ai",
+    "pathname": "/",
+    "light": "3cbda26043bed3b35f41ece45f7b4d76e859bfad52c6a2d31b15fe8fa54ee2d8.svg",
+    "dark": "42c4de241005af2df38b22c977a85937ed7524d898f66a4e847045af00811d9c.svg",
+    "tile": false
+  },
+  {
+    "title": "Link",
+    "hostname": "chain.link",
+    "pathname": "/",
+    "light": "017138893f3843a738d9d6932600364e5cbb3b6f2f12a72702c8d6cb47a8f808.svg",
+    "tile": false
+  },
+  {
+    "title": "Chakra UI",
+    "hostname": "chakra-ui.com",
+    "pathname": "/",
+    "light": "cd5ea7e1068f3ad2fcf65693559ffd084f7772de1e4281d8e79469d7dc9a0a6c.svg",
+    "tile": false
+  },
+  {
+    "title": "Chart.js",
+    "hostname": "chartjs.org",
+    "pathname": "/",
+    "light": "911a74e7097f72d5523fe5e7775029f40823fceca56ad11c2e89d306166c48b2.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Chat",
+    "hostname": "chat.google.com",
+    "pathname": "/",
+    "light": "312c80c128321382587295936e079c245bd74a0c5db9fcb3b7cfbf8095d3d457.svg",
+    "tile": false
+  },
+  {
+    "title": "Qwen",
+    "hostname": "chat.qwenlm.ai",
+    "pathname": "/",
+    "light": "dcb3ba2f2b55ccbacbade0ca0bf98921fbaf8a07848972974b4a9bf8077376cf.svg",
+    "dark": "1729febe65990585b1ba96c223143f108f709f722c1d354238fd470630b51f54.svg",
+    "tile": false
+  },
+  {
+    "title": "Chrome",
+    "hostname": "chrome.com",
+    "pathname": "/",
+    "light": "fa70a8395db5875747df112606379788854a86ac0d39d06914d5fd0c7ba7dc76.svg",
+    "tile": false
+  },
+  {
+    "title": "Chromium",
+    "hostname": "chromium.org",
+    "pathname": "/",
+    "light": "f10fd8a8cdd4bb4d9057c561e9590aaf2d749cd108045c89121dc32c36cd0dfb.svg",
+    "tile": false
+  },
+  {
+    "title": "Cisco",
+    "hostname": "cisco.com",
+    "pathname": "/",
+    "light": "591c0ab6e761f708e1cfc36ccd048c72e61569e8a15640d6beb46f92e427c9de.svg",
+    "dark": "174dfecdc8c1ef48981b126520f2d5927ec49a7af3ce2afe228cc781c6e7247d.svg",
+    "tile": false
+  },
+  {
+    "title": "Claude AI",
+    "hostname": "claude.ai",
+    "pathname": "/",
+    "light": "0df6dad23995f5a76c6db8cc2a4e646ff45bd7a0626ef98662a7025646e5eea1.svg",
+    "tile": false
+  },
+  {
+    "title": "Clerk",
+    "hostname": "clerk.com",
+    "pathname": "/",
+    "light": "4833dd802dd55468cf9113f4f40831380a3e8f431ccc7c2b0a34866430ca2af3.svg",
+    "dark": "d62d8a4fe8e22c34235c0934a73ec48321bba42d4d26df39de887eb489d87f36.svg",
+    "tile": false
+  },
+  {
+    "title": "ClickUp",
+    "hostname": "clickup.com",
+    "pathname": "/",
+    "light": "a8b08e70df4a7d7c949a423b4f3caa04671e209617c8b73bc24cff846ae2e017.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Clipchamp",
+    "hostname": "clipchamp.com",
+    "pathname": "/",
+    "light": "53d26716c74458c28292bf23cb365ba6ba0c58e84ae2547b2a15a9607df0ebd5.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Cloud",
+    "hostname": "cloud.google.com",
+    "pathname": "/",
+    "light": "e314a1d65f5035bdcebb84ed740ed0341cc5ba15ecf22fa2c1b10d39fbe18880.svg",
+    "tile": false
+  },
+  {
+    "title": "Cloudflare",
+    "hostname": "cloudflare.com",
+    "pathname": "/",
+    "light": "b8dff311e8041942b6006c907fd44c5f3ae941bd88ec650e552fe3f727f5139c.svg",
+    "tile": false
+  },
+  {
+    "title": "Cloudinary",
+    "hostname": "cloudinary.com",
+    "pathname": "/",
+    "light": "7f2045602c564ca1f8016bb629d57cb2af05485948664fab3449794a6c1cedd6.svg",
+    "tile": false
+  },
+  {
+    "title": "Visual Studio Code",
+    "hostname": "code.visualstudio.com",
+    "pathname": "/",
+    "light": "0c3dbeed85a5881f0e778a941f6033b8b42022587187f1e23e6f1c31a91ed3a0.svg",
+    "tile": false
+  },
+  {
+    "title": "Codesandbox",
+    "hostname": "codesandbox.io",
+    "pathname": "/",
+    "light": "810055d904a61e529dadfaa8c1249a3cc411372a3875acb38569722ae494db76.svg",
+    "tile": false
+  },
+  {
+    "title": "Codium",
+    "hostname": "codium.ai",
+    "pathname": "/",
+    "light": "8e32a40c6e27c44ba2fb9e4e768244f4ef9b3a469183d18cd25741c75be61e04.svg",
+    "tile": false
+  },
+  {
+    "title": "Cohere",
+    "hostname": "cohere.com",
+    "pathname": "/",
+    "light": "c7fba29253b3b598d149f764d2629344bd60e13abfbd770a4214331950936d67.svg",
+    "tile": false
+  },
+  {
+    "title": "Coinbase",
+    "hostname": "coinbase.com",
+    "pathname": "/",
+    "light": "755d740e4136eacde4e1dda216cb170812dc7588d7764ea90f5352b78be66697.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Colaboratory",
+    "hostname": "colab.research.google.com",
+    "pathname": "/",
+    "light": "ca357e894ab100932849f62de9028e3077ce99f43e462ccda3fb01c9f73908af.svg",
+    "tile": false
+  },
+  {
+    "title": "Conductor",
+    "hostname": "conductor.build",
+    "pathname": "/",
+    "light": "be9f59cfca8235b978532d2d3dab94002e68d882f3314b95bb43f27dd58a41e5.svg",
+    "dark": "404be085ed68552905988f6d8092f49f265ef54c2385f8596e9c3dc0c79b8c41.svg",
+    "tile": false
+  },
+  {
+    "title": "Nuxt Content",
+    "hostname": "content.nuxt.com",
+    "pathname": "/",
+    "light": "947ec8ffb95a3a9b76fb054ad4fcd56869e5ed5926d713c71ab254d20c4619dd.svg",
+    "dark": "6aa5b6aeee012d045967b42f139bd2f9a7945e0fe92a4abafed3558f2a7632fb.svg",
+    "tile": false
+  },
+  {
+    "title": "Convex",
+    "hostname": "convex.dev",
+    "pathname": "/",
+    "light": "4dafe466c51191efc7c1da64f7a8f46157d7aa5631f5d96e84a9e39abc3d1f17.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Copilot",
+    "hostname": "copilot.microsoft.com",
+    "pathname": "/",
+    "light": "67e887e025d189f71770ef40d0895217e98b2b2ad13cb0a4d9703c4cf2a1896b.svg",
+    "tile": false
+  },
+  {
+    "title": "Coursera",
+    "hostname": "coursera.org",
+    "pathname": "/",
+    "light": "1835f3c9f31264390c686138ffdbd950c13feaf2aa829c07b0671a8b6c4c5c1c.svg",
+    "tile": false
+  },
+  {
+    "title": "cPanel",
+    "hostname": "cpanel.net",
+    "pathname": "/",
+    "light": "d4874c12025059a2cde95e09d46f7d2feba5a51d9ceca1deb86ed60404be28c3.svg",
+    "tile": false
+  },
+  {
+    "title": "T3 Stack",
+    "hostname": "create.t3.gg",
+    "pathname": "/",
+    "light": "3664404c980eda6debd0a88ea4f15895655d088a1ca1a61f5315264905a0c71e.svg",
+    "dark": "f39bd17df51f5054cb25f633f4ed13c41968487d878c18a62cffe3311c8f70e2.svg",
+    "tile": false
+  },
+  {
+    "title": "Crossplane",
+    "hostname": "crossplane.io",
+    "pathname": "/",
+    "light": "f07119b7eee065cf2d1b3eb1a3ae0456e404a35164f985527ab2604d9ab0ce6e.svg",
+    "tile": false
+  },
+  {
+    "title": "CSDN",
+    "hostname": "csdn.net",
+    "pathname": "/",
+    "light": "6f227ba59b356d762521f557da4c78bbd2dcf8ee996fcbfbfebafd1e15b3dba4.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "CurseForge",
+    "hostname": "curseforge.com",
+    "pathname": "/",
+    "light": "f76de2e5ed216fad5c5f79c492e512741fc05b42527e6b0a6de41a1844713897.svg",
+    "dark": "c4439a343ab5cc1535880d84cbbdea87e6fe6caf76922139b8365b097aca70bb.svg",
+    "tile": false
+  },
+  {
+    "title": "Cursor",
+    "hostname": "cursor.com",
+    "pathname": "/",
+    "light": "c483c02f78eb2619778fdd959e72a9adfac4844854472cd2653d4cbfd60e4d71.svg",
+    "dark": "cd0e3e5d8991a4cdd4577f8896cd063105207665165c73e25a1ff918dd367eb7.svg",
+    "tile": false
+  },
+  {
+    "title": "Cypress",
+    "hostname": "cypress.io",
+    "pathname": "/",
+    "light": "672cd4e9682efb86a209aeb48dc0ba451475f04d20e9d621fe350516677c2b4c.svg",
+    "tile": false
+  },
+  {
+    "title": "D3.js",
+    "hostname": "d3js.org",
+    "pathname": "/",
+    "light": "45f81f315768ce46dfc80a3373076f1b3a74d993260332f10ec38ab09d465e87.svg",
+    "tile": false
+  },
+  {
+    "title": "daily.dev",
+    "hostname": "daily.dev",
+    "pathname": "/",
+    "light": "b99f89020826b58b560bf6232d14c703c30d613e52415381a6aff045f598c168.svg",
+    "dark": "69e588cad0c727bbc45669105d3ed9010ee0c89f575275c7ffabc6dac1bad577.svg",
+    "tile": false
+  },
+  {
+    "title": "daisyUI",
+    "hostname": "daisyui.com",
+    "pathname": "/",
+    "light": "abfef856207fa654b63cf52fd0cca64d7b6abdbda15007d656652769ece1ee18.svg",
+    "tile": false
+  },
+  {
+    "title": "Dart",
+    "hostname": "dart.dev",
+    "pathname": "/",
+    "light": "8423e862bf0e51da0959ad1d3de4a0c5d777898e6d22d83796eb946e090857c8.svg",
+    "tile": false
+  },
+  {
+    "title": "Datadog",
+    "hostname": "datadoghq.com",
+    "pathname": "/",
+    "light": "d7c954e9f3316e1fea4353e71e266ca50f81628f358a8ccd484bdf512fcdd691.svg",
+    "tile": false
+  },
+  {
+    "title": "DeepSeek",
+    "hostname": "deepseek.com",
+    "pathname": "/",
+    "light": "360336e87a3336f60b7d2432ecdea2982537806886e20b170163fd5d3dda825b.svg",
+    "tile": false
+  },
+  {
+    "title": "Deno",
+    "hostname": "deno.com",
+    "pathname": "/",
+    "light": "dca1ffa501e450f933071877f245af6fcb28caee7fab0d3108a45288f0d51586.svg",
+    "dark": "df1ad2289e1168ebab2c639a9a9f10d0141d1a3abb48260afb0f1dfe21c9c667.svg",
+    "tile": false
+  },
+  {
+    "title": "Depot",
+    "hostname": "depot.dev",
+    "pathname": "/",
+    "light": "40f3e499193a7d7616b27b8cb85e449aba6a4b7aedbf8b4f73362ae760145398.svg",
+    "dark": "8f19082a326d63aa3abad94157dbcb9946a68690bb934393d8dcf53bd72a0d97.svg",
+    "tile": false
+  },
+  {
+    "title": "Designali",
+    "hostname": "designali.in",
+    "pathname": "/",
+    "light": "5ba790148071e6a4598df83aadfa56db123c816f98ae2a993c37d8141151a1c0.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Designer",
+    "hostname": "designer.microsoft.com",
+    "pathname": "/",
+    "light": "80e0438f6c3aae94b7c150410153783327332aba37e174580072b4661225e10c.svg",
+    "tile": false
+  },
+  {
+    "title": "Devto",
+    "hostname": "dev.to",
+    "pathname": "/",
+    "light": "901efee57c9b0e375b939f8f996bd6f3655210ccfc236dcf444ab39d0bffbd60.svg",
+    "dark": "01b5e9477a26a787c3add858853d729914c182547ddaa148820967ccdb4540fd.svg",
+    "tile": false
+  },
+  {
+    "title": "JavaScript",
+    "hostname": "developer.mozilla.org",
+    "pathname": "/docs/Web/JavaScript",
+    "light": "35328c60cffee71518294d614325fad52f903b48b5b63ac5f59fe1997249942c.svg",
+    "tile": false
+  },
+  {
+    "title": "Digital Ocean",
+    "hostname": "digitalocean.com",
+    "pathname": "/",
+    "light": "7cd3313483ad97ede51f547018d50a8bb3e0ea117fbf1d1c68c5dfabfe614d00.svg",
+    "tile": false
+  },
+  {
+    "title": "Dingocoin",
+    "hostname": "dingocoin.com",
+    "pathname": "/",
+    "light": "9d58b2649250773446a0e010b36a9a2771f44f92892e751d7caca41a28684ef1.svg",
+    "tile": false
+  },
+  {
+    "title": "钉钉",
+    "hostname": "dingtalk.com",
+    "pathname": "/",
+    "light": "b2e66fe19baad6742c70f492ce86ff5a919d8c077afe622c6141f086156dfd06.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Directus",
+    "hostname": "directus.io",
+    "pathname": "/",
+    "light": "ca1542dfcad1903f6bab41ffa0ff3561fed5d2b611e3e264a6961c732cc0e0bb.svg",
+    "tile": false
+  },
+  {
+    "title": "Discord",
+    "hostname": "discord.com",
+    "pathname": "/",
+    "light": "6634cc2f915db66df7a5237cac0c1b98016289e86a2bb4b7bf6408ec2b95265c.svg",
+    "tile": false
+  },
+  {
+    "title": "Discord.js",
+    "hostname": "discord.js.org",
+    "pathname": "/",
+    "light": "e26c6fd72b122256c08896463c1b28d15ae6afa9da704d87e27a9acfb0b3d9f4.svg",
+    "tile": false
+  },
+  {
+    "title": "Discourse",
+    "hostname": "discourse.org",
+    "pathname": "/",
+    "light": "7b2d5fcdbea690930648f4bcc57407f8dac4f18b5732e3ee742367662a2b6261.svg",
+    "tile": false
+  },
+  {
+    "title": "Disney+",
+    "hostname": "disneyplus.com",
+    "pathname": "/",
+    "light": "80e69492df9045f7ef728b6ef9277bbb0a6e1191e6ffceac487f399e0f9f9b6f.svg",
+    "tile": false
+  },
+  {
+    "title": "Django",
+    "hostname": "djangoproject.com",
+    "pathname": "/",
+    "light": "a4b590f977591f7e8530d4110cf59c98a729df2141954bddd62af1275707ddb7.svg",
+    "tile": false
+  },
+  {
+    "title": "Docker",
+    "hostname": "docker.com",
+    "pathname": "/",
+    "light": "29e91bf0593f02cf32efc849f2e9707dfddd4684b4d72b2a2b6a89da9626c60d.svg",
+    "tile": false
+  },
+  {
+    "title": "UV",
+    "hostname": "docs.astral.sh",
+    "pathname": "/uv",
+    "light": "fc5aeabf925cbdaba99f4e86635eeef2d47a5ecd715d7994490ef9082fd12bfb.svg",
+    "tile": false
+  },
+  {
+    "title": "Documenso",
+    "hostname": "documenso.com",
+    "pathname": "/",
+    "light": "7ba9d0d41d2ec4876c6d7ac0499a64119c05c1ce8d303d762a28afe200fc2cf3.svg",
+    "dark": "f3564ff9a8170734efde2bbafa1db4e85a73cb74e8c00cc8036ab1873b4434e3.svg",
+    "tile": false
+  },
+  {
+    "title": "Docus",
+    "hostname": "docus.dev",
+    "pathname": "/",
+    "light": "c1d9d96a93ed2f22e077ebaa3658da2d8123b7d1a464f9294c8504c74b265eb0.svg",
+    "dark": "68d36d775ad209cb15eb2f6cbb814f9ca161e0bd5df0f09b673c5ab87b6a29de.svg",
+    "tile": false
+  },
+  {
+    "title": "Docusaurus",
+    "hostname": "docusaurus.io",
+    "pathname": "/",
+    "light": "01a352b09caafc7b87186c845b5ee819d747ff5f0ee12f92ec0911db19cac6bf.svg",
+    "tile": false
+  },
+  {
+    "title": "Dodo Payments",
+    "hostname": "dodopayments.com",
+    "pathname": "/",
+    "light": "5a187ae515eb889da0289111b7e64b1153b5fe6a11c6f5d91492cf74bdb63823.svg",
+    "tile": false
+  },
+  {
+    "title": "Dogecoin",
+    "hostname": "dogecoin.com",
+    "pathname": "/",
+    "light": "f84a7caa9a5c774fe21e5c75556554dcba877637ceac01dd5c88a4b84d348c2d.svg",
+    "tile": false
+  },
+  {
+    "title": "dotenvx",
+    "hostname": "dotenvx.com",
+    "pathname": "/",
+    "light": "74a63b749af760dabd844faefa81516d218e51dc458b6b76609d9ab0dec6ecce.svg",
+    "tile": false
+  },
+  {
+    "title": "C#",
+    "hostname": "dotnet.microsoft.com",
+    "pathname": "/languages/csharp",
+    "light": "637b695492be05f7d0ec6977de4aa9b46133df52315be214c34572d176c8a1e3.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft .NET",
+    "hostname": "dotnet.microsoft.com",
+    "pathname": "/",
+    "light": "6bedd3108c94aee4a57337cd0b392cb03b4ca35265c505eb7f86ee083aba8051.svg",
+    "tile": false
+  },
+  {
+    "title": "豆瓣",
+    "hostname": "douban.com",
+    "pathname": "/",
+    "light": "fe84b3fa031aff5603ec36a0588f50a147978de820fc094ddb749842118e6e90.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Dracula",
+    "hostname": "draculatheme.com",
+    "pathname": "/",
+    "light": "8786b752b34371eb235cd9d4488840e7febcd7972f070da84b84bb9d64d5e1ef.svg",
+    "dark": "2a1af6a6419b2c65bc8e4745c40b16bdbdb756ccb89adc2924888add07845002.svg",
+    "tile": false
+  },
+  {
+    "title": "Dribbble",
+    "hostname": "dribbble.com",
+    "pathname": "/",
+    "light": "92e6451cbd800603f5e5bf13098760443a3dd58245bbfb947e06d1c006635ef0.svg",
+    "tile": false
+  },
+  {
+    "title": "Dropbox",
+    "hostname": "dropbox.com",
+    "pathname": "/",
+    "light": "ef6eeed72f74fcd89674afd62dcf451eaf48c360da516679b08c1e99a8ea0819.svg",
+    "tile": false
+  },
+  {
+    "title": "Dub",
+    "hostname": "dub.co",
+    "pathname": "/",
+    "light": "a401f6e146c32e6036cda21c0ab70f6b5671d9e421e16ed5e4d9ae7c5bd3a495.svg",
+    "dark": "a912f1665ff127b1124de873d058bd08996ca592d3814e612d1c667b21073116.svg",
+    "tile": false
+  },
+  {
+    "title": "DuckDuckGo",
+    "hostname": "duckduckgo.com",
+    "pathname": "/",
+    "light": "905694fbd62e8ca176f4990d94d5afedbccb92d05b146339775bb8d4deb9ef72.svg",
+    "tile": false
+  },
+  {
+    "title": "Ebay",
+    "hostname": "ebay.com",
+    "pathname": "/",
+    "light": "a2d4e64c235f23c710f480f740fbd60cdfb2e08c29b6132e28dedec986e611f6.svg",
+    "tile": false
+  },
+  {
+    "title": "Eclipse IDE",
+    "hostname": "eclipse.org",
+    "pathname": "/",
+    "light": "56ef9f45d51a73ef23fec94d713ee78934ae45945566eda252009e02afbdd6a0.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Classroom",
+    "hostname": "edu.google.com",
+    "pathname": "/workspace-for-education/products/classroom",
+    "light": "c817f23c6e83fd615091b0a5a42d9cd42273238c0760f4f85ddd60ec4ff57081.svg",
+    "tile": false
+  },
+  {
+    "title": "Effect TS",
+    "hostname": "effect.website",
+    "pathname": "/",
+    "light": "2da1978e46d63cb58fccab36e60419ccdff14656d4bf89ea67cbaa9c90f28cf0.svg",
+    "dark": "d09b1400b0a2abaa6e2ecceccff7e69e3ddf284a1d37c06a25ddafc72479ed46.svg",
+    "tile": false
+  },
+  {
+    "title": "饿了么",
+    "hostname": "ele.me",
+    "pathname": "/",
+    "light": "264ec2f8ea938e6f69cfbd937f5a4fe5919579ed434c38719f10ecbe3faeb425.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Electron",
+    "hostname": "electronjs.org",
+    "pathname": "/",
+    "light": "fc2327856d69c432d7702827dc55304068f640b53e559c86faf3ed8358176c84.svg",
+    "tile": false
+  },
+  {
+    "title": "Elementor",
+    "hostname": "elementor.com",
+    "pathname": "/",
+    "light": "18dee6fb30f593ccb2fa3da51c39f19bfb221c21992852da085f2537305eab19.svg",
+    "tile": false
+  },
+  {
+    "title": "ElysiaJS",
+    "hostname": "elysiajs.com",
+    "pathname": "/",
+    "light": "417d09b10398e64dfa96a2a860483d77c388d301169f4338c3efd9990efe4c75.svg",
+    "tile": false
+  },
+  {
+    "title": "Ember",
+    "hostname": "emberjs.com",
+    "pathname": "/",
+    "light": "8c36a0debd6e645c45f870b21adf8c1c7af5fb4c02129fc25c821d699ace448a.svg",
+    "tile": false
+  },
+  {
+    "title": "C",
+    "hostname": "en.wikipedia.org",
+    "pathname": "/wiki/C_(programming_language)",
+    "light": "e119105e30cda078cad336fb6901fff95f9accee27d5671f3ee05d7da98c96fb.svg",
+    "tile": false
+  },
+  {
+    "title": "C++",
+    "hostname": "en.wikipedia.org",
+    "pathname": "/wiki/C%2B%2B",
+    "light": "2b9ea95a002dcac557b07262cad792cfe2068c46912af78185ec8523357aedde.svg",
+    "tile": false
+  },
+  {
+    "title": "Cobol",
+    "hostname": "en.wikipedia.org",
+    "pathname": "/wiki/COBOL",
+    "light": "126e5a09e331adea59dc9840c0215cdf9d2808c7b9dcbde2e64caf5c6f59095f.svg",
+    "tile": false
+  },
+  {
+    "title": "Epic Games",
+    "hostname": "epicgames.com",
+    "pathname": "/",
+    "light": "11135765d4ce74fdd2a0b6923f826bc1ed55ca4cf7c96be01607d74b4cee7c14.svg",
+    "dark": "5a269dfecc21389a056e5ef15d6321536fa0120fc821760997f01f47abbde8c7.svg",
+    "tile": false
+  },
+  {
+    "title": "HTML5",
+    "hostname": "es.wikipedia.org",
+    "pathname": "/wiki/HTML5",
+    "light": "8c4d77863a0a21b9b451a6da54176025954485a1f0842eb2627c3c52a5041bf2.svg",
+    "tile": false
+  },
+  {
+    "title": "CSS",
+    "hostname": "es.wikipedia.org",
+    "pathname": "/wiki/CSS",
+    "light": "38b506b8c8ec918edde57d6b052f5898a3fd5536a25d4756407596f0bcdd229e.svg",
+    "tile": false
+  },
+  {
+    "title": "CSS (New)",
+    "hostname": "es.wikipedia.org",
+    "pathname": "/wiki/CSS",
+    "light": "267799f536024481b18fc84fb715bf4f95078bb3204062112cfb94d9fa059706.svg",
+    "tile": false
+  },
+  {
+    "title": "Esbuild",
+    "hostname": "esbuild.github.io",
+    "pathname": "/",
+    "light": "6f44643bec69c1d9f2225531f180a4416db89dadab1beadd69a05bb1d82005c1.svg",
+    "tile": false
+  },
+  {
+    "title": "ESLint",
+    "hostname": "eslint.org",
+    "pathname": "/",
+    "light": "02448e2d7bb5f5091ab651aeb2ad4bce08283c114d58fff96c54c3a245f07906.svg",
+    "dark": "dc243a14ed48a7f9507d8bef52bd49c88c9df9b204d6737006458626490399b7.svg",
+    "tile": false
+  },
+  {
+    "title": "Ethereum",
+    "hostname": "ethereum.org",
+    "pathname": "/",
+    "light": "2cd04a33058ac8d87d745f0a8287a83f6b2c89887b1398abd44415ad130f214d.svg",
+    "tile": false
+  },
+  {
+    "title": "Exome",
+    "hostname": "exome.dev",
+    "pathname": "/",
+    "light": "708153f0b1dcdd80c31a1be06d0d917c359a33dacfcfab525b1bf2d881ef68a6.svg",
+    "tile": false
+  },
+  {
+    "title": "Expo",
+    "hostname": "expo.dev",
+    "pathname": "/",
+    "light": "d304768a7a3c8de8638ead0c6bca24758cb39ee3065e42a6a7326024aa507555.svg",
+    "tile": false
+  },
+  {
+    "title": "Express.js",
+    "hostname": "expressjs.com",
+    "pathname": "/",
+    "light": "44e8ea182f4bd0587559b6e81fe930242bc2273f54bb31abc4797891c4339f6c.svg",
+    "dark": "efd960856d23e75f865ebbd8df1a28e50ecf5887900f4a10f7b733ce401f0074.svg",
+    "tile": false
+  },
+  {
+    "title": "Facebook",
+    "hostname": "facebook.com",
+    "pathname": "/",
+    "light": "003fc3e7814ddcd270e030014f120f4cb8bef38be40022ebca913cafb7617a76.svg",
+    "tile": false
+  },
+  {
+    "title": "FastAPI",
+    "hostname": "fastapi.tiangolo.com",
+    "pathname": "/",
+    "light": "f8c2f8fdb66a407792269909ca1be804cdd5823584fb304e4be97d431ae0cfcb.svg",
+    "tile": false
+  },
+  {
+    "title": "Fastify",
+    "hostname": "fastify.io",
+    "pathname": "/",
+    "light": "1a13e816a3d0720b719b101bfd49b902901b87ffd78dea011e1551f3c32d4896.svg",
+    "dark": "1b89d951562391d2ec84348157492b857264cda200735819ee6d24832f1fa3a5.svg",
+    "tile": false
+  },
+  {
+    "title": "飞书",
+    "hostname": "feishu.cn",
+    "pathname": "/",
+    "light": "665e6874bc86b2833a3437b5cdc4e25fea68a343d2e9b0f499ec0f5aaccbc01b.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Figma",
+    "hostname": "figma.com",
+    "pathname": "/",
+    "light": "5bcdea3417293412845b8298fe357fce3b192e8ff112d9b3fef315bc5cd127f6.svg",
+    "tile": false
+  },
+  {
+    "title": "Firebase",
+    "hostname": "firebase.google.com",
+    "pathname": "/",
+    "light": "d7237deed92953b176ebf4d2010b121efecaa381fc3469cd879d2f99d8b18d8b.svg",
+    "tile": false
+  },
+  {
+    "title": "Firebase Studio",
+    "hostname": "firebase.studio",
+    "pathname": "/",
+    "light": "d56d9b6be66978ad754a5ca447f12910b9f425c6006eabafe9e51ef0f3c613a2.svg",
+    "tile": false
+  },
+  {
+    "title": "Firecrawl",
+    "hostname": "firecrawl.dev",
+    "pathname": "/",
+    "light": "f5ecdf6ffce04ed6bc2fac2ed409f566bf5ea98c687b8d405942de1556174c9b.svg",
+    "dark": "925752e210b3a9d943d35a95b1cd08bd8e94f016f97c6d43f7c5fc20a20275d5.svg",
+    "tile": false
+  },
+  {
+    "title": "Flask",
+    "hostname": "flask.palletsprojects.com",
+    "pathname": "/",
+    "light": "70433390c0c0d571045c650035fb46ea764ae015b9211f4f27976efccf8b8dcc.svg",
+    "dark": "22ea19ea0ff68f4c5c00f9f2c9838b3f8361b85064d68cd4184eea85980af11c.svg",
+    "tile": false
+  },
+  {
+    "title": "Flowbite",
+    "hostname": "flowbite.com",
+    "pathname": "/",
+    "light": "dac0b7e269a3bf98b472508fb5adb1a38144dbd0a9854df8a36937ebb3ed9903.svg",
+    "tile": false
+  },
+  {
+    "title": "Flow Launcher",
+    "hostname": "flowlauncher.com",
+    "pathname": "/",
+    "light": "b31a4a32db9e1b5851025f4520607e6af03ac567541504699dbfe50fe926a8a0.svg",
+    "tile": false
+  },
+  {
+    "title": "Flutter",
+    "hostname": "flutter.dev",
+    "pathname": "/",
+    "light": "ae67e4eec7eed6a6580f7e63c71d17ba4125ffd85a8e9f30fe74b7a6e48916a7.svg",
+    "tile": false
+  },
+  {
+    "title": "Fly",
+    "hostname": "fly.io",
+    "pathname": "/",
+    "light": "16fa96c3d880ee79817e596a6fe5f234ef29b5f1e086fa78d1296ccc2f58ef0c.svg",
+    "tile": false
+  },
+  {
+    "title": "Adobe Fonts",
+    "hostname": "fonts.adobe.com",
+    "pathname": "/",
+    "light": "6fee9d49e0b3ab25279bc09c63cf38e4e1f4913389426097002f178ce6a6a2d0.svg",
+    "tile": false
+  },
+  {
+    "title": "Formance",
+    "hostname": "formance.com",
+    "pathname": "/",
+    "light": "bee5421b963fcf7c4416eb9fc43ad689d9e9f8b52d2f9b6a5935dd9c2e13ed5d.svg",
+    "dark": "7ecacf03d1d043c528069bf48409d2b721195284678ef133fedf330a6ab43451.svg",
+    "tile": false
+  },
+  {
+    "title": "Fortran",
+    "hostname": "fortran-lang.org",
+    "pathname": "/",
+    "light": "cd01a6a53e0961795e3907158f7f3a59c5135a0aab3d5c9d337aa6b96ada1688.svg",
+    "tile": false
+  },
+  {
+    "title": "Framer",
+    "hostname": "framer.com",
+    "pathname": "/",
+    "light": "dbd3d12549fb051c55b7c5f3039e69fdf4ba0399c840b9fc3496b7ddb5026b37.svg",
+    "dark": "ca81b1326c70ab672d63319655ed433fab6591e5548271300b0788ac1b9e9ec0.svg",
+    "tile": false
+  },
+  {
+    "title": "Fresh",
+    "hostname": "fresh.deno.dev",
+    "pathname": "/",
+    "light": "f8288eb63c235dbf28a2632edad6ec8983bc4a272c73abaabea2dedbc474c279.svg",
+    "tile": false
+  },
+  {
+    "title": "Front",
+    "hostname": "front.com",
+    "pathname": "/",
+    "light": "777aeb8bb007d2a1b5a91d77e5956588789d5081acd6a58fb1932d696a96e84c.svg",
+    "tile": false
+  },
+  {
+    "title": "Gatsby",
+    "hostname": "gatsbyjs.org",
+    "pathname": "/",
+    "light": "2955a084875ce0ff740017b3f2654e04db43de4ce5cd962a2c71b97f6b54be00.svg",
+    "tile": false
+  },
+  {
+    "title": "Developer Student Club",
+    "hostname": "gdsc.community.dev",
+    "pathname": "/",
+    "light": "f51127cd21a42a29fccbb9d6caaf63f81248f0f7fea35ef79055b98515dd8f96.svg",
+    "tile": false
+  },
+  {
+    "title": "Gemini",
+    "hostname": "gemini.google.com",
+    "pathname": "/",
+    "light": "c11d94a9e3ecb32f67dd9350848cf3124d617680533275c672e1e6bf61ce8cd4.svg",
+    "tile": false
+  },
+  {
+    "title": "Bootstrap",
+    "hostname": "getbootstrap.com",
+    "pathname": "/",
+    "light": "fbb3756346b6a6316b7c32a6a683056f916a3ba4f7d6758cbe489f8982a2bbd6.svg",
+    "tile": false
+  },
+  {
+    "title": "Mocha",
+    "hostname": "getmocha.com",
+    "pathname": "/",
+    "light": "da2500c22b8b419936c849ec94294e182ca082b8920721f217a2be46b5eaf056.svg",
+    "dark": "53455446a03bec63f52bbdf4ab50984fa0ea52b7e3e9389f44f7429b538a360b.svg",
+    "tile": false
+  },
+  {
+    "title": "Monero",
+    "hostname": "getmonero.org",
+    "pathname": "/",
+    "light": "518cce1ce614c00e4b947d1ac40e13f8811d0aaa119805c2417f6c7a604d2ed3.svg",
+    "tile": false
+  },
+  {
+    "title": "Postman",
+    "hostname": "getpostman.com",
+    "pathname": "/",
+    "light": "5fc6ed981f9c44d5b17816c375b89eb62a31ec6a546e61d796d39bca464a5e54.svg",
+    "tile": false
+  },
+  {
+    "title": "Ghostty",
+    "hostname": "ghostty.org",
+    "pathname": "/",
+    "light": "8fa3da3c0bb36a8a4d18376828645b9f64fd3ff0ded4acc070720a6be1c24e76.svg",
+    "tile": false
+  },
+  {
+    "title": "Gimp",
+    "hostname": "gimp.org",
+    "pathname": "/",
+    "light": "dff90d72fe4c27ec04dca99265c3759f79298b72c5726ab7ec93b52778db226d.svg",
+    "tile": false
+  },
+  {
+    "title": "Git",
+    "hostname": "git-scm.com",
+    "pathname": "/",
+    "light": "cc43d5b0c4fae45b6e0857c17d602c0efb8526241ca9623a29863867a8f59f3a.svg",
+    "tile": false
+  },
+  {
+    "title": "Home Assistant",
+    "hostname": "github.com",
+    "pathname": "/home-assistant/assets/tree/master/logo",
+    "light": "d8d34582a06ee0a7632c577670e4e995edad4a2704f99ee7fadf6877d596a183.svg",
+    "tile": false
+  },
+  {
+    "title": "Ivy Framework",
+    "hostname": "github.com",
+    "pathname": "/Ivy-Interactive/Ivy-Framework",
+    "light": "e443e970a0e05b3123863176e0bdf993cdd7dd1f88d6b33b132fe12f3494477c.svg",
+    "tile": false
+  },
+  {
+    "title": "GitHub Copilot",
+    "hostname": "github.com",
+    "pathname": "/features/copilot",
+    "light": "f9a0867d6e367502b33b093b638b066092b0f1b8814cd1450c745360aa92f1ba.svg",
+    "dark": "38b9324574b647fcda85d87642a0bf3c7804dcf4b7ad9f534f924de38a1dfbe4.svg",
+    "tile": false
+  },
+  {
+    "title": "XState",
+    "hostname": "github.com",
+    "pathname": "/statelyai/xstate",
+    "light": "20c12c072402495abe8e19175315128a5f8d7167e0318884d3c00d0bea6cbb63.svg",
+    "dark": "9e9b1a1bc09cfa91c66427e7e48052e5c0faecbbba8346efa330678161e8cc06.svg",
+    "tile": false
+  },
+  {
+    "title": "dotenv",
+    "hostname": "github.com",
+    "pathname": "/motdotla/dotenv",
+    "light": "cc4cce6c7a8e18a1b74e30cb57b1842748a81066d2ea571492b7d741388ef10c.svg",
+    "tile": false
+  },
+  {
+    "title": "UXCorpRangel",
+    "hostname": "github.com",
+    "pathname": "/UXCorpRangel",
+    "light": "ce4923b8fc7d03c03e034291be21d948978b5ff94307eeec78141dc0d29e1d68.svg",
+    "dark": "c99287d916d00716201b3badb6b6245c0b862b7253461295809c12f73bd64396.svg",
+    "tile": false
+  },
+  {
+    "title": "GitHub",
+    "hostname": "github.com",
+    "pathname": "/",
+    "light": "64568845c83d5e840e6a1fb7af1939fed14709636427ce9be2fbcdc14ac5e021.svg",
+    "dark": "83adf1cacb564250654ccf60caadd8aaf852d9de47936befb7cb61b674ace7e8.svg",
+    "tile": false
+  },
+  {
+    "title": "GitLab",
+    "hostname": "gitlab.com",
+    "pathname": "/",
+    "light": "f113a0879aae4d458ac1de8f6ff3c8c6f9793299069fa1e422350ca24128a1fa.svg",
+    "tile": false
+  },
+  {
+    "title": "Gleam",
+    "hostname": "gleam.run",
+    "pathname": "/",
+    "light": "8570057d096e35137dcb2323fa634d427c1f04a17a7f3dac6cb2239052dd7d07.svg",
+    "tile": false
+  },
+  {
+    "title": "Glide",
+    "hostname": "glideapps.com",
+    "pathname": "/",
+    "light": "4b4e11ecc9d1b0aef28d1f980af8648b328fa7208ff775d1012d003e7965d626.svg",
+    "dark": "b5228de7ed502dc81915c9ef155c1be56c330443f3295f0b4080ca5533699bd1.svg",
+    "tile": false
+  },
+  {
+    "title": "Gmail",
+    "hostname": "gmail.com",
+    "pathname": "/",
+    "light": "6e0a1db3ce3893a809c3293bf0780902cad270ed443bb118cfcbc40647e272ab.svg",
+    "tile": false
+  },
+  {
+    "title": "Emacs",
+    "hostname": "gnu.org",
+    "pathname": "/software/emacs",
+    "light": "58f939fe8636482ab5da6794af28ebda350aa9aa1ca66ede705474d9ff1b354d.svg",
+    "tile": false
+  },
+  {
+    "title": "Bash",
+    "hostname": "gnu.org",
+    "pathname": "/software/bash",
+    "light": "ef11e445f7d1b06ff5fe46679e8ccd0ebe73b5b350c0c7399d59ad7c8b59c891.svg",
+    "dark": "2218052bfc95e42b534fae668d86e98f5b4998b480264843509ad3c72a2a4f59.svg",
+    "tile": false
+  },
+  {
+    "title": "Go",
+    "hostname": "go.dev",
+    "pathname": "/",
+    "light": "4bd88a16c62798dc12ac6b10dd190ba6ea45a63cef6c3af0a8330c667a384354.svg",
+    "dark": "6f0fa917b83cf37f49bec402d06f38d937a344a819ea58b354fc7224f5169815.svg",
+    "tile": false
+  },
+  {
+    "title": "GoDaddy",
+    "hostname": "godaddy.com",
+    "pathname": "/",
+    "light": "0af96d636c740f6c49172958ba9ef99af3e7ee4fb9046176d58930551f096f66.svg",
+    "dark": "5a7adf758c27c533142cad44da068e35d662ee8f5ff271ae2796bf7813deb477.svg",
+    "tile": false
+  },
+  {
+    "title": "Godot Engine",
+    "hostname": "godotengine.org",
+    "pathname": "/",
+    "light": "78f842c9c26247dc400901311e025b90fc045ab0864bb49c7d8a7ac0b77c303c.svg",
+    "tile": false
+  },
+  {
+    "title": "Hugo",
+    "hostname": "gohugo.io",
+    "pathname": "/",
+    "light": "6ee8f862c3ff80150d4b6aa882a3f6350411960ef8a1002f2df963949164fddd.svg",
+    "tile": false
+  },
+  {
+    "title": "Goil",
+    "hostname": "goil.app",
+    "pathname": "/",
+    "light": "990b990c78d2bf2477219e7fe59a1afbb44ef05afc81938d4a7df24618f172c5.svg",
+    "dark": "875bf88b18df2b6e6ff2aad0698318db21d73c2813909adad45180e30beb2d9e.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Antigravity",
+    "hostname": "google.com",
+    "pathname": "/antigravity",
+    "light": "4ad13823e4020b2b32fb2d78d0fbc28fca07b37c509dbf1d0709a918afa3a24b.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Drive",
+    "hostname": "google.com",
+    "pathname": "/drive",
+    "light": "2a0272583e3ea138ba5b809d9fa7d099b7b31e18221d5550c4e6f0d8866d4f84.svg",
+    "tile": false
+  },
+  {
+    "title": "Google",
+    "hostname": "google.com",
+    "pathname": "/",
+    "light": "a60266dab17c1c00981c7077fa025aa84c92782e0657ca2f78b7f70cbb8d5a56.svg",
+    "tile": false
+  },
+  {
+    "title": "Gradio",
+    "hostname": "gradio.app",
+    "pathname": "/",
+    "light": "6adbdae05367f0b9f6a9403fbcaf2ccd18c2631d8bccd8772149ae716faf1845.svg",
+    "tile": false
+  },
+  {
+    "title": "Grafana",
+    "hostname": "grafana.com",
+    "pathname": "/",
+    "light": "0b7f85edd76a69eee78c7781a037d982c6168cb2c2238d13683c7f7ddfd07b0f.svg",
+    "tile": false
+  },
+  {
+    "title": "Granola",
+    "hostname": "granola.ai",
+    "pathname": "/",
+    "light": "82826bd3a435a4c244b8e2e04f114bc30aab9117df704e48abb56f9060128fe4.svg",
+    "dark": "9a888713d73d2202f9cb2a1079756349bfd03070a109beac7c0f6919397bf3ff.svg",
+    "tile": false
+  },
+  {
+    "title": "GraphQL",
+    "hostname": "graphql.org",
+    "pathname": "/",
+    "light": "0f0ef57b63927ab5694b91d6e39fbd37ce11053c2018baab5c943eada03fced9.svg",
+    "tile": false
+  },
+  {
+    "title": "Grida",
+    "hostname": "grida.co",
+    "pathname": "/",
+    "light": "136ddea21cd973b15990fc8e814158c226550ffbedbf8a74abf4bff8ad20193a.svg",
+    "dark": "9c06ac7d316ed55c21e82a8c4089002afbb5eb6b7227a4b4c9d656b2131481be.svg",
+    "tile": false
+  },
+  {
+    "title": "Grok",
+    "hostname": "grok.com",
+    "pathname": "/",
+    "light": "a127a7cd42b0450f7d3827a331b0730aab49fd99c3fe920d172475b9ffc83992.svg",
+    "dark": "b20648e2f111d7fbc91f58b22d1e76e9885b68a163cb5a1010f7f11bf5840491.svg",
+    "tile": false
+  },
+  {
+    "title": "xAI",
+    "hostname": "grok.com",
+    "pathname": "/",
+    "light": "a805762f862713b85a68f05b6a7cb15d4bc42fd3a5f17cda706b77bccca6d7b2.svg",
+    "dark": "aa41806e679c972053a12fd33d0165daef4ce60be572976cce0e9026bcd47158.svg",
+    "tile": false
+  },
+  {
+    "title": "Groq",
+    "hostname": "groq.com",
+    "pathname": "/",
+    "light": "f8b4420340ff8875a1f04ce80909325dd81b0cb78d0c7a15fd567977338ae956.svg",
+    "tile": false
+  },
+  {
+    "title": "Hack The Box",
+    "hostname": "hackthebox.com",
+    "pathname": "/",
+    "light": "fdf21b4fb72c1dcc6170881920934464141cb669519408ee2a253de2855da013.svg",
+    "tile": false
+  },
+  {
+    "title": "Hashnode",
+    "hostname": "hashnode.com",
+    "pathname": "/",
+    "light": "cc8a2da8294043d5879f6878ef8bc95d18adc65c07a431b2bd05b50ede02dbcd.svg",
+    "tile": false
+  },
+  {
+    "title": "Haskell",
+    "hostname": "haskell.org",
+    "pathname": "/",
+    "light": "9ed5b6a0d6595c45c59af34fb3f16c1e6802a7412b3b69ec8720385c7495cfac.svg",
+    "tile": false
+  },
+  {
+    "title": "hCaptcha",
+    "hostname": "hcaptcha.com",
+    "pathname": "/",
+    "light": "cc4d45695601cdc6897e30bb4dff139a8fd8e035e0ebce8d5d7653e413370e28.svg",
+    "tile": false
+  },
+  {
+    "title": "Headless UI",
+    "hostname": "headlessui.dev",
+    "pathname": "/",
+    "light": "4ff0fac1a4d00de65ae305315a97d67a80eab24ae53b47567495012335a15cd5.svg",
+    "tile": false
+  },
+  {
+    "title": "Heptabase",
+    "hostname": "heptabase.com",
+    "pathname": "/",
+    "light": "2fb7077fde26669a360541d69af7f4cc7cc808d5de7d8cf1fa416d8e30a6737c.svg",
+    "tile": false
+  },
+  {
+    "title": "Heroku",
+    "hostname": "heroku.com",
+    "pathname": "/",
+    "light": "eed8d3cb106c7d1047cbf85d974011911c46aed78616dc748133fe6b7740ee33.svg",
+    "tile": false
+  },
+  {
+    "title": "HeroUI",
+    "hostname": "heroui.com",
+    "pathname": "/",
+    "light": "4408ff35f6c71982a358552544a82197d489e7a7c58383a96c5d2855c9c4875f.svg",
+    "dark": "827656b7494287d86f0156bdb3650a6ab33904a25a6b6027c21cec47d19e9b18.svg",
+    "tile": false
+  },
+  {
+    "title": "Hono",
+    "hostname": "hono.dev",
+    "pathname": "/",
+    "light": "a557ab8856080d16ba8a5a2b3d04ef60e1bfa66eada2abe292d69bdb94988c48.svg",
+    "tile": false
+  },
+  {
+    "title": "Hoppscotch",
+    "hostname": "hoppscotch.com",
+    "pathname": "/",
+    "light": "a248b53681949dd21f0a93d307d96664c66b4382f6fad1653a04aec6c3ac2784.svg",
+    "tile": false
+  },
+  {
+    "title": "Hostgator",
+    "hostname": "hostgator.com",
+    "pathname": "/",
+    "light": "579ddfbf07870e0c9c4e6b9f3d3323742fe4991f1217fb9d8dbf0a15362a6003.svg",
+    "tile": false
+  },
+  {
+    "title": "Hotmart",
+    "hostname": "hotmart.com",
+    "pathname": "/",
+    "light": "470c34055575ca8556f2f2ac0b8fec8b8c41e65e1a9ca4899ac5f09a1763094b.svg",
+    "tile": false
+  },
+  {
+    "title": "NuxtHub",
+    "hostname": "hub.nuxt.com",
+    "pathname": "/",
+    "light": "3de0c5afb2903f7bb5dbfa29a8a82a1d3bc6750a5d410210683c924266d09f08.svg",
+    "tile": false
+  },
+  {
+    "title": "Hugging Face",
+    "hostname": "huggingface.co",
+    "pathname": "/",
+    "light": "b5d3cd5fd73e72a38784cc834f153aa1c985b4071f32154ba506862fce18a0ee.svg",
+    "tile": false
+  },
+  {
+    "title": "Hulu",
+    "hostname": "hulu.com",
+    "pathname": "/",
+    "light": "d14d779e9ac79c2eefc2ba0b0fdc8aad1087c533a3d4039a4940a7adc343eff8.svg",
+    "dark": "e8d747e1cf3fb6d66d623d5ffd2df2f81861e0b1883b27fccc7e6aded4495df0.svg",
+    "tile": false
+  },
+  {
+    "title": "Hume AI",
+    "hostname": "hume.ai",
+    "pathname": "/",
+    "light": "773c850abb44aa968c1343df6f3d5dbdcf5db0b452f0d890deab3e5d5f92b474.svg",
+    "tile": false
+  },
+  {
+    "title": "IBM",
+    "hostname": "ibm.com",
+    "pathname": "/",
+    "light": "b68f2d7e0cb1e0a7c09a54574402528be3b00bfdd4bb7710e85aec7a50efb6f2.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Idx",
+    "hostname": "idx.dev",
+    "pathname": "/",
+    "light": "8a07ede9f401fad723942b98981f18fac5d86897e4188b66edd45f69cc88421a.svg",
+    "tile": false
+  },
+  {
+    "title": "QQ",
+    "hostname": "im.qq.com",
+    "pathname": "/",
+    "light": "f6af285b83e99514e22efbc212c64a421f895dfced6a2b495e59a7e6e32d5fe2.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Inflection AI",
+    "hostname": "inflection.ai",
+    "pathname": "/",
+    "light": "7038eddf1d9e8441ffe65ba33b20f4639dded9e21ca7f8efc859a7b709e48be8.svg",
+    "dark": "9b10d971e88c398f9591e1da355e3308c9db624088e3cec56b596e3092ae2c2b.svg",
+    "tile": false
+  },
+  {
+    "title": "Infojobs",
+    "hostname": "infojobs.net",
+    "pathname": "/",
+    "light": "708eb449c7aceda987a8baed426db4fbbe4cfcdb5b84146094ed34d71d1a4643.svg",
+    "tile": false
+  },
+  {
+    "title": "Inngest",
+    "hostname": "inngest.com",
+    "pathname": "/",
+    "light": "aec2d2b5c6055baca8c57a8e171352e97af5e56891ef5aa3bf0f6f593e8aa09e.svg",
+    "dark": "c276fa856391fd03e75eb461c233c737f85e1c7ea8ed05bea0f1d85cd5ea9b72.svg",
+    "tile": false
+  },
+  {
+    "title": "Instagram",
+    "hostname": "instagram.com",
+    "pathname": "/",
+    "light": "821d3a84a192e97a1744a140afd871e8a81d8f7b81fdc33cbf54e74f09ee6143.svg",
+    "tile": false
+  },
+  {
+    "title": "Instatus",
+    "hostname": "instatus.com",
+    "pathname": "/",
+    "light": "262470c1d90ffb0b096600b472de4d585189de7cefd31a7a1cb4cc891ed2cf0a.svg",
+    "dark": "65530f83a9825a0110025e1adaeab2103b2447df5ca5463282c013e2d0be8ffc.svg",
+    "tile": false
+  },
+  {
+    "title": "Intello",
+    "hostname": "intelloai.com",
+    "pathname": "/",
+    "light": "6f70c26d4c1ebc516d2b873d4f821d3763efc1e76ffef32c3978db8ccce9e36d.svg",
+    "dark": "918accc7950612b19da86aa6d300548d7756c4857be2b72aeab3aad1ac5c9841.svg",
+    "tile": false
+  },
+  {
+    "title": "Interfere",
+    "hostname": "interfere.com",
+    "pathname": "/",
+    "light": "7235eaf2b2d011f8aefed8ef8ed46154d851fdaeb66f31e33346edf8d0a5144f.svg",
+    "dark": "21d52d034c2af2a0ceec71e5682136b99d3427e95326fd6719bfe7c61cc3297c.svg",
+    "tile": false
+  },
+  {
+    "title": "Intlayer",
+    "hostname": "intlayer.org",
+    "pathname": "/",
+    "light": "41cb49e86357492df173911e39415bc677d24ec729eaa0e8c65647c34752db0d.svg",
+    "dark": "24a42dfce165f28f70a240426b890a67236515ad2d23963d136cb306bb9cb04d.svg",
+    "tile": false
+  },
+  {
+    "title": "爱奇艺",
+    "hostname": "iqiyi.com",
+    "pathname": "/",
+    "light": "6bd0af7f23c837fc1d0feeb0a8b57157b7847a3ba6aff5eaef8c941f1f5bc7af.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Jasmine",
+    "hostname": "jasmine.github.io",
+    "pathname": "/",
+    "light": "021d74c0181b8080621dd744d35f52cd3f53c3f44980a4c77b55e06932723596.svg",
+    "tile": false
+  },
+  {
+    "title": "Java",
+    "hostname": "java.com",
+    "pathname": "/",
+    "light": "4b27a8d7bd73b87ed0a80428cc18025a52bd9366208d4ebc0c7834e5afc7ce9e.svg",
+    "tile": false
+  },
+  {
+    "title": "京东",
+    "hostname": "jd.com",
+    "pathname": "/",
+    "light": "d71bcae7214e3401d42af8b8f4a288da25fdc72601e7592586e5596e45f481ba.ico",
+    "tile": true,
+    "width": 96,
+    "height": 96
+  },
+  {
+    "title": "Jest",
+    "hostname": "jestjs.io",
+    "pathname": "/",
+    "light": "37da0dc1c42afa532381103d04acad3c65b798f58ad19ddc515f018783e46ed1.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains PhpStorm",
+    "hostname": "jetbrains.com",
+    "pathname": "/phpstorm",
+    "light": "39ad564806996f3139277798d40ebec2c51ea975245663da0ea2c32af8f26e4e.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains WebStorm",
+    "hostname": "jetbrains.com",
+    "pathname": "/webstorm",
+    "light": "34c852803d8a6fafd837003626984886d4c82dd7a63b002561c47f85debc519e.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains PyCharm",
+    "hostname": "jetbrains.com",
+    "pathname": "/pycharm",
+    "light": "231b0187ef9209554cec9088155f75fd9c288f405e1428731c229144f6675f49.svg",
+    "tile": false
+  },
+  {
+    "title": "PyCharm",
+    "hostname": "jetbrains.com",
+    "pathname": "/pycharm",
+    "light": "231b0187ef9209554cec9088155f75fd9c288f405e1428731c229144f6675f49.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains Fleet",
+    "hostname": "jetbrains.com",
+    "pathname": "/fleet",
+    "light": "a929bd8d7453251e51500058d85321584a32cc8510d07389502b60194d802d19.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains Rider",
+    "hostname": "jetbrains.com",
+    "pathname": "/rider",
+    "light": "75e2be3440a5ee2d469073822abed02d08a82f2c3f4b80ebbfa850feb3d1fc56.svg",
+    "tile": false
+  },
+  {
+    "title": "Jetbrains Space",
+    "hostname": "jetbrains.com",
+    "pathname": "/space",
+    "light": "76d141b044f01e4dd05f5f212639d3822466b2ec903a20ed9890bc37620ab33b.svg",
+    "tile": false
+  },
+  {
+    "title": "IntelliJ IDEA",
+    "hostname": "jetbrains.com",
+    "pathname": "/idea",
+    "light": "d9658cdcaaa23d526e803aa0b1da584219629df1b4d27a45aec0dd7d1f21dd7c.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains RubyMine",
+    "hostname": "jetbrains.com",
+    "pathname": "/ruby",
+    "light": "9131527257d5cc7e4bd868e6c467b82f32b2078bb328ef6b21b2ddf475df5b8a.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains",
+    "hostname": "jetbrains.com",
+    "pathname": "/",
+    "light": "68af1284877cf1e36f7b6bff377b63164e63fe2efb4ca2362a5092c401a8548a.svg",
+    "tile": false
+  },
+  {
+    "title": "JetBrains",
+    "hostname": "jetbrains.com",
+    "pathname": "/",
+    "light": "9b04a56463911720d24ba084018d9c91a02b79ad43f8ed388fcc49f7c205024a.svg",
+    "tile": false
+  },
+  {
+    "title": "Mastodon",
+    "hostname": "joinmastodon.org",
+    "pathname": "/",
+    "light": "d4e4fe356db1471c671d6260670e4d4d35ca38523d0c076d29d643442bd80302.svg",
+    "tile": false
+  },
+  {
+    "title": "jQuery",
+    "hostname": "jquery.com",
+    "pathname": "/",
+    "light": "c7b990f0919b1a5948c2c2f080f2235edf66f6b6e006f5ec20f1d13e17a51757.svg",
+    "dark": "d04461219bf3dc166ba6c06592c80291de0aba4e4de6832b84f9b4cf2da933b8.svg",
+    "tile": false
+  },
+  {
+    "title": "JSON Schema",
+    "hostname": "json-schema.org",
+    "pathname": "/",
+    "light": "08afae3484416c4159d0fe179b29f20826717326196f36a969fd691c48d9deec.svg",
+    "tile": false
+  },
+  {
+    "title": "JSON",
+    "hostname": "json.org",
+    "pathname": "/",
+    "light": "11b13e5de6d44ea546f60f490f34a8a23e692069b97612fcd8e9f844e733fbfe.svg",
+    "tile": false
+  },
+  {
+    "title": "Julia",
+    "hostname": "julialang.org",
+    "pathname": "/",
+    "light": "56a467b8c531c978d8b57a0c1b13d94b6f6d2ae924ff36f2036c9b9a9bdd32c1.svg",
+    "tile": false
+  },
+  {
+    "title": "JWT",
+    "hostname": "jwt.io",
+    "pathname": "/",
+    "light": "7bdfd08faadeec315c5daa3b4d4558bd0ed239bdcae71138678097ccd85ce02f.svg",
+    "tile": false
+  },
+  {
+    "title": "Apache Kafka",
+    "hostname": "kafka.apache.org",
+    "pathname": "/",
+    "light": "3d81cef7761cd9e818c9a8a14c4dd902656f57e16999eb439e4ba91746bcbf32.svg",
+    "dark": "079cfae98f2ae2f8d84d10bc1806d64d6364bb738ebb8c0dd6808210b196939d.svg",
+    "tile": false
+  },
+  {
+    "title": "Keycloak",
+    "hostname": "keycloak.org",
+    "pathname": "/",
+    "light": "8da437b63f6f0c3cc490eafeabeaab676652d3a3e251bc05a88ba768eade92f5.svg",
+    "tile": false
+  },
+  {
+    "title": "WebGL",
+    "hostname": "khronos.org",
+    "pathname": "/webgl",
+    "light": "df2c419fff4c05793bbe5279765ee877250a0bc0ba963e5883f4296acb0ff9a8.svg",
+    "dark": "cf25d67f917ea5a17587ffb17916f765aeeb23c4703722702b02e7aa2200e7fb.svg",
+    "tile": false
+  },
+  {
+    "title": "Kibo UI",
+    "hostname": "kibo-ui.com",
+    "pathname": "/",
+    "light": "2167e3fd7e79fee5c6f2f07399f7e57e647c164ceee49e27fcf5b4591904ba8e.svg",
+    "dark": "c4003e1dba1b2afae184df4ac4036a3e055711c7ca8a847a55eaf54fba716c82.svg",
+    "tile": false
+  },
+  {
+    "title": "Kick",
+    "hostname": "kick.com",
+    "pathname": "/",
+    "light": "01463b661b590dc27a092293df10dba9335fa0c7e889303d62bc9eb1e51ea945.svg",
+    "dark": "a3876c5701cb2e927959b3a02ed9b322ff665ee0f0df7b67bfd38a3711678e8a.svg",
+    "tile": false
+  },
+  {
+    "title": "Kilo Code",
+    "hostname": "kilocode.ai",
+    "pathname": "/",
+    "light": "02386f2469272dcd72ea34c5bd7fa703833739ab44dd579b1c2f90ae3bd48054.svg",
+    "dark": "4a86b375b2ea32c7d594bba6f93119b09d7dcd01d86893967cc2c7a3fcd73150.svg",
+    "tile": false
+  },
+  {
+    "title": "Kimi",
+    "hostname": "kimi.ai",
+    "pathname": "/",
+    "light": "0ba35ce31b57bb6db39d4e454925e39f88f46a3b52a07898bd8262c3902df7fc.svg",
+    "tile": false
+  },
+  {
+    "title": "Kokonut UI",
+    "hostname": "kokonutui.com",
+    "pathname": "/",
+    "light": "3dea329a00ff75155cc91319594a2d3ef01e054e7a668fa371f1687711358d4d.svg",
+    "dark": "176f12dcb32f78bdb1fcef0bd389761522f88c93594e798d2fe7afedc930af52.svg",
+    "tile": false
+  },
+  {
+    "title": "Kotlin",
+    "hostname": "kotlinlang.org",
+    "pathname": "/",
+    "light": "2b3f6cea6f052140ab7b6d67c771b45d5eaa1ea3963785229f2bc55998ac7084.svg",
+    "tile": false
+  },
+  {
+    "title": "KrakenJS",
+    "hostname": "krakenjs.com",
+    "pathname": "/",
+    "light": "b05443892fbc02fc4f67fd542b9b2e9158aa7775623fad2508583b6fd8e3e253.svg",
+    "tile": false
+  },
+  {
+    "title": "Kubernetes",
+    "hostname": "kubernetes.io",
+    "pathname": "/",
+    "light": "6daec9288a3c914035040dbc19a277e59917ec3a9ddae47d97822d2b37949800.svg",
+    "tile": false
+  },
+  {
+    "title": "LangChain",
+    "hostname": "langchain.com",
+    "pathname": "/",
+    "light": "92ca7624afead79ec9dd62561dbd6b9f224d3b4a441d228641fd1a70f119d0c5.svg",
+    "tile": false
+  },
+  {
+    "title": "Laravel",
+    "hostname": "laravel.com",
+    "pathname": "/",
+    "light": "41b8d143dbaa0606712ef9163aa7cfd56865e670331f1bdcb0ec77cc350f00e0.svg",
+    "tile": false
+  },
+  {
+    "title": "Layers",
+    "hostname": "layers.to",
+    "pathname": "/",
+    "light": "e31c0cb3753c817bb0b5b2dd673331dd7f45491f41b1be242a17c953f5171298.svg",
+    "dark": "e7269c2dddcce4aa4962d9f6f025164008e245d82db4ca3e24607a7ddf5be6a4.svg",
+    "tile": false
+  },
+  {
+    "title": "Leap Wallet",
+    "hostname": "leapwallet.io",
+    "pathname": "/",
+    "light": "4cf08c7504dc55a8abdb0373f198c9d27a100dd2a06ae8fddcecf825266ee2e3.svg",
+    "tile": false
+  },
+  {
+    "title": "PowerToys",
+    "hostname": "learn.microsoft.com",
+    "pathname": "/en-us/windows/powertoys",
+    "light": "af347e679676251332599f8d79cb9bf884d7b1ad9c0c74cc981601bb77609c5b.svg",
+    "tile": false
+  },
+  {
+    "title": "PowerShell",
+    "hostname": "learn.microsoft.com",
+    "pathname": "/en-us/powershell",
+    "light": "f72bc9843ff04005045b659f1ce960d03ddf7707fe02cb5d3dee373914a6d750.svg",
+    "tile": false
+  },
+  {
+    "title": "LearnThis",
+    "hostname": "learnthisacademy.com",
+    "pathname": "/",
+    "light": "f35b549faad1c23dab97b09723c204111e820f592639f029414bacceb00259b7.svg",
+    "tile": false
+  },
+  {
+    "title": "Leedlime",
+    "hostname": "leedlime.com",
+    "pathname": "/",
+    "light": "7b966cfa9b063db6af3e789befd3ce206a82eff1795af495bd895183a2531eaf.svg",
+    "tile": false
+  },
+  {
+    "title": "Lemon Squeezy",
+    "hostname": "lemonsqueezy.com",
+    "pathname": "/",
+    "light": "93f437b860545ece5b4fa3ce4b8dce09900abeeee23db174b70e31fcbe79e5cb.svg",
+    "tile": false
+  },
+  {
+    "title": "Linear",
+    "hostname": "linear.app",
+    "pathname": "/",
+    "light": "e669549bf9917d616f3ae10ace5ba9af6e84966ec12cadd13459489cded34ccf.svg",
+    "tile": false
+  },
+  {
+    "title": "LinkedIn",
+    "hostname": "linkedin.com",
+    "pathname": "/",
+    "light": "ac8c9e0426de08e1f0ae7ca0d4f7551c89a011071c6dfe2ff926fa6b7dfd0942.svg",
+    "tile": false
+  },
+  {
+    "title": "Linux",
+    "hostname": "linux.org",
+    "pathname": "/",
+    "light": "ee7e85d245e8cac3de69ad0e5ad131ccf5cead034f407fcdec410fcf24710185.svg",
+    "tile": false
+  },
+  {
+    "title": "Lit",
+    "hostname": "lit.dev",
+    "pathname": "/",
+    "light": "b4136d91fdb921da2ae11900e39f4e88a2d23131fca85fb794b2d3d9d267ac8b.svg",
+    "tile": false
+  },
+  {
+    "title": "Locofy",
+    "hostname": "locofy.ai",
+    "pathname": "/",
+    "light": "b801aa104717c4a7bddbb66ab211cf9eec30b977d3c41bf7db86375bc8eed536.svg",
+    "tile": false
+  },
+  {
+    "title": "Loom",
+    "hostname": "loom.com",
+    "pathname": "/",
+    "light": "6d06c7a6826072f5943306ad8162ea6c43c8b6cef4a559b4afcf8e5d7fabd2c5.svg",
+    "tile": false
+  },
+  {
+    "title": "LottieFiles",
+    "hostname": "lottiefiles.com",
+    "pathname": "/",
+    "light": "27b842fc07666aab518bcdb728c9ee5a9c4195f91d357c659137bf69163036b9.svg",
+    "tile": false
+  },
+  {
+    "title": "Lottielab",
+    "hostname": "lottielab.com",
+    "pathname": "/",
+    "light": "59c903cc3c11f4fc63286675a5460bbaa5c80643acf85c3dd2394b27ab00eaf5.svg",
+    "tile": false
+  },
+  {
+    "title": "Lovable",
+    "hostname": "lovable.dev",
+    "pathname": "/",
+    "light": "a5aa75b9ac3d40073492f49e62e63a696167acc9e922d54fe05aeb0244df9cc4.svg",
+    "tile": false
+  },
+  {
+    "title": "Lua",
+    "hostname": "lua.org",
+    "pathname": "/",
+    "light": "a63736dc372c7644b83b8e33b35f88f296bb4272fe55d5e38b28efe33871695c.svg",
+    "tile": false
+  },
+  {
+    "title": "Magic UI",
+    "hostname": "magicui.design",
+    "pathname": "/",
+    "light": "18f402de52fc77c208abde7e98341e9b396a34247035ad16fb565b857c1364ed.svg",
+    "tile": false
+  },
+  {
+    "title": "Proton Mail",
+    "hostname": "mail.proton.me",
+    "pathname": "/",
+    "light": "d686e3bdfa32c24cabb48c2fbb5e1cb0a7931fc249470c818d45a80f3a83ff27.svg",
+    "tile": false
+  },
+  {
+    "title": "QQ邮箱",
+    "hostname": "mail.qq.com",
+    "pathname": "/",
+    "light": "781cd6542c8c09331c46cf617cf7187d3e3490d8c71ebc71ff97c556f6bbfcf1.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Manifest",
+    "hostname": "manifest.build",
+    "pathname": "/",
+    "light": "2159d72a98270a586e6c1156037bbf82282f2acad5cadabfd35c9ca24e5b99f2.svg",
+    "tile": false
+  },
+  {
+    "title": "Mantine",
+    "hostname": "mantine.dev",
+    "pathname": "/",
+    "light": "ab04c8ba341843d744b2a9b652f45543621e5374be040f55a3dcda588416273b.svg",
+    "tile": false
+  },
+  {
+    "title": "Manus",
+    "hostname": "manus.ai",
+    "pathname": "/",
+    "light": "db3a1852c7be2b3e5773e8828f846c8938fbcfafcc9f9ec0df1734120f77a9b4.svg",
+    "dark": "41f76d46da04c4ef76e9ae1df962e2df25a04d72b20b6e41358482ac6ea252bc.svg",
+    "tile": false
+  },
+  {
+    "title": "ManzDev",
+    "hostname": "manz.dev",
+    "pathname": "/",
+    "light": "de40006dab110518648bbef2be6eb73231bf8da61498fda43a90972d1523f2ab.svg",
+    "tile": false
+  },
+  {
+    "title": "百度地图",
+    "hostname": "map.baidu.com",
+    "pathname": "/",
+    "light": "2b5b619408f20ffe94fa168397fc5beb0ad709d38d14e3e3766ea9884467dc2e.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "MariaDB",
+    "hostname": "mariadb.org",
+    "pathname": "/",
+    "light": "89951d6e8abc9786602859be82605ba1b1a8003409eebf15037a5620e6ea2fd4.svg",
+    "tile": false
+  },
+  {
+    "title": "Markdown",
+    "hostname": "markdownguide.org",
+    "pathname": "/",
+    "light": "398f195e6d4e1857b548d631678b1078509b968996429b3110295d35405a07ff.svg",
+    "dark": "72351f4b18077331828c6c7b6b37004f093187a9c78fcf3401d69be875d87791.svg",
+    "tile": false
+  },
+  {
+    "title": "Mastra",
+    "hostname": "mastra.ai",
+    "pathname": "/",
+    "light": "91877f658b5edc770e57526e0bfa697b8f9482b62ea81ade06902cbb3a7bcc9f.svg",
+    "dark": "8bbf0cc0671ab2c05ecdf115fefe9dc9eb3d79109e0cf7b63fa863eea40c0e1e.svg",
+    "tile": false
+  },
+  {
+    "title": "matlab",
+    "hostname": "mathworks.com",
+    "pathname": "/products/matlab.html",
+    "light": "f21e7dfbc195d61a6a6c2d18f669d3284348e045d152f9e2064254e853c4a30e.svg",
+    "tile": false
+  },
+  {
+    "title": "Matrix",
+    "hostname": "matrix.org",
+    "pathname": "/",
+    "light": "e1171d08fed25279817624391fc795b53ff669962b32819d34cfaf835a8e82ae.svg",
+    "dark": "0c1764d012afe4bd38f675515e96b89705e2cdc99414f514a9c3f1584a7f7bcf.svg",
+    "tile": false
+  },
+  {
+    "title": "MediaWiki",
+    "hostname": "mediawiki.org",
+    "pathname": "/",
+    "light": "096c97cc52a04fc8eddb28ad6cdf82ba53c131888dd72771386455bd301b55ad.svg",
+    "tile": false
+  },
+  {
+    "title": "Medusa",
+    "hostname": "medusajs.com",
+    "pathname": "/",
+    "light": "d312d90b0d15b1c37d5e569acafa4e7be0d49d798f1cdc3dc6e9e492ecd5033b.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Meet",
+    "hostname": "meet.google.com",
+    "pathname": "/",
+    "light": "78740599528aa18810c9ab7e854fd1607679bccf3ee7a00a622f9dce2b5d8473.svg",
+    "tile": false
+  },
+  {
+    "title": "美团",
+    "hostname": "meituan.com",
+    "pathname": "/",
+    "light": "c9fc65e374b36bcfb2a0a809641f182a9b75dcc09b6ce1d04df70a6ef6ad8738.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Mercado Libre",
+    "hostname": "mercadolibre.com",
+    "pathname": "/",
+    "light": "e69eb891ec886d5339e9f849de296ee7bb04add1f79274c7a1a9feff2b1236f5.svg",
+    "tile": false
+  },
+  {
+    "title": "Mercado Pago",
+    "hostname": "mercadopago.com",
+    "pathname": "/developers",
+    "light": "4299ec11af9344b4fb538af06e1a5f3a66bb3d7d037a8ff9862e6cd64d405a09.svg",
+    "tile": false
+  },
+  {
+    "title": "Mermaid",
+    "hostname": "mermaid.js.org",
+    "pathname": "/",
+    "light": "f814709d2276fd5e668f0f7215e9628dc778af6014d18d849ea56c42d1eec38c.svg",
+    "dark": "45217b5c0d23538eecaee9bcb700f9635e336eecea349cbcdc287192b043b60c.svg",
+    "tile": false
+  },
+  {
+    "title": "Messenger",
+    "hostname": "messenger.com",
+    "pathname": "/",
+    "light": "30673d61e5c72c4f1911a29f743f846e5f09a6dc88f46681e3414afcda6c5a76.svg",
+    "tile": false
+  },
+  {
+    "title": "MetaMask",
+    "hostname": "metamask.io",
+    "pathname": "/",
+    "light": "cd6a85f5cdc27987405eddb33f8c620f9a3701d0925704070e6b013ddd80255e.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Outlook",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/outlook/email-and-calendar-software-application",
+    "light": "334bf1a0ef366570a80d62faa0dc9c34de094cbc18c4935f2ceb26a140875d5b.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Defender",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/microsoft-defender-for-individuals",
+    "light": "0fbf443ad3c2e5bf6b6af6df28c3168e66fc68d04a62a3e5a50aa4e1a661174f.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft SharePoint",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/sharepoint/collaboration-software",
+    "light": "700032b1561229cbebdbdf5a4412959669b335d0f4f7b7f20c5661ac2d7eb794.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft OneNote",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/onenote/digital-note-taking-app",
+    "light": "f0754f78d8bfb25284254e8a130acfdb3a4e27b1f5c12371378bf077fae69d62.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft OneDrive",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/onedrive/online-cloud-storage",
+    "light": "8362ba656c60d5301a8064f557bcd9108aedfddbb63c01a0b0c2b6c7b27bfa60.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Teams",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-teams/group-chat-software",
+    "light": "4062cb6a318a51966278983171dae4a207d42ea9454c1fc5df75ff3bfb6cb4db.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Editor",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/microsoft-editor",
+    "light": "3280081304562b3e7d3b4d08965c992f931bc1f496872a85b6b50ebfc7003f6c.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft PowerPoint",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/powerpoint",
+    "light": "437950c8d8732ff0862b8c0596195d6edc081170a0ebb63c817769b05dad14ea.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Access",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/access",
+    "light": "3f5353f6ef2f4c7f01926239f131ea0119674e337ed895ee6e8e26db48f9baa5.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Excel",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/excel",
+    "light": "5bc26d57588379670dbe146095096bdb9b615c0b6904153bdeffc81e7904949d.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Word",
+    "hostname": "microsoft.com",
+    "pathname": "/microsoft-365/word",
+    "light": "4bfaa245bbc7840d81d2506eb248a01e26aa64dce0e48333fa88177c02aca0f5.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft SQL Server ",
+    "hostname": "microsoft.com",
+    "pathname": "/en-us/sql-server",
+    "light": "18f29022bbad5471efc0d39b782949ad60ccaaa1231a15e82dd77c0606f5db7f.svg",
+    "tile": false
+  },
+  {
+    "title": "Edge",
+    "hostname": "microsoft.com",
+    "pathname": "/en-us/edge",
+    "light": "b2cc3e0066cf332b9d421d075f125b0f99431b534184e8722c4dea7dc5474a18.svg",
+    "tile": false
+  },
+  {
+    "title": "Windows",
+    "hostname": "microsoft.com",
+    "pathname": "/windows",
+    "light": "449a3893f905fd5a3206ff6cd7ca9cb4b26f64f23d480bec2e335ccb5a395b96.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft",
+    "hostname": "microsoft.com",
+    "pathname": "/",
+    "light": "726aa11548b3771591ccbd747f744fbc8acc6879594c14edc740f2c0a00f016b.svg",
+    "tile": false
+  },
+  {
+    "title": "Midday",
+    "hostname": "midday.ai",
+    "pathname": "/",
+    "light": "2f47a414d06fe969074e6b1c305c8cf0a5025ee08d117598506010e10ae8bdba.svg",
+    "tile": false
+  },
+  {
+    "title": "Midjourney",
+    "hostname": "midjourney.com",
+    "pathname": "/",
+    "light": "2bbf36ccd2bfc9b96e43cbf9a92496142588fdf69dad2ebf44a9a3ebc75ec54e.svg",
+    "dark": "0e30b983881cc31316772f4cb5f01a4ee89658d6d5b8a7ed817913586cfc0158.svg",
+    "tile": false
+  },
+  {
+    "title": "midudev",
+    "hostname": "midu.dev",
+    "pathname": "/",
+    "light": "076e66d3ae156308bcc151b44df3f05621e12b208a5d87da37bfbe11f418759b.svg",
+    "tile": false
+  },
+  {
+    "title": "Milanote",
+    "hostname": "milanote.com",
+    "pathname": "/",
+    "light": "5ee16b6eed089ee028a2b2c2aa261c6cd86d9faf9b1f1b12dc83a635c579914b.svg",
+    "dark": "76e8ab4cb270aa80753f0d78869c48765ee81d03171977c2f28934f08c3de7f5.svg",
+    "tile": false
+  },
+  {
+    "title": "Million",
+    "hostname": "million.dev",
+    "pathname": "/",
+    "light": "f170b173fad8ef00c42fe3822018d26663ce5efd446a0a5ae3d426fb460e759a.svg",
+    "tile": false
+  },
+  {
+    "title": "Mintlify",
+    "hostname": "mintlify.com",
+    "pathname": "/",
+    "light": "3943a56499b82f690f0a7993e423aa7e10e0c0d66bd78f4cc936366b6736f022.svg",
+    "tile": false
+  },
+  {
+    "title": "Mistral AI",
+    "hostname": "mistral.ai",
+    "pathname": "/",
+    "light": "792480de7c64c395ad438cfe0dd668cf7577961a8e653512ea6a45591a2f488e.svg",
+    "tile": false
+  },
+  {
+    "title": "Model Context Protocol",
+    "hostname": "modelcontextprotocol.io",
+    "pathname": "/",
+    "light": "7b1a39135aff77616de792f253e38e2d0c308fb09e81586a2ce0454156f9ae4f.svg",
+    "dark": "ac789162cbc24f8be20f17fe8390d9d95ac6f58d1444ec8d8d5fddd3339b894e.svg",
+    "tile": false
+  },
+  {
+    "title": "MongoDB",
+    "hostname": "mongodb.com",
+    "pathname": "/",
+    "light": "873cf00837b6cc30a01c878ba5656444299e562b032fdcd2d1222759c6e405fe.svg",
+    "dark": "43c4f5a1261601683e1403e9f4a5497b6fe0ee17448b5b12dfb289e7b637b770.svg",
+    "tile": false
+  },
+  {
+    "title": "Monkeytype",
+    "hostname": "monkeytype.com",
+    "pathname": "/",
+    "light": "07700c82e4642ff6a45a31d402bdcefda8c614aeeb65897cedf6123bb9075f30.svg",
+    "tile": false
+  },
+  {
+    "title": "Moon",
+    "hostname": "moonjs.org",
+    "pathname": "/",
+    "light": "4fe1d96a496a828f48188632454f814c2fae4c6df9225dda356ec266dfb18bed.svg",
+    "tile": false
+  },
+  {
+    "title": "Motion",
+    "hostname": "motion.dev",
+    "pathname": "/",
+    "light": "ff0bf6947b386cb13f8ae5705a64f200d19a585af37209d4a0d337881565e174.svg",
+    "dark": "b564c3e99a9766d9eaf8ece7875ee021566d0cd108b5bba0bf24d0fefccceced.svg",
+    "tile": false
+  },
+  {
+    "title": "Firefox",
+    "hostname": "mozilla.org",
+    "pathname": "/en-US/firefox",
+    "light": "9521fdb4b835f114aa94510c398d56e3aa362e8e49ba2361a509f4e95ba69c70.svg",
+    "tile": false
+  },
+  {
+    "title": "Material UI",
+    "hostname": "mui.com",
+    "pathname": "/",
+    "light": "9152904a5b3a28e9d1f37f0e4b41995711b7c750b489f47f6b347c2873b776ab.svg",
+    "tile": false
+  },
+  {
+    "title": "Mulesoft",
+    "hostname": "mulesoft.com",
+    "pathname": "/",
+    "light": "3094970860db90af0e9721de26ce0016ccbf688bc484f00b81466fc6d47a7655.svg",
+    "tile": false
+  },
+  {
+    "title": "网易云音乐",
+    "hostname": "music.163.com",
+    "pathname": "/",
+    "light": "2cfa9b26beb49357c837065e46b8281c17e60e3cfc7acd94f3b743ae17ac701c.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Apple Music",
+    "hostname": "music.apple.com",
+    "pathname": "/",
+    "light": "fbc73944b7a3afec9917cfb53f9a6d0ecf651f52ddc0e0117abf835d514f99ca.svg",
+    "tile": false
+  },
+  {
+    "title": "Youtube Music",
+    "hostname": "music.youtube.com",
+    "pathname": "/",
+    "light": "31258a6a93e4b1c404ffef6a8aebaf2b4ac057770878e84eb54aec55d63568d4.svg",
+    "tile": false
+  },
+  {
+    "title": "MySQL",
+    "hostname": "mysql.com",
+    "pathname": "/",
+    "light": "a6b4206adaaf2e56e842df3f9a93b1c174c01f23439cab71e9412520d5a610da.svg",
+    "dark": "d666d07efc294db49dc2c794d689dbae17878b7049aaa49f9c0339a81f525ab9.svg",
+    "tile": false
+  },
+  {
+    "title": "n8n",
+    "hostname": "n8n.io",
+    "pathname": "/",
+    "light": "de2f3496ee97a2f7adeaa65b7e5cab617b425ab37aab4c14c87057a4e2af77f8.svg",
+    "tile": false
+  },
+  {
+    "title": "Nano",
+    "hostname": "nano.org",
+    "pathname": "/",
+    "light": "d544734f9b0958a6e27f06cd6714d03a8fcd867e0858f0f2565e7804256e91b8.svg",
+    "dark": "d2682bb61928d424dc8429ca643df1884acad3acd69ef6a38bbef736058ca998.svg",
+    "tile": false
+  },
+  {
+    "title": "Neon",
+    "hostname": "neon.com",
+    "pathname": "/",
+    "light": "3af6fa33e85ad9dff82abf21f3a0eb1ffe01d5e2d221c250857e74078aef34c2.svg",
+    "tile": false
+  },
+  {
+    "title": "Neovim",
+    "hostname": "neovim.io",
+    "pathname": "/",
+    "light": "4d63e1b4de99e936dd8b3c94d5a6ce2b1e7892790030e4e2f47f8ccf9d56d27a.svg",
+    "tile": false
+  },
+  {
+    "title": "NestJS",
+    "hostname": "nestjs.com",
+    "pathname": "/",
+    "light": "3e30541f7759019a544b5a33d7888694198230fe6af99474c108076636f43c7f.svg",
+    "tile": false
+  },
+  {
+    "title": "Netflix",
+    "hostname": "netflix.com",
+    "pathname": "/",
+    "light": "d199925b1d017cf0fba0b5b5fa23e1270647aa5d5031903745a7d4e2f560c673.svg",
+    "tile": false
+  },
+  {
+    "title": "Netlify",
+    "hostname": "netlify.com",
+    "pathname": "/",
+    "light": "49c48ca9efc5f9419acc5c8546e99a81cc33dff8eb9eb55c7122d21f820376ac.svg",
+    "tile": false
+  },
+  {
+    "title": "Turbopack",
+    "hostname": "nextjs.org",
+    "pathname": "/docs/app/api-reference/turbopack",
+    "light": "4d93134e8ab93adcb4ccfeae66a768ff1f1abb39e1e7d9f497fa3ac919553ce2.svg",
+    "dark": "035b939b2e98f9c1b48a19d5a64d49d8b6d516e6a83ca14dc9a3c7fe4a49a75a.svg",
+    "tile": false
+  },
+  {
+    "title": "Next.js",
+    "hostname": "nextjs.org",
+    "pathname": "/",
+    "light": "efa7511b383927ea64c2e44c918bc40146c648fbc16e0389df87df5263e492eb.svg",
+    "tile": false
+  },
+  {
+    "title": "Nginx",
+    "hostname": "nginx.org",
+    "pathname": "/",
+    "light": "14a1150aa841144836d376cef531fa18d487ba118f526a023d77a8fceea7c775.svg",
+    "tile": false
+  },
+  {
+    "title": "Ngrok",
+    "hostname": "ngrok.com",
+    "pathname": "/",
+    "light": "26084d0eb93ca5fb7908e2e99211f2a9d7e41dc4cbf84eb185ac9f4147ff553a.svg",
+    "dark": "08ef16d178af470aa4db8b38aa6529ca7317aafd0c74754b251cdde65475571b.svg",
+    "tile": false
+  },
+  {
+    "title": "NHost",
+    "hostname": "nhost.io",
+    "pathname": "/",
+    "light": "4175dfc0d972bdec1d4320ca719ef68234721ab3e83702f73e2cd91c6ae51605.svg",
+    "tile": false
+  },
+  {
+    "title": "Node.js",
+    "hostname": "nodejs.org",
+    "pathname": "/",
+    "light": "6cd865951598a8a16dd3d588bd93c9d96b3b415a7162d6a1cf63089a2769ed0f.svg",
+    "tile": false
+  },
+  {
+    "title": "Notion",
+    "hostname": "notion.so",
+    "pathname": "/",
+    "light": "0d94471649fb9badd434394846079c279876fdd224cf49ed46b6c09fbd3a041f.svg",
+    "tile": false
+  },
+  {
+    "title": "NPM",
+    "hostname": "npmjs.com",
+    "pathname": "/",
+    "light": "8fe7a9b3c30d7c44a4b7a431d6f943e30e374d8bde032d83377f2ab4e6a34544.svg",
+    "tile": false
+  },
+  {
+    "title": "Nuget",
+    "hostname": "nuget.org",
+    "pathname": "/",
+    "light": "40a44a690fa2b864c9897aad2e8dc1d039e74b698a5f7f576353dc91a910a8d1.svg",
+    "tile": false
+  },
+  {
+    "title": "nuqs",
+    "hostname": "nuqs.47ng.com",
+    "pathname": "/",
+    "light": "bc60663c79a8aedf24680e2abda44640671d82c8428ea3d3e90657c3f9caf4d7.svg",
+    "dark": "53af3feb986b2df9c24e95c0d7410675f29465e09afcab00292ff89ead8a28ce.svg",
+    "tile": false
+  },
+  {
+    "title": "Nuxt",
+    "hostname": "nuxt.com",
+    "pathname": "/",
+    "light": "9323b7013d0e1da4762b76a87ff137a99ff240f9564623283205aaf84bec27bb.svg",
+    "tile": false
+  },
+  {
+    "title": "NVIDIA",
+    "hostname": "nvidia.com",
+    "pathname": "/",
+    "light": "034bb5cb032e6174f16c5bfffaaf03f9453c95ae707f4c3cee3ffb0e53e8a8c0.svg",
+    "dark": "c0ba24515aa21f07119e15914abbde64dd17b42fd95518a15df208a615c3810e.svg",
+    "tile": false
+  },
+  {
+    "title": "Nx",
+    "hostname": "nx.dev",
+    "pathname": "/",
+    "light": "8eb6cd5f40c38a38354fe891a6996c2103d77c55f34dcf13e459199540ce599c.svg",
+    "dark": "f9e553d76fb5790e9e83bae15fcb76b2496355cba130d9287c1c4160efd93060.svg",
+    "tile": false
+  },
+  {
+    "title": "Obsidian",
+    "hostname": "obsidian.md",
+    "pathname": "/",
+    "light": "410068dcd81b6bf0bd003668eeef348ca6e09418b70b41a82da96c81a37bbf5e.svg",
+    "tile": false
+  },
+  {
+    "title": "OBS",
+    "hostname": "obsproject.com",
+    "pathname": "/",
+    "light": "c8272936e0564725b579b72379ab014a71bb8aa998a4c30288937d010d4d4216.svg",
+    "tile": false
+  },
+  {
+    "title": "Microsoft Office",
+    "hostname": "office.com",
+    "pathname": "/",
+    "light": "8c40e1eec40fb98f8172ac6894266ad6c1b365eb366a3831ef532eed36bdb12b.svg",
+    "tile": false
+  },
+  {
+    "title": "Ollama",
+    "hostname": "ollama.com",
+    "pathname": "/",
+    "light": "b5ee1874b69d216fbc420c6118fac9b2fcc9eeb6ab6a7fc374c6a6512e48b993.svg",
+    "dark": "04d95aa0e2cccdd24f8f6c9c58ac2f312464d0f8280a6744fdd48b28b15aebab.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenBootcamp",
+    "hostname": "open-bootcamp.com",
+    "pathname": "/",
+    "light": "f662044ceed69cbfd3e3a7d3471cb412dc5a06be2de968db1bf05ec2bf6b5f99.svg",
+    "tile": false
+  },
+  {
+    "title": "Codex",
+    "hostname": "openai.com",
+    "pathname": "/codex",
+    "light": "dde8b3563a40d55af25e3fb2509864d16ae214b0260748d294e2d011f2a6907c.svg",
+    "dark": "1b156eb915f7e74443f3fc491334f1896b6650e8fb597e2f2cb71c0ff7dd1cb0.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenAI",
+    "hostname": "openai.com",
+    "pathname": "/",
+    "light": "71eba8e11d265af0e3375ad610db95b4a5fedf9f07c40e5252e73942b8c5982e.svg",
+    "dark": "4dac62f014aac76e15be7d681776cda434ce540beaa22410e9f7a87806a91f5a.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenClaw",
+    "hostname": "openclaw.ai",
+    "pathname": "/",
+    "light": "3caaae34b7b1e4c0d831a8f107095b5362e0581bcc300118fa7e1b45317674a2.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenCode",
+    "hostname": "opencode.ai",
+    "pathname": "/",
+    "light": "5a44ee78769508c7226d8ac35b7b9738f929176a6c63b15f594a617afbc82a72.svg",
+    "dark": "e29bbe33380ad1c1ada9134b52f229d30e9776d60481512c9d81f2bb6f37def9.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenHunts",
+    "hostname": "openhunts.com",
+    "pathname": "/",
+    "light": "96d08cbedc817951423492f3544bbe16bd9efc6b22626aded2f16a4ca980cd36.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenRouter",
+    "hostname": "openrouter.ai",
+    "pathname": "/",
+    "light": "fec63b6dc071651e45a784031c4755250384314289e3a2695a3383635f6de1d3.svg",
+    "dark": "d05021526e72fddf3426eabc066924aca83da0cd66a699a3de3bac58ed2fe0a2.svg",
+    "tile": false
+  },
+  {
+    "title": "OpenSea",
+    "hostname": "opensea.io",
+    "pathname": "/",
+    "light": "935238661147be3915ab0807cfa3220b6472c2e9d6354bd820b2cde119885e25.svg",
+    "tile": false
+  },
+  {
+    "title": "Open WebUI",
+    "hostname": "openwebui.com",
+    "pathname": "/",
+    "light": "3a773b745a78a572af439a3e5984583696f145f96e0cebd5cb3fdcda6f4a5174.svg",
+    "tile": false
+  },
+  {
+    "title": "Opera",
+    "hostname": "opera.com",
+    "pathname": "/",
+    "light": "b5f48b5315662eb5de828c719d3eebc3a61a3ff66b87c506fa00203d93daf2fb.svg",
+    "tile": false
+  },
+  {
+    "title": "Drizzle ORM",
+    "hostname": "orm.drizzle.team",
+    "pathname": "/",
+    "light": "9d341992d30be0a3a2101c45d73e5e1a8baba2fbb7367304f6839d1991056498.svg",
+    "dark": "c5c63f272205538753d0109ad66b24da4427387722bc865019823114c7d4d308.svg",
+    "tile": false
+  },
+  {
+    "title": "Orshot",
+    "hostname": "orshot.com",
+    "pathname": "/",
+    "light": "67ea4ba58052a92f0e659873aef1e8f5e951c959f13031290fab9178589f2357.svg",
+    "tile": false
+  },
+  {
+    "title": "Ossium",
+    "hostname": "ossium.in",
+    "pathname": "/",
+    "light": "2a37014fbe8085a1e370c134d529ee42ec15bbf7fc9f11d95ca7d684e756b9b2.svg",
+    "tile": false
+  },
+  {
+    "title": "Oxc",
+    "hostname": "oxc.rs",
+    "pathname": "/",
+    "light": "e2eda2d429afd0d206ea709d78c7a05b632fe45aa8d4902413e734f632fe7f36.svg",
+    "tile": false
+  },
+  {
+    "title": "百度网盘",
+    "hostname": "pan.baidu.com",
+    "pathname": "/",
+    "light": "12477a0308a5e4e5b774d08ef592de1da16d0ec9b7e727591901c051520c7de6.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "PandaCSS",
+    "hostname": "panda-css.com",
+    "pathname": "/",
+    "light": "d34ba5c25eb5fec746cc23de89e1ee8633757d7a94f276c21bbba671ab1f21ef.svg",
+    "tile": false
+  },
+  {
+    "title": "Paper",
+    "hostname": "paper.design",
+    "pathname": "/",
+    "light": "a3932a51a52f7aa38e1c7b7dfaf6f7ccee6f01d89667534c4997d2e55fd31d4a.svg",
+    "tile": false
+  },
+  {
+    "title": "Parcel",
+    "hostname": "parceljs.org",
+    "pathname": "/",
+    "light": "bc3971e48f1e682e5f8894ac74805c5a502698a3a5c439024526b8a6f70039e1.svg",
+    "tile": false
+  },
+  {
+    "title": "Patreon",
+    "hostname": "patreon.com",
+    "pathname": "/",
+    "light": "45412302f74fa1ca615fc68dc7ebf6800cdc6df98663e19a03cdbf07748a1741.svg",
+    "dark": "53e19a6a4f62872030326db0f29917ef854d1f4e7955bfd6824558aa01b6d378.svg",
+    "tile": false
+  },
+  {
+    "title": "Payload CMS",
+    "hostname": "payloadcms.com",
+    "pathname": "/",
+    "light": "cf3d7617dc3919bfc778ef8bed7ae6cd3aa9d58c811f18afbb7036e2c4f89495.svg",
+    "dark": "eda1c2d87051007a677d7bcfaea508181ca36b59a2db8f5868ad9f3b686c4e77.svg",
+    "tile": false
+  },
+  {
+    "title": "PayPal",
+    "hostname": "paypal.com",
+    "pathname": "/",
+    "light": "be46ba3ede93ac6d513f00947d6aba825e450497b1a47a8bd408e90d6ee829c7.svg",
+    "tile": false
+  },
+  {
+    "title": "Peerlist",
+    "hostname": "peerlist.io",
+    "pathname": "/",
+    "light": "c5da39ae7712dd12f266a9279fe2b5add632aff0d220fe82ec36a7143ac45526.svg",
+    "tile": false
+  },
+  {
+    "title": "Penpot",
+    "hostname": "penpot.app",
+    "pathname": "/",
+    "light": "09dc6fe7bb0135682f17fdfc981ad140411c7a6ae7adc4eefa91286a41b52e6d.svg",
+    "dark": "40ef1470edcb0a136082baea0dd2a7f64a4f3e4ab18061d26f1eb385e92eb09b.svg",
+    "tile": false
+  },
+  {
+    "title": "Perplexity AI",
+    "hostname": "perplexity.ai",
+    "pathname": "/",
+    "light": "2fe528d6f0596ba84b57a7ecaeb6bf295aef01cfeebcda096116aca8ee58b4bd.svg",
+    "tile": false
+  },
+  {
+    "title": "Perspective",
+    "hostname": "perspective.co",
+    "pathname": "/",
+    "light": "28380a5d3ee00c44265a12bb581e100e60e6b13fa2cf6af0a0d832b4e3f47a91.svg",
+    "dark": "08ba111ebcf274a0c8e960cdcd80ea96a7cc7f04b23b36b60e6a1cf68b88dd25.svg",
+    "tile": false
+  },
+  {
+    "title": "Photopea",
+    "hostname": "photopea.com",
+    "pathname": "/",
+    "light": "190551a2deb80054a9dc517a5b3b7b52a766b82d41a3c6b0e38efccdae7ab327.svg",
+    "tile": false
+  },
+  {
+    "title": "Php",
+    "hostname": "php.net",
+    "pathname": "/",
+    "light": "27efe9b4c9e3866805880f2d89e46f5495bdb5458eefa8cc04d0c7d27e7f9cff.svg",
+    "dark": "563fc6669fdd5165a71c84362afe6bce29612f0fce269f22869b57070a9abf3f.svg",
+    "tile": false
+  },
+  {
+    "title": "拼多多",
+    "hostname": "pinduoduo.com",
+    "pathname": "/",
+    "light": "eaecdaab33edb3937f222fa906a188f923212328bce4c1aacd59f52ce4b1f61c.png",
+    "tile": true,
+    "cover": true,
+    "width": 360,
+    "height": 126
+  },
+  {
+    "title": "Pinia",
+    "hostname": "pinia.vuejs.org",
+    "pathname": "/",
+    "light": "3918c12b9c3a1f912e4bfbf4ae96343ea8467e4bad356a9b4e86afaa04ec72c5.svg",
+    "tile": false
+  },
+  {
+    "title": "Pinterest",
+    "hostname": "pinterest.com",
+    "pathname": "/",
+    "light": "91440d1c387877dafbd0cadee7d44a9e7fab3d172b4d4ffd688e5eecbdbbcb2e.svg",
+    "tile": false
+  },
+  {
+    "title": "Pitch",
+    "hostname": "pitch.com",
+    "pathname": "/",
+    "light": "3ecbdf25fe6bda252eb6ff1336891af894f666c718e375be07a5172978ca0d4c.svg",
+    "tile": false
+  },
+  {
+    "title": "PlainSignal",
+    "hostname": "plainsignal.com",
+    "pathname": "/",
+    "light": "b7e14530224b3fc46f992ec4a4efafc9f1147854e2ed31f403423388a7c41627.svg",
+    "tile": false
+  },
+  {
+    "title": "PlanetScale",
+    "hostname": "planetscale.com",
+    "pathname": "/",
+    "light": "e82ee94c34a2a832fd499aee243e64084c03c51d46a7d1c11fd27b540a48e21c.svg",
+    "dark": "cba6b59b8cd79e9b4d9e29a3649371b69c15a7caac539072235e4e71afdf35c2.svg",
+    "tile": false
+  },
+  {
+    "title": "Platzi",
+    "hostname": "platzi.com",
+    "pathname": "/",
+    "light": "d35f58aac9ead465610d443d007b7bd0b5ae4bc60215e57f3d29ff0d0678e0ef.svg",
+    "tile": false
+  },
+  {
+    "title": "Plausible Analytics",
+    "hostname": "plausible.io",
+    "pathname": "/",
+    "light": "ee2a3d9810f4f736dcea00d3b7d0055a2fb2653ad8467771ca8a2af82eaeb361.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Play",
+    "hostname": "play.google.com",
+    "pathname": "/",
+    "light": "c4720abfe9edd80259ce7891534867e85060beea67f919afb5ebb9bd3a331dfb.svg",
+    "tile": false
+  },
+  {
+    "title": "PlayStation",
+    "hostname": "playstation.com",
+    "pathname": "/",
+    "light": "cfe0e6a650ee1ce1870bf5a6b576354b689aba72c22b2665f741fdc2ca166a58.svg",
+    "tile": false
+  },
+  {
+    "title": "Playwright",
+    "hostname": "playwright.dev",
+    "pathname": "/",
+    "light": "12d4dc0107deb4e8b9ab5f6e2b0d30034a887bd90ae2e34f342e74a25dd9f0d4.svg",
+    "tile": false
+  },
+  {
+    "title": "PM2",
+    "hostname": "pm2.io",
+    "pathname": "/",
+    "light": "7a57ed0eda8a6ee1a43d0229e12dc8b67dc3f9c68c0667222795cd1483c77faa.svg",
+    "tile": false
+  },
+  {
+    "title": "Pnpm",
+    "hostname": "pnpm.io",
+    "pathname": "/",
+    "light": "b8f4f05304a2081b08dc2a6713de68c5178ddec5ec8ef0b07c7852b00084ab61.svg",
+    "dark": "bde4fb8d2d95cc126c221113edc85fb393e24bf2085b12e1a376a669f3b8cd93.svg",
+    "tile": false
+  },
+  {
+    "title": "Pocketbase",
+    "hostname": "pocketbase.io",
+    "pathname": "/",
+    "light": "9f96301c9d3569325abc4560a36c9ceadbbe34960acb1f43d9b7a1869e7a7d46.svg",
+    "tile": false
+  },
+  {
+    "title": "Polars",
+    "hostname": "pola.rs",
+    "pathname": "/",
+    "light": "acee5b1cf31ac3b8582c73e16c9045331c553f841434788af30b8ae98906f081.svg",
+    "tile": false
+  },
+  {
+    "title": "Polar",
+    "hostname": "polar.sh",
+    "pathname": "/",
+    "light": "bbb39bab8c342d1198909f172287f7859e9f76109d316c5df41a55ced5f28862.svg",
+    "dark": "e9d02ec174dc2c3f9d655aaa2b1113e63d6e0620fbac1565c784d376ac27f7f6.svg",
+    "tile": false
+  },
+  {
+    "title": "Polygon",
+    "hostname": "polygon.technology",
+    "pathname": "/",
+    "light": "67b9894f720179c93c46a04205080033badcb77c3e195e0671a664bb1c2cf39e.svg",
+    "tile": false
+  },
+  {
+    "title": "Poper",
+    "hostname": "poper.ai",
+    "pathname": "/",
+    "light": "9201c31dca3cbb62adcc8177e12cac180f0b76da5c2af2f07b0bfac2c581f0ed.svg",
+    "tile": false
+  },
+  {
+    "title": "PostCSS",
+    "hostname": "postcss.org",
+    "pathname": "/",
+    "light": "465edc81a6a6fb72dfd4163b0605be0e91c617530091b1871419973c714087d3.svg",
+    "tile": false
+  },
+  {
+    "title": "PostgreSQL",
+    "hostname": "postgresql.org",
+    "pathname": "/",
+    "light": "dc6bb4376a5cf235b19a8871f3219c2b98d97e4469309c8bbecb86ff1811f506.svg",
+    "tile": false
+  },
+  {
+    "title": "PostHog",
+    "hostname": "posthog.com",
+    "pathname": "/",
+    "light": "3fec8f0274ad4956866b74ba6d9fc8204d9d379192f967f738a55477caac89dd.svg",
+    "tile": false
+  },
+  {
+    "title": "Postqued",
+    "hostname": "postqued.com",
+    "pathname": "/",
+    "light": "6ce4a127f74fb65e5f269a69c50a720b3978cb76d1de3cabc7ab98aba720473b.svg",
+    "dark": "08221748c938094f68b3404520dc1cc59ce0add1449259ef6411b3ebff702007.svg",
+    "tile": false
+  },
+  {
+    "title": "PowerSync",
+    "hostname": "powersync.com",
+    "pathname": "/",
+    "light": "ea08e278e40206f4f242a1db57fc4a4761a99fa953e0de2efd1196079068e6db.svg",
+    "tile": false
+  },
+  {
+    "title": "Preact",
+    "hostname": "preactjs.com",
+    "pathname": "/",
+    "light": "21acecc5f28a719ac3aa16a458032e3bbf2bc2ec993c4c7c6aedf66299f7d720.svg",
+    "tile": false
+  },
+  {
+    "title": "Prettier",
+    "hostname": "prettier.io",
+    "pathname": "/",
+    "light": "3e01fd476ed70882b3dbede11204b85a46361b5f2da3d1b8db4e047198abbe53.svg",
+    "dark": "7b9a378c012bdddcb4ae7b671a5e68ebaaeeaba800bc1fec5995b019282093ba.svg",
+    "tile": false
+  },
+  {
+    "title": "Prime video",
+    "hostname": "primevideo.com",
+    "pathname": "/",
+    "light": "9bf0fa7321521e1e4729daa65674758da68d8d37051ea2821ffa07fcf15dab47.svg",
+    "tile": false
+  },
+  {
+    "title": "Prisma",
+    "hostname": "prisma.io",
+    "pathname": "/",
+    "light": "ae59021bf39c95cff16bfdd634d2e266e9ad4f152fc1f014509d56b120a81c1f.svg",
+    "dark": "e1644113be3d0aaf749c72bee12776d0f87d4dad96bef1bc580a88db5088dbe2.svg",
+    "tile": false
+  },
+  {
+    "title": "Procure",
+    "hostname": "procure.biz",
+    "pathname": "/",
+    "light": "2b87e7cd0c48dbf324666f347340afc1156fc86a466021e480ac9c288c618fd6.svg",
+    "tile": false
+  },
+  {
+    "title": "Product Hunt",
+    "hostname": "producthunt.com",
+    "pathname": "/",
+    "light": "67c8db8ca7f814273f1080cfea82c093aa33799543da97c124b2310cfc028cf4.svg",
+    "tile": false
+  },
+  {
+    "title": "Proton VPN",
+    "hostname": "protonvpn.com",
+    "pathname": "/",
+    "light": "cd1115c3431db36abb8bd74e5f3b74df73d63852afb12b8238660a65a82af6da.svg",
+    "tile": false
+  },
+  {
+    "title": "Pulumi",
+    "hostname": "pulumi.com",
+    "pathname": "/",
+    "light": "8f723cbbc2c3e6ac124818dcc7398b743dc88c24cf4d2fa491b603f1f23bda07.svg",
+    "tile": false
+  },
+  {
+    "title": "putio",
+    "hostname": "put.io",
+    "pathname": "/",
+    "light": "68b1bef65f4e2eacaeeb21857b43c97fd1f52a72eeac8e33c977028e1d0cef06.svg",
+    "tile": false
+  },
+  {
+    "title": "Python",
+    "hostname": "python.org",
+    "pathname": "/",
+    "light": "e4d80b4ca9418d1ebb4ff880eb7cbe6896d60d61d9f44ead6723db29a4ed962e.svg",
+    "tile": false
+  },
+  {
+    "title": "Qdrant",
+    "hostname": "qdrant.tech",
+    "pathname": "/",
+    "light": "e620b07335d021791abe6e1c8d46c4c64f1113d0717e79bb46e7228a6b3f8e1c.svg",
+    "dark": "1a061aa0ed894c8580b83e62934ae77d7d852d5020ba0d190b1c4daf7d713fad.svg",
+    "tile": false
+  },
+  {
+    "title": "Qt",
+    "hostname": "qt.io",
+    "pathname": "/",
+    "light": "6999a003e832a81e3a42232bb7f867fc42132162948f713a00f9a6c2cd7f435e.svg",
+    "tile": false
+  },
+  {
+    "title": "夸克",
+    "hostname": "quark.cn",
+    "pathname": "/",
+    "light": "fb9bd93de44ef3d42c27ea5218da9def76fa39625e82d295845f2691b14d24b9.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Qwik",
+    "hostname": "qwik.builder.io",
+    "pathname": "/",
+    "light": "5f375cf023a44a8a68cd45c8b84f19f77c401de75ee2e3c50fbceeb1a5544343.svg",
+    "tile": false
+  },
+  {
+    "title": "R",
+    "hostname": "r-project.org",
+    "pathname": "/",
+    "light": "63fc589c927ea68fe8e6cc9bc5e5df5a8a06d8cabbf728966d6c02caef8f1c7f.svg",
+    "dark": "05326763a9c1dd307ad83cf5fef5faae02ebb5d5b1844c0accf3dff8afd329e3.svg",
+    "tile": false
+  },
+  {
+    "title": "Radix UI",
+    "hostname": "radix-ui.com",
+    "pathname": "/",
+    "light": "25ef3ff43a10bfac6de7489a22020d061d634d77c83db8b4678b26c3b4a8cc38.svg",
+    "dark": "e08c48b16978a5656765bb8ff2e88fb78073d0723f88272eec283e0342233a37.svg",
+    "tile": false
+  },
+  {
+    "title": "Railway",
+    "hostname": "railway.app",
+    "pathname": "/",
+    "light": "3e22cde367ddca01e9b78fb3a2f7288c9cc72fb76ef0133a6a6600cef7ca9057.svg",
+    "dark": "e9141826a7590b6bfbd159f3b31539429915840ad04b80bf3eb40cf44dc65f2f.svg",
+    "tile": false
+  },
+  {
+    "title": "Raindrop.io",
+    "hostname": "raindrop.io",
+    "pathname": "/",
+    "light": "ed922ed9b8373e2c9522edad857f73e0fdabdc4b0398e215855670f53545c481.svg",
+    "tile": false
+  },
+  {
+    "title": "Randevum",
+    "hostname": "randevum.co",
+    "pathname": "/",
+    "light": "885783333f4ea7df62b45e9e21a9ba668d0c4ab28a0a1edaf51c2adafdf8c721.svg",
+    "tile": false
+  },
+  {
+    "title": "Rapid API",
+    "hostname": "rapidapi.com",
+    "pathname": "/",
+    "light": "6c6a14a68cb54980524afe269cd6fc7d1943bcfc51b63ff7312ad1a6c60c72c3.svg",
+    "tile": false
+  },
+  {
+    "title": "Raspberry PI",
+    "hostname": "raspberrypi.com",
+    "pathname": "/",
+    "light": "c53e2512930da2b9825d61f71ab50f0359201c0e565cd8bb4a70da618c344bc6.svg",
+    "tile": false
+  },
+  {
+    "title": "Raycast",
+    "hostname": "raycast.com",
+    "pathname": "/",
+    "light": "82339c44d887a9f030e76355448465b1661eafecbb63ad7f7dfa4242a60bec21.svg",
+    "tile": false
+  },
+  {
+    "title": "React Wheel Picker",
+    "hostname": "react-wheel-picker.chanhdai.com",
+    "pathname": "/",
+    "light": "a74ec0f65ed0df18fe718f551c0000728141d172d909f5493393479ae8b22afd.svg",
+    "dark": "2d02bafdf5b332813dc35ff4347cf1f1dde38f80c44cfcc530a4060a93ddd5ec.svg",
+    "tile": false
+  },
+  {
+    "title": "React",
+    "hostname": "react.dev",
+    "pathname": "/",
+    "light": "0e3b3b606248d4868b5f0c63c30f27929e94724591e28cbd6852ccb649857998.svg",
+    "dark": "7e773e15e632c065987493b83b6ef5afc74a0a004b02843578f70c703b840404.svg",
+    "tile": false
+  },
+  {
+    "title": "React Router",
+    "hostname": "reactrouter.com",
+    "pathname": "/en/main",
+    "light": "7c5e08979214dae70a40d49a96fbaaee8b91cbcc8606af0533d8dbd5fb685d01.svg",
+    "tile": false
+  },
+  {
+    "title": "Reddit",
+    "hostname": "reddit.com",
+    "pathname": "/",
+    "light": "8828c655276d02496250cf8f421b59ced6bb4a93a9894665e5b37a7076b17883.svg",
+    "tile": false
+  },
+  {
+    "title": "Redis",
+    "hostname": "redis.io",
+    "pathname": "/",
+    "light": "0588a304be52b7a96f531268ea68624d504d4c93175e41d2feba7bce9ae22fbb.svg",
+    "tile": false
+  },
+  {
+    "title": "Redux",
+    "hostname": "redux.js.org",
+    "pathname": "/",
+    "light": "e6780d6facbc66e6afd29d5cfae2e27b66f8462dd29b42b193b3338ff069d4a6.svg",
+    "tile": false
+  },
+  {
+    "title": "RedwoodJS",
+    "hostname": "redwoodjs.com",
+    "pathname": "/",
+    "light": "66552cf3bd9baff925e8712634cebb1559ea82a84db65baed4c231751709aa8c.svg",
+    "tile": false
+  },
+  {
+    "title": "Refine",
+    "hostname": "refine.dev",
+    "pathname": "/",
+    "light": "7ab697f296b32ed15577e616e595c696de2068f54209a96a59f5bf71d8e99adc.svg",
+    "dark": "bfa9826c5de4286be84dc73507ec3eb4d5484d83b3df137f090ac902f253b174.svg",
+    "tile": false
+  },
+  {
+    "title": "Reflex",
+    "hostname": "reflex.dev",
+    "pathname": "/",
+    "light": "6f69b859f95cb3a8fbd2e24f9dd8070c5f5ac0d750f666ca8278efe4a7c471ca.svg",
+    "dark": "004c805180ac1530e2468bfc9692f53b5c8ff66120916c4664bd6f2fe3dfc512.svg",
+    "tile": false
+  },
+  {
+    "title": "RelaGit",
+    "hostname": "rela.dev",
+    "pathname": "/",
+    "light": "bd29abf4f52cd049085c8a7380e24be3a745518b0bdc294945aadd667545349f.svg",
+    "dark": "4557d92d55b84a9fb30c24add93964181a9ee1b41493c07d6309b2127015383d.svg",
+    "tile": false
+  },
+  {
+    "title": "Remix",
+    "hostname": "remix.run",
+    "pathname": "/",
+    "light": "9c5edead5a99c400907a934bb0ebca5e00f5cd744e26b38d7300820025290af5.svg",
+    "dark": "2c730aa20aa04773cf6a3b2c5c94a9ac75aa5761bc92761a9783c79e282c83b6.svg",
+    "tile": false
+  },
+  {
+    "title": "Remotion",
+    "hostname": "remotion.dev",
+    "pathname": "/",
+    "light": "b2347078552bdc8f93f970b04988c15fb6d6f5563752ed0a2afc3d65b1d7ef40.svg",
+    "tile": false
+  },
+  {
+    "title": "Render",
+    "hostname": "render.com",
+    "pathname": "/",
+    "light": "ee09996a19157a73dbaec1fef1d159a74de2d8e060525b6830c74f676bc6c411.svg",
+    "dark": "f05692b3d37cd62acadcfacb2811095d64b4d581df1ed6c8756f87b122595daa.svg",
+    "tile": false
+  },
+  {
+    "title": "Replicate",
+    "hostname": "replicate.com",
+    "pathname": "/",
+    "light": "b9471730df4736d149ac9393e443eabc2e19a25b0ffe42d5d0864ea51b5e8159.svg",
+    "dark": "3a1a39f81c20c507bb84b105d022f5c3af35c1f561005493b1c654bcf356f3a5.svg",
+    "tile": false
+  },
+  {
+    "title": "Replit",
+    "hostname": "replit.com",
+    "pathname": "/",
+    "light": "e5f9e579255ff505b3b327ef4d9ca6dfabec1b35c36f72848848fa10e6fc65a3.svg",
+    "tile": false
+  },
+  {
+    "title": "Resend",
+    "hostname": "resend.com",
+    "pathname": "/",
+    "light": "7251dba7137e25a4117154bfdaef8333128a9dcc67446912ddcf6d6048573b12.svg",
+    "dark": "9d6a386b319b8d0f421918e270f843d9996e31021fad9e41bc4c10a8882b9908.svg",
+    "tile": false
+  },
+  {
+    "title": "Retain",
+    "hostname": "retain.so",
+    "pathname": "/",
+    "light": "e34a6f43a4237d8ca9f256aa03145cdd228ffe9ae700fb865b89f809762dd377.svg",
+    "dark": "28b4cf86a61c52562cecc1fa1ec8fe765313fb60322e107b20439e5c882bb524.svg",
+    "tile": false
+  },
+  {
+    "title": "Roblox",
+    "hostname": "roblox.com",
+    "pathname": "/",
+    "light": "4b8d50d04639796213a6f6c915f3e9ba8576d4fdb7ddf7ec4bc70987db65675f.svg",
+    "dark": "7f63d524e48915dbe9d005fb82aac5214d575becdd9c81f12093a2616c9e9fe0.svg",
+    "tile": false
+  },
+  {
+    "title": "Rolldown",
+    "hostname": "rolldown.rs",
+    "pathname": "/",
+    "light": "f4de9dd8183d0124dbc75b5de4b0cb0f47a4c212110b93b1337201d97336d4a2.svg",
+    "tile": false
+  },
+  {
+    "title": "Rowy",
+    "hostname": "rowy.io",
+    "pathname": "/",
+    "light": "4314d5978c8847d8a9efb33bf9994778b4982e83727ed7628627cd93a8967bd6.svg",
+    "tile": false
+  },
+  {
+    "title": "Rsbuild",
+    "hostname": "rsbuild.rs",
+    "pathname": "/",
+    "light": "92b5b9d1f702ea12e24d12bf64deabd6bf5312dd0d414207932a45e67b8f57c0.svg",
+    "tile": false
+  },
+  {
+    "title": "Rspack",
+    "hostname": "rspack.rs",
+    "pathname": "/",
+    "light": "32aafbcd7125c504735db53c0bae7425f2ff4db3271629a283791a0ae07b4fdc.svg",
+    "tile": false
+  },
+  {
+    "title": "Ruby",
+    "hostname": "ruby-lang.org",
+    "pathname": "/",
+    "light": "aae4b61b825b0b41f05a80c5971f0d5834953a92a34f63f9b5953d5f661351b5.svg",
+    "tile": false
+  },
+  {
+    "title": "Runframe",
+    "hostname": "runframe.io",
+    "pathname": "/",
+    "light": "871a62c77ff42fbbb3fe0fd22ea352cb38ba9c6cc591c7575764a746abda3fd3.svg",
+    "tile": false
+  },
+  {
+    "title": "Runway",
+    "hostname": "runwayml.com",
+    "pathname": "/",
+    "light": "ef0fbd9493bef73b1db7d69910078fbc90024780e4e326d33107983ebd66a4e0.svg",
+    "tile": false
+  },
+  {
+    "title": "Rust",
+    "hostname": "rust-lang.org",
+    "pathname": "/",
+    "light": "383a6e47b7ef50f2646c626084896af12d79a7262f60a318cc51bfb780a0529d.svg",
+    "dark": "93750b6a19c9c4723956684ee4bde7691a652dafd782cfef76d27937cd0a0be6.svg",
+    "tile": false
+  },
+  {
+    "title": "RxJS",
+    "hostname": "rxjs.dev",
+    "pathname": "/",
+    "light": "fdd8944b1616f359b9ce7d21b83a43be43c955d6848b60dfa8d8091acd0f23db.svg",
+    "tile": false
+  },
+  {
+    "title": "Salesforce",
+    "hostname": "salesforce.com",
+    "pathname": "/",
+    "light": "aa6d730bbb164c2df9ab8355731a8b5c327b54640ae9f9a6a25527785dda5682.svg",
+    "tile": false
+  },
+  {
+    "title": "Sanity",
+    "hostname": "sanity.io",
+    "pathname": "/",
+    "light": "3b80206f784fcdd78ae4fa46c6fda1ae524af28b56e80556c6e1579e3a426cfd.svg",
+    "dark": "8aca6d850923160b5a691f09176e82bba11bdcebddda744b3082b80cd8ab87db.svg",
+    "tile": false
+  },
+  {
+    "title": "Sass",
+    "hostname": "sass-lang.com",
+    "pathname": "/",
+    "light": "388e6f654683371844588c18cdd3272f04707f124bae85e201375e20b371e0a9.svg",
+    "tile": false
+  },
+  {
+    "title": "Scala",
+    "hostname": "scala-lang.org",
+    "pathname": "/",
+    "light": "73bb3fb80797f95214e330e47bb46a7a3cc6308fb8b85ad953b9488903c94628.svg",
+    "tile": false
+  },
+  {
+    "title": "Sentry",
+    "hostname": "sentry.io",
+    "pathname": "/",
+    "light": "1469719716614dcb8f95c3bba9d158b97724a3236e38630ffc9e85aebc7123d9.svg",
+    "tile": false
+  },
+  {
+    "title": "Sequelize",
+    "hostname": "sequelize.org",
+    "pathname": "/",
+    "light": "dd182b40fcefcd6cab41699734161ad1db21410bc979c0334f9d43bf082c63fd.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Sheets",
+    "hostname": "sheets.google.com",
+    "pathname": "/",
+    "light": "1e610a408605d9cfc1e90683ef25f360e7eaa6eb89c4c54dcab40a19b5c72562.svg",
+    "tile": false
+  },
+  {
+    "title": "Shiki",
+    "hostname": "shiki.style",
+    "pathname": "/",
+    "light": "514cfc8ff4e15327713609ba7a562dc1d48eca5e1daf5fd1124574be9cd134bf.svg",
+    "tile": false
+  },
+  {
+    "title": "Shopify",
+    "hostname": "shopify.com",
+    "pathname": "/",
+    "light": "86e19afda708cead229b714d25de147ef0b920cfea807c5b2933b30d17a234db.svg",
+    "tile": false
+  },
+  {
+    "title": "Sketch",
+    "hostname": "sketch.com",
+    "pathname": "/",
+    "light": "1abe4769e34613abbceda0846b481e99dfca09e898e9c55a913bcc2c663995d9.svg",
+    "dark": "e16d400c31d8c97f651e16116268cd9359b2e174b7dfe5198c35744c27a47636.svg",
+    "tile": false
+  },
+  {
+    "title": "sky",
+    "hostname": "sky.com",
+    "pathname": "/",
+    "light": "eaa4eecd3fdc2307e192b1bb75d2eea7299fa9428c1cb4f66cdf482c6ac86dac.svg",
+    "tile": false
+  },
+  {
+    "title": "Skype",
+    "hostname": "skype.com",
+    "pathname": "/",
+    "light": "b1b78c223b66293d1827852235be0098030d28372b59547acc366cb50bbe00ad.svg",
+    "tile": false
+  },
+  {
+    "title": "Slack",
+    "hostname": "slack.com",
+    "pathname": "/",
+    "light": "29734796b3a85f9d0e03150d53142fab0b7f994ae80c7e3e1efd0bef52c12f5d.svg",
+    "tile": false
+  },
+  {
+    "title": "Google Slides",
+    "hostname": "slides.google.com",
+    "pathname": "/",
+    "light": "328414886ebfaeea95e460cdda3fd015c143c910399799654b0f73e1e9b1c558.svg",
+    "tile": false
+  },
+  {
+    "title": "Snapchat",
+    "hostname": "snapchat.com",
+    "pathname": "/",
+    "light": "cff099bda38d661e0f5bb7b0792743c8a3851b88e7c9028dadbb8361fffbe299.svg",
+    "tile": false
+  },
+  {
+    "title": "Socket.IO",
+    "hostname": "socket.io",
+    "pathname": "/",
+    "light": "f03cbed27f0f7fe304c05172986faa8e5f8f8b04533fda11fd32c061d56b7ddd.svg",
+    "dark": "f1486266899ff2279ddcb90558caa8c24bf1957fbc25ae10cb0c6070224b067d.svg",
+    "tile": false
+  },
+  {
+    "title": "Solana",
+    "hostname": "solana.com",
+    "pathname": "/",
+    "light": "d5ae3179116a3e643c131489e305cd71a6eb2f0d58e20f3c4189f741eed9ac91.svg",
+    "tile": false
+  },
+  {
+    "title": "Soldera",
+    "hostname": "soldera.org",
+    "pathname": "/",
+    "light": "3a992e7f996b6d9f01335f007dfad8bc93c7840c64329a2308227d79e69e9754.svg",
+    "dark": "ed799c719ec3ee0f77edd15afbb3ca67f97e6400ca3b18a37da3c27abcc90a0a.svg",
+    "tile": false
+  },
+  {
+    "title": "Solidity",
+    "hostname": "soliditylang.org",
+    "pathname": "/",
+    "light": "3a6ef657eebdfd7ee3f1e6d2e8fa02fbd1e065330c7d1be0648a4889d5d37b32.svg",
+    "tile": false
+  },
+  {
+    "title": "Solidjs",
+    "hostname": "solidjs.com",
+    "pathname": "/",
+    "light": "13680c683f4d4048d43752b42d8cf5d52bc0e6388a457dcc2733b7e03825befd.svg",
+    "tile": false
+  },
+  {
+    "title": "SoundCloud",
+    "hostname": "soundcloud.com",
+    "pathname": "/",
+    "light": "836322df1cab126540c81f5c1d725e70a25db0671635df9f32daad589203936a.svg",
+    "dark": "e04011edd4b74238a7c29ef90ae321bf97e93ce339f193e80a5779e04ba498db.svg",
+    "tile": false
+  },
+  {
+    "title": "Spinnaker",
+    "hostname": "spinnaker.io",
+    "pathname": "/",
+    "light": "86f7aa2c157a173d1ab8ee86066c99f753e0e243cc0a6e6d178962f551688fea.svg",
+    "tile": false
+  },
+  {
+    "title": "Spotify",
+    "hostname": "spotify.com",
+    "pathname": "/",
+    "light": "d3f7f94d90089fd318a2649807d5d57cf353affcf9d4cd2c5d373062822cf507.svg",
+    "tile": false
+  },
+  {
+    "title": "Spring",
+    "hostname": "spring.io",
+    "pathname": "/",
+    "light": "c63a5d0029b815f240f2d48e1552ac94b125485c3bb9e064b61cba8a2c1c9100.svg",
+    "tile": false
+  },
+  {
+    "title": "SQLite",
+    "hostname": "sqlite.org",
+    "pathname": "/",
+    "light": "f58b28cbded13fccd343cb5b0505e7c2d430bd84215c52eca8f52b4522f69ce0.svg",
+    "tile": false
+  },
+  {
+    "title": "SST",
+    "hostname": "sst.dev",
+    "pathname": "/",
+    "light": "30951e0f3ad24c8f8b72337d068180139d39efefa6353f630935b643e79a5196.svg",
+    "tile": false
+  },
+  {
+    "title": "Stability AI",
+    "hostname": "stability.ai",
+    "pathname": "/",
+    "light": "5f479609f05fb857094d0c50ca01bd753364e624c821ab1b017f6ee3d7c042ec.svg",
+    "tile": false
+  },
+  {
+    "title": "Stackblitz",
+    "hostname": "stackblitz.com",
+    "pathname": "/",
+    "light": "e8dc642d175c3cce72c7f16c7df5fd2e1792f0150e0490e85ffa43690bd6e7cd.svg",
+    "tile": false
+  },
+  {
+    "title": "Stack Overflow",
+    "hostname": "stackoverflow.com",
+    "pathname": "/",
+    "light": "4f8838781664e9c878f19b1465ccde5233212eeba45ee3020f2a2dfc03a58cfc.svg",
+    "tile": false
+  },
+  {
+    "title": "Stately.ai",
+    "hostname": "stately.ai",
+    "pathname": "/",
+    "light": "8f33ea79d0c0a682c54c7c962c6b3175988c70ef50794044218a8548e69ab146.svg",
+    "dark": "391afff38318d66081caa0409ea98fa071865420ae1d9ba6e196d1e1198fb935.svg",
+    "tile": false
+  },
+  {
+    "title": "Stimulus",
+    "hostname": "stimulus.hotwired.dev",
+    "pathname": "/",
+    "light": "14ae54da020e062bf86907e97ff58ce7b8cddeecf91e5651cf082d38dbd99e12.svg",
+    "tile": false
+  },
+  {
+    "title": "Adobe Stock",
+    "hostname": "stock.adobe.com",
+    "pathname": "/",
+    "light": "b2318b373b00d2a2301cbb93bd9842deb16eb9061df92d008a8d749594f749dd.svg",
+    "tile": false
+  },
+  {
+    "title": "Steam",
+    "hostname": "store.steampowered.com",
+    "pathname": "/",
+    "light": "f9dfd02f603715cb12a8b0530e0c4dec21ecf4104c053bf62dd8139f19ea47af.svg",
+    "tile": false
+  },
+  {
+    "title": "Storyblok",
+    "hostname": "storyblok.com",
+    "pathname": "/",
+    "light": "1cd80e89c95bd38226235d6f5a5b9d62ba888d3784f959a5f84808e41a0a7ca8.svg",
+    "tile": false
+  },
+  {
+    "title": "Storybook",
+    "hostname": "storybook.js.org",
+    "pathname": "/",
+    "light": "de5d709c20339ecf7d9ab4c73ae570f6d2680f8dbfe4d17f5db22b834ed5babf.svg",
+    "tile": false
+  },
+  {
+    "title": "Strapi",
+    "hostname": "strapi.io",
+    "pathname": "/",
+    "light": "f3635f9be4f4e600f4f1de3c5d23399aee6b2f2bf3a952d22676ccd28c779e87.svg",
+    "tile": false
+  },
+  {
+    "title": "Stripe",
+    "hostname": "stripe.com",
+    "pathname": "/",
+    "light": "d1dd829f330c3c17a02c7356e2e41f77f6ecad3f72a9b2bf11b649703c66e30a.svg",
+    "tile": false
+  },
+  {
+    "title": "Nuxt Studio",
+    "hostname": "studio.nuxt.com",
+    "pathname": "/",
+    "light": "88507245114890d8ed5d63abe72457b4052e03af505d46c22fadcbe44af24cb9.svg",
+    "dark": "3a1ae1b7354afa27b2be5b76185a43d1f383525d6f0b53603f4abcdcaf97bd35.svg",
+    "tile": false
+  },
+  {
+    "title": "Styled Components",
+    "hostname": "styled-components.com",
+    "pathname": "/",
+    "light": "ce2e9fd41dddb14c1d1de71b8c0232430027eacd377df69e39128e5899a010f3.svg",
+    "tile": false
+  },
+  {
+    "title": "Sublime Text",
+    "hostname": "sublimetext.com",
+    "pathname": "/",
+    "light": "13a3118739a8fa01fe31770c5164f34bd118aa204dbc366804b95fd2def06dbe.svg",
+    "tile": false
+  },
+  {
+    "title": "Suno",
+    "hostname": "suno.com",
+    "pathname": "/",
+    "light": "03bd7a6888d7ba010c616ae6402c222683d7f909eddb028241220f227ff6d1a6.svg",
+    "tile": false
+  },
+  {
+    "title": "Supabase",
+    "hostname": "supabase.com",
+    "pathname": "/",
+    "light": "1f9387ffd2d8bea4b535f13f12c34b4b4c2df7ee0e5eefe1f532bbda0a3ce969.svg",
+    "tile": false
+  },
+  {
+    "title": "Surrealdb",
+    "hostname": "surrealdb.com",
+    "pathname": "/",
+    "light": "af732e9e57857287ae3ec6ac1e0b5ae93825a6f31efdd87fd271622558eca24c.svg",
+    "tile": false
+  },
+  {
+    "title": "Svelte",
+    "hostname": "svelte.dev",
+    "pathname": "/",
+    "light": "9864a6c1b0d9c2f4f453b3c0c049c61b7f81e9b3dae8207d033e05472ef45682.svg",
+    "tile": false
+  },
+  {
+    "title": "Svgl",
+    "hostname": "svgl.app",
+    "pathname": "/",
+    "light": "26b81ff58827f6d0adcdf0a95c0961c2998027d61a17147a5453fdb7dec7cef0.svg",
+    "tile": false
+  },
+  {
+    "title": "Swagger",
+    "hostname": "swagger.io",
+    "pathname": "/",
+    "light": "bc47850429e1c88e740e03a1e24c34df1b867f088a5f698a0f0e3c981469c955.svg",
+    "tile": false
+  },
+  {
+    "title": "SWC",
+    "hostname": "swc.rs",
+    "pathname": "/",
+    "light": "179ae429947ac41bb442ade16af39ce20bc69f58e74479a38ad8cfa50143cfbe.svg",
+    "tile": false
+  },
+  {
+    "title": "Swift",
+    "hostname": "swift.org",
+    "pathname": "/",
+    "light": "22c315da13ba77ca3bbe83dc3b1fd54211ae619151c91427d39616bf0e61879d.svg",
+    "tile": false
+  },
+  {
+    "title": "SWR",
+    "hostname": "swr.vercel.app",
+    "pathname": "/",
+    "light": "97758cbd4950c0868983f99f436882493eb49e36dd5121ae109655493fe2101e.svg",
+    "dark": "20bb6c4326e75feaa8c6638e9fc333848947d93d6377508a8b09f53e89a2c9cc.svg",
+    "tile": false
+  },
+  {
+    "title": "Tabby",
+    "hostname": "tabby.sh",
+    "pathname": "/",
+    "light": "c3b44f70a4462e34d83738f734c40b610573e8d15c04ad884f3a13d02e030399.svg",
+    "tile": false
+  },
+  {
+    "title": "Tailwind CSS",
+    "hostname": "tailwindcss.com",
+    "pathname": "/",
+    "light": "ad607cfe6ce1d86f700264bea3ded08e4b3d7d50370e3f11260297ca41087098.svg",
+    "tile": false
+  },
+  {
+    "title": "React Query",
+    "hostname": "tanstack.com",
+    "pathname": "/query/v4",
+    "light": "0e4987d4def40d1df9fc6028d89316efb54f97c9ea0213f4d1051c40223124d2.svg",
+    "tile": false
+  },
+  {
+    "title": "TanStack",
+    "hostname": "tanstack.com",
+    "pathname": "/",
+    "light": "628d270c6ce84a773113fa4e8098d0ba194de7edddf07384dffe336098160868.svg",
+    "dark": "0f7d0805e1bf9a37d3e9203fb02b719cff2a3e469596a77b6414f57c435151cb.svg",
+    "tile": false
+  },
+  {
+    "title": "Tauri",
+    "hostname": "tauri.app",
+    "pathname": "/",
+    "light": "dcb62f32a210db055e90c4b63f2c641448fd0367a34f8074cb8215cc64143db9.svg",
+    "tile": false
+  },
+  {
+    "title": "Tembo",
+    "hostname": "tembo.io",
+    "pathname": "/",
+    "light": "571a37fa9b8fa00ef4a1803041875590d195015abfed8abdf92d2af60f6098f4.svg",
+    "dark": "3572a9dce7cc0eb3c19c8fa7ae848bd15d7083fd28c65fd6de62ef228bc61f03.svg",
+    "tile": false
+  },
+  {
+    "title": "TensorFlow",
+    "hostname": "tensorflow.org",
+    "pathname": "/",
+    "light": "4e79f63108f6baba4fd02b00f1ce58cb9b9939413b6706f240f5caf1b2471b22.svg",
+    "dark": "5ce40657105dc138823732bc446fe8e0bee666e9348fe80b7ef1b03bd873b953.svg",
+    "tile": false
+  },
+  {
+    "title": "Terraform",
+    "hostname": "terraform.io",
+    "pathname": "/",
+    "light": "cf3bb4f507c867cb161aea01bee525da057fe0fd727d7f6168e344c05f1209b2.svg",
+    "tile": false
+  },
+  {
+    "title": "Tether",
+    "hostname": "tether.to",
+    "pathname": "/",
+    "light": "14c4ce4de02e430893b51b6fd6c814d1c32a2001d5a0f8962304652f30773a17.svg",
+    "tile": false
+  },
+  {
+    "title": "Threads",
+    "hostname": "threads.net",
+    "pathname": "/",
+    "light": "6ffd63eec1001eead4aa083a4089ce396bd5ffc1a36a51c1f875cea863fb895f.svg",
+    "dark": "6a43ac094c81a49dedfd1a6289cf53692baaf1fa92001ac3c9ba9f530bece2a6.svg",
+    "tile": false
+  },
+  {
+    "title": "Three.js",
+    "hostname": "threejs.org",
+    "pathname": "/",
+    "light": "a89488a12c1d31150843ad261c40e76d5e0451520b9bf9db0036de0cbdca8c1c.svg",
+    "dark": "fefb8afe9e88ad63f5f615540cc902ff3b26c1f2504fabdeb55b098af8ad1a1d.svg",
+    "tile": false
+  },
+  {
+    "title": "TIDAL",
+    "hostname": "tidal.com",
+    "pathname": "/",
+    "light": "e5d212320f53df7f1560c0bb5584204407d38e1e2baaf57c886b8562cd71db73.svg",
+    "dark": "e3781b3f5864daf72669acab1713005a99a97bf176e49621fb25259b999f4cbd.svg",
+    "tile": false
+  },
+  {
+    "title": "贴吧",
+    "hostname": "tieba.baidu.com",
+    "pathname": "/",
+    "light": "882659e5178d26b0ae3aeef038bef434e319137ffd85c096848b89f32d70687e.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "TikTok",
+    "hostname": "tiktok.com",
+    "pathname": "/",
+    "light": "d07d73c12868843cd864b4885bf67f460460328e440fd88e70533899d37e31f8.svg",
+    "dark": "3e014b901b0de29d50e0b15c99fc563a21a8e538f2271fef8c9e404d3926d07b.svg",
+    "tile": false
+  },
+  {
+    "title": "Tina",
+    "hostname": "tina.io",
+    "pathname": "/",
+    "light": "f31b194a91f4501bb6361951952aa93f0c5a52b047b4d144b0e7ea11e8e285bc.svg",
+    "tile": false
+  },
+  {
+    "title": "天猫",
+    "hostname": "tmall.com",
+    "pathname": "/",
+    "light": "784795d6a3658685b462f4d72c575de6213dea095273bf0bac083001cea6d77b.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Microsoft Todo",
+    "hostname": "to-do.office.com",
+    "pathname": "/",
+    "light": "9bc67c856c9e2b177e4d172dd51fcec8bfece46113126c81c77071027b8fa54d.svg",
+    "tile": false
+  },
+  {
+    "title": "Todoist",
+    "hostname": "todoist.com",
+    "pathname": "/",
+    "light": "78240ee4a39bcf705a9033bb9b9c4ca4c17d11ca9e0804255b6a9b5debe98593.svg",
+    "tile": false
+  },
+  {
+    "title": "Together AI",
+    "hostname": "together.ai",
+    "pathname": "/",
+    "light": "a783e1fe58888d2221b621490017b967a3c583886a1b2aa4da5c193640536703.svg",
+    "dark": "c6e1ee605ce8926266443772b1c84f69fdc16fe227f9e2883647822cbdb4f2d7.svg",
+    "tile": false
+  },
+  {
+    "title": "Ton",
+    "hostname": "ton.org",
+    "pathname": "/",
+    "light": "5dbc101086122e88854aadebd0af52e847ab16c8398523060a2efa6efc6a2436.svg",
+    "tile": false
+  },
+  {
+    "title": "Tor",
+    "hostname": "torproject.org",
+    "pathname": "/",
+    "light": "29ef20b55a3eb08de86462baa86764cc9d82df32b0c7cdd0d1e598d32871de7e.svg",
+    "tile": false
+  },
+  {
+    "title": "TravelPerk",
+    "hostname": "travelperk.com",
+    "pathname": "/",
+    "light": "efc8e107482f7e9a353af33fd85273b4466d73d3bb26ea898123421537fb0b31.svg",
+    "dark": "46bb680c1c6706e8aaff4e4501f143fceedaa5382727ef7779efdfaa973de4d4.svg",
+    "tile": false
+  },
+  {
+    "title": "Trello",
+    "hostname": "trello.com",
+    "pathname": "/",
+    "light": "a5422037fb80fcd3a1b71ef5c9ca96d7a353ddac2df9058fd381e729c311cc74.svg",
+    "tile": false
+  },
+  {
+    "title": "Tron",
+    "hostname": "tron.network",
+    "pathname": "/",
+    "light": "f62dee27a9d33cfdff3f416ed097ffd7f52b085359acf590c17f830a53e2d350.svg",
+    "tile": false
+  },
+  {
+    "title": "tRPC",
+    "hostname": "trpc.io",
+    "pathname": "/",
+    "light": "72193d723ea34d3c2bf9fe1715d40bd3844ec38f7dbadb12ac3eec3a7ee5ba66.svg",
+    "tile": false
+  },
+  {
+    "title": "TrustPilot",
+    "hostname": "trustpilot.com",
+    "pathname": "/",
+    "light": "a467b821e7dc341f6c3ecafd5f62fab1359b879960a88707cba66d865f499d59.svg",
+    "tile": false
+  },
+  {
+    "title": "Trust Wallet",
+    "hostname": "trustwallet.com",
+    "pathname": "/",
+    "light": "e8781f111813c36d4ae5920fc044b07325286aac697fc838e35ad45831e41cf2.svg",
+    "tile": false
+  },
+  {
+    "title": "Turborepo",
+    "hostname": "turborepo.com",
+    "pathname": "/",
+    "light": "6f7346aa3bde0e824e6aa523d804a0d17a02f9f6b5853202f95d0c044e812e93.svg",
+    "dark": "dbbcf730bd0fde6852a18ece41faf99c9d35bc98e74d7f664cbda4172250aa76.svg",
+    "tile": false
+  },
+  {
+    "title": "Turso",
+    "hostname": "turso.tech",
+    "pathname": "/",
+    "light": "2ced4ccd84ceef9008173fc1e988d222a50ee62825e3c05e3801d914713c9706.svg",
+    "dark": "df2a5795079800728bd9a3823724de73c5d04aeb53900ebe2493a5c666c142d4.svg",
+    "tile": false
+  },
+  {
+    "title": "Twilio",
+    "hostname": "twilio.com",
+    "pathname": "/",
+    "light": "16de11fe08c106fc52a984b8204ea2e5a51f50b2193d4411212c57e35e9bd4be.svg",
+    "tile": false
+  },
+  {
+    "title": "Twitch",
+    "hostname": "twitch.tv",
+    "pathname": "/",
+    "light": "eec8e2ac87a922022ef88825abf3da3e5395fc7be3c1a480da87fbaad574863c.svg",
+    "tile": false
+  },
+  {
+    "title": "Twitter",
+    "hostname": "twitter.com",
+    "pathname": "/",
+    "light": "5e226d395b06e5bad62beefbe4b1544ac30fca00d9d47fc4338ef86ff80a3681.svg",
+    "tile": false
+  },
+  {
+    "title": "TypeGPU",
+    "hostname": "typegpu.com",
+    "pathname": "/",
+    "light": "0ca176a272c370432a2c585d9a26bdb224708df00902c7e6081f66b6fb350796.svg",
+    "dark": "45866bad7d90d3e96f088443d0224eb7ef157acc5a758825715fcdc418b1ccc2.svg",
+    "tile": false
+  },
+  {
+    "title": "TypeORM",
+    "hostname": "typeorm.io",
+    "pathname": "/",
+    "light": "554547d8b9f0d92fc1e28f404b58b28dd8b9f5fd65e057c47b3cf56f8b8702e3.svg",
+    "tile": false
+  },
+  {
+    "title": "TypeSafe AI",
+    "hostname": "typesafe.ai",
+    "pathname": "/",
+    "light": "daa795f95140646f707e38b0a9de639c79a4e8b07d799dcf6e8975152bab62e9.svg",
+    "dark": "249c965f98bedcb6ed3ce243b38ef94bbf5b3ea024a561c3d4710a06b14d5959.svg",
+    "tile": false
+  },
+  {
+    "title": "TypeScript",
+    "hostname": "typescriptlang.org",
+    "pathname": "/",
+    "light": "a72e88ebd02b5e28708e7dfb3ca09c5bc524482f3d0b6a3df3053ed5d51a5f6b.svg",
+    "tile": false
+  },
+  {
+    "title": "Typesense",
+    "hostname": "typesense.org",
+    "pathname": "/",
+    "light": "137699c85a480538a46045c3417b37c84b64c7440d3fb34d061795a868999c6f.svg",
+    "tile": false
+  },
+  {
+    "title": "Uber",
+    "hostname": "uber.com",
+    "pathname": "/",
+    "light": "7b1e21e850dcf4664c8f138c680a327e98e9171684d1412c759d14807d821468.svg",
+    "dark": "b878e4a3a4697b68dc57d9799325b9afd1c1652d63ae5d93e55bdefa659842ce.svg",
+    "tile": false
+  },
+  {
+    "title": "Ubuntu",
+    "hostname": "ubuntu.com",
+    "pathname": "/",
+    "light": "3b05953913a3516bac214790e365556295b824a1ec90d23ad832e27886bb30b8.svg",
+    "tile": false
+  },
+  {
+    "title": "Udacity",
+    "hostname": "udacity.com",
+    "pathname": "/",
+    "light": "4c1d4dcd82b3c224ee7ecf8a8ea58300f30f1214d0d4c4617b649cf74a1e909d.svg",
+    "tile": false
+  },
+  {
+    "title": "Udemy",
+    "hostname": "udemy.com",
+    "pathname": "/",
+    "light": "899cd9425cf3a2677f792728e1021ac804900fbd6483b5778140469f3d8a7203.svg",
+    "dark": "9b3f8681d12a0dbb2d989aec536283c2803db1de5aa2e18320b0ba3a70c0910e.svg",
+    "tile": false
+  },
+  {
+    "title": "Nuxt UI",
+    "hostname": "ui.nuxt.com",
+    "pathname": "/",
+    "light": "4848ab6f15e7ec824950bf2fcfa33b7aa722a86bf8fc1a3b153088b21a07f6a4.svg",
+    "dark": "e4b04a5bf366af126c60cd61313163fdf638011cfafffb0569f584f578b0cb99.svg",
+    "tile": false
+  },
+  {
+    "title": "shadcn/ui",
+    "hostname": "ui.shadcn.com",
+    "pathname": "/",
+    "light": "e428d7ab874700aa57e64263a6481c1cafc29864028f99b3c7bcd545dc87f90c.svg",
+    "dark": "3edbb63bd4ce9eb107bd6aadcc2f1027accedb98637df63e44b4b2e712c871ab.svg",
+    "tile": false
+  },
+  {
+    "title": "Unity",
+    "hostname": "unity.com",
+    "pathname": "/",
+    "light": "cfb570daf64fd1a058d125a7ae26ded519fd6f8d757813cf76b21bcfc76ca6f0.svg",
+    "dark": "100097f4a4b74eb5ec029ffe5a4723da03ab36d7cfed85d16809c1ce19e2e760.svg",
+    "tile": false
+  },
+  {
+    "title": "UnJS",
+    "hostname": "unjs.io",
+    "pathname": "/",
+    "light": "5fbf9a4538f15386410e212580f0d0671dd7f0f8371880b173aa092fd14245c0.svg",
+    "tile": false
+  },
+  {
+    "title": "UnoCSS",
+    "hostname": "unocss.dev",
+    "pathname": "/",
+    "light": "8066269ac43f4f325023ccd27ad8ae78af9177d8518771f6ed074f7c90d628d8.svg",
+    "tile": false
+  },
+  {
+    "title": "Unreal Engine",
+    "hostname": "unrealengine.com",
+    "pathname": "/",
+    "light": "f2861d04c39f39b7779317dc0ebd039223174dca6046740dbcdcad789f711bdb.svg",
+    "dark": "2e043bf53407fdf08143254d80c6eba27b72889e403d7ec2b92eddfbbc0ab94d.svg",
+    "tile": false
+  },
+  {
+    "title": "UpLeveled",
+    "hostname": "upleveled.io",
+    "pathname": "/",
+    "light": "feaa4cf52184c570b2cea6ad3c48396d8c2c7f06fb47b311d7a80edb3190fa71.svg",
+    "tile": false
+  },
+  {
+    "title": "Upstash",
+    "hostname": "upstash.com",
+    "pathname": "/",
+    "light": "b100d0e1ca0cb721cd5375272321d94ba2a5d2c262d36d8f785ef2d58234758c.svg",
+    "tile": false
+  },
+  {
+    "title": "UXAnaRangel",
+    "hostname": "uxanarangel.com",
+    "pathname": "/",
+    "light": "ff52addc4cbf9ee2437b11a277eff365084af6f053b86bb9ae187bda51cca9bc.svg",
+    "dark": "f2db7a9dcdfe638c2c292fbb80a85b34eab960441cbb88627ad3ecffb0b3b5db.svg",
+    "tile": false
+  },
+  {
+    "title": "腾讯视频",
+    "hostname": "v.qq.com",
+    "pathname": "/",
+    "light": "57b1ee68d9469ea82f1cc4f4de01881f632c584be31b1dc4a4f7cb8ad3214367.png",
+    "tile": true,
+    "width": 192,
+    "height": 192
+  },
+  {
+    "title": "v0",
+    "hostname": "v0.dev",
+    "pathname": "/",
+    "light": "6501b54310eff20c295966fc4b1eb666fe846a7e887e598bf68ac839001cc353.svg",
+    "dark": "e33ce9865356b381e2752a07a100d136ed80179645084eef185448be29c65a17.svg",
+    "tile": false
+  },
+  {
+    "title": "Valibot",
+    "hostname": "valibot.dev",
+    "pathname": "/",
+    "light": "6115c4146eddbadaa40bbabaa042040c9ff95f0764fac9ddb00785e4a4684300.svg",
+    "tile": false
+  },
+  {
+    "title": "eve",
+    "hostname": "vercel.com",
+    "pathname": "/eve",
+    "light": "57ca1b832229fb77f009b2bb412f165b2816ab7015c3af4bae88dbd184416a4f.svg",
+    "dark": "58e808baee790b3681c0487145388dc930dadb74e262b0eabc36f213f2225c7a.svg",
+    "tile": false
+  },
+  {
+    "title": "Vercel",
+    "hostname": "vercel.com",
+    "pathname": "/",
+    "light": "565f40e56abbd9c9f31e113c45e90ce456cc112d4811f2f49d1d5041fe501b7c.svg",
+    "dark": "a9ae5ad4ea10c39122cc6b07927132f9c684dd2f1a7bef5337b0eb7364e139ae.svg",
+    "tile": false
+  },
+  {
+    "title": "Vim",
+    "hostname": "vim.org",
+    "pathname": "/",
+    "light": "f2d7e93c65de5c48adac05f7bbd6fb7ea5a3ebb53f0fbed7a428dd35ad0edffe.svg",
+    "tile": false
+  },
+  {
+    "title": "Visual Studio",
+    "hostname": "visualstudio.microsoft.com",
+    "pathname": "/",
+    "light": "0b50b3aa56c3ed9e9a2b801c3aa38881cc4a12ba9cd24eef5e920eb14d84406e.svg",
+    "tile": false
+  },
+  {
+    "title": "Vite",
+    "hostname": "vitejs.dev",
+    "pathname": "/",
+    "light": "1d85800a1f7e07cc92cdb5938a52dff050849e9a96de3cf4c3cd31662dde5d2c.svg",
+    "tile": false
+  },
+  {
+    "title": "Vitest",
+    "hostname": "vitest.dev",
+    "pathname": "/",
+    "light": "6d244e70c998b2e3207d75596ac0fc4f561e2cb906571f7d9e97b36f46308463.svg",
+    "tile": false
+  },
+  {
+    "title": "Vivaldi",
+    "hostname": "vivaldi.com",
+    "pathname": "/",
+    "light": "4c38100405bfc9d451768d23f212da2555b36daab0dc94563b96ddfde16a8356.svg",
+    "tile": false
+  },
+  {
+    "title": "VK",
+    "hostname": "vk.com",
+    "pathname": "/",
+    "light": "84aff921bc21af91367f5dbc514ceb9d9dd9534336d4bf2c703894cc1f55cd83.svg",
+    "tile": false
+  },
+  {
+    "title": "vlt",
+    "hostname": "vlt.sh",
+    "pathname": "/",
+    "light": "e239fb13d189a2a0e268c5f106e2ddb869f14c8717bd1a0c980fbedd59c2a148.svg",
+    "dark": "b7605bc4721cb7907259e7c13afda433fbddc23c603aecda3db94476ef5a0ed5.svg",
+    "tile": false
+  },
+  {
+    "title": "Voicemod",
+    "hostname": "voicemod.net",
+    "pathname": "/",
+    "light": "9d64260fe66e07efb358fde5bd623d6e53f243c5b4ae25a82aece8bc9f9e2cfe.svg",
+    "dark": "d0c24f0bc8201453f9f1b55b9d62f1b629b7a8dc7af07a695efa24d905efaddd.svg",
+    "tile": false
+  },
+  {
+    "title": "VoidZero",
+    "hostname": "voidzero.dev",
+    "pathname": "/",
+    "light": "34d06b1518c45e4d83f027b968a3ed32f0cef69c8fe4f526f9d34d3fe38a1fa9.svg",
+    "tile": false
+  },
+  {
+    "title": "Volta",
+    "hostname": "volta.net",
+    "pathname": "/",
+    "light": "48b556e4ca2219576c596eda31af7b0ecf7b6e63e6d1b2aa9527ac54dbc02b5b.svg",
+    "dark": "aa38be01a309e0791e0d06c85a9683eb04916a533035ff4d34ced129b219e5fb.svg",
+    "tile": false
+  },
+  {
+    "title": "VSCodium",
+    "hostname": "vscodium.com",
+    "pathname": "/",
+    "light": "994c1860d8ba097903c0f722cb284dcda4e355824e8a28900a4cea9bd786dce2.svg",
+    "tile": false
+  },
+  {
+    "title": "Vue",
+    "hostname": "vuejs.org",
+    "pathname": "/",
+    "light": "60a30f7a5713727d77d1d4b19bda2f7f11fad7d0fa7d62a708ab38c095aeb8d8.svg",
+    "tile": false
+  },
+  {
+    "title": "Vuetify",
+    "hostname": "vuetifyjs.com",
+    "pathname": "/",
+    "light": "62d316e14abd90cfe14060596743d33d97ea70e46428887cf78108f14d99f91b.svg",
+    "tile": false
+  },
+  {
+    "title": "VueUse",
+    "hostname": "vueuse.org",
+    "pathname": "/",
+    "light": "3c2d76de287ee4212e712c79b11b09c243fc42886e6d116053ef1b3dab1915c6.svg",
+    "tile": false
+  },
+  {
+    "title": "SVG",
+    "hostname": "w3.org",
+    "pathname": "/TR/SVG",
+    "light": "470eaad5e92b6265a185946084eb29f50b86e76f1681fbdea6f37e4b11478709.svg",
+    "tile": false
+  },
+  {
+    "title": "WakaTime",
+    "hostname": "wakatime.com",
+    "pathname": "/",
+    "light": "a61d1f89a1489f00bbe7516ea7c9aa0292d64a72aa4e4b3b1bef867b4977b2f4.svg",
+    "dark": "8e5aea8460a3ed995b96741529742f6c6719ec318a5707c45bbe8c93f8f96f31.svg",
+    "tile": false
+  },
+  {
+    "title": "Warp",
+    "hostname": "warp.dev",
+    "pathname": "/",
+    "light": "7bc782742832d9dbbe80e4d775831ee7014ff7c15188c3cae33df33fbfb1c395.svg",
+    "tile": false
+  },
+  {
+    "title": "Web.dev",
+    "hostname": "web.dev",
+    "pathname": "/",
+    "light": "9a419500e4e4653c9d8b13c8370aee7744e40af4d3f3dfc25d38a00283b74036.svg",
+    "tile": false
+  },
+  {
+    "title": "Telegram",
+    "hostname": "web.telegram.org",
+    "pathname": "/",
+    "light": "05f6898c0c087f84c8bcf65e93721bde65abe34093045d4e9ecddbb8dc9f6a18.svg",
+    "tile": false
+  },
+  {
+    "title": "WhatsApp",
+    "hostname": "web.whatsapp.com",
+    "pathname": "/",
+    "light": "a4b676938ab2392d5755b2f9c99bf465587b72c984558e5e798d203645f9a0e7.svg",
+    "tile": false
+  },
+  {
+    "title": "Web Components",
+    "hostname": "webcomponents.org",
+    "pathname": "/",
+    "light": "8821b17a91790f5f5d9bb6edcd35cd2aaf70263a7c972c5f8a9e280ca08e9509.svg",
+    "tile": false
+  },
+  {
+    "title": "Webflow",
+    "hostname": "webflow.com",
+    "pathname": "/",
+    "light": "6c7af754c04acbff9c59e266e118179a6d2bedab02e69e0b2be47a2070709a71.svg",
+    "tile": false
+  },
+  {
+    "title": "WebKit",
+    "hostname": "webkit.org",
+    "pathname": "/",
+    "light": "feda0c29751b83fb58a5e9dc604f8a311aac31f5f29248c9aa55c8cca3b4191d.svg",
+    "tile": false
+  },
+  {
+    "title": "Whop",
+    "hostname": "whop.com",
+    "pathname": "/",
+    "light": "d8dcd2d81aadc468cce73656024d0674154597e32f8155b8d56c48ad285b71b7.svg",
+    "dark": "9b667214ef64f61e2fc965b7ec6923a263a5a38b820262474ead922f73fad393.svg",
+    "tile": false
+  },
+  {
+    "title": "WindiCSS",
+    "hostname": "windicss.org",
+    "pathname": "/",
+    "light": "ea8aca467eeba0cda9bb175bc06ae659f82e6cdc6ef17263bf5bd569a0ba7176.svg",
+    "tile": false
+  },
+  {
+    "title": "Windsurf",
+    "hostname": "windsurf.com",
+    "pathname": "/editor",
+    "light": "35a676cd1038849de4acd21bb03aebd452d0206369b33d3c695fc36ce9aaaec1.svg",
+    "dark": "e961c08c7e84e90d74e67830cc4812298af404f2e205a9b120a16bff80b1d617.svg",
+    "tile": false
+  },
+  {
+    "title": "WordPress",
+    "hostname": "wordpress.org",
+    "pathname": "/",
+    "light": "2f6afab5e812f045486103d57111a590aa0683ed130ccaf67d9dabd129c663a0.svg",
+    "tile": false
+  },
+  {
+    "title": "Cloudflare Workers",
+    "hostname": "workers.cloudflare.com",
+    "pathname": "/",
+    "light": "3a2d79964d57db88c0f29ec2097f3c609d74fae722102f395d8591a94e74e81e.svg",
+    "tile": false
+  },
+  {
+    "title": "WorkOS",
+    "hostname": "workos.com",
+    "pathname": "/",
+    "light": "564931f909334c5269b2029dfc1ffb52cd87b91a6d2d3bb76b027b99e0b0c219.svg",
+    "dark": "b1744548e1975e820bb75a4bbb4150fae5433297607d16cee5860a8e1543e387.svg",
+    "tile": false
+  },
+  {
+    "title": "X (formerly Twitter)",
+    "hostname": "x.com",
+    "pathname": "/",
+    "light": "e88ffa80c72f1a6b99e31b2c2c9c667ce3f19a4c8a45ef8d6c92e90a454d8a00.svg",
+    "dark": "c6bd6462f99f1f9beade2f75359edf3d6ae907dd8b6d11e32957ad298527cd13.svg",
+    "tile": false
+  },
+  {
+    "title": "Xata",
+    "hostname": "xata.io",
+    "pathname": "/",
+    "light": "85ca51598b4267e5f9e979787ccc5e182b8328d63d2ec1e2c39f548e5b8f7356.svg",
+    "tile": false
+  },
+  {
+    "title": "Xbox",
+    "hostname": "xbox.com",
+    "pathname": "/",
+    "light": "6a8769b0575623ecebbdb772cdcd097a90e112825ca72f4419e742a7ee992024.svg",
+    "tile": false
+  },
+  {
+    "title": "XRP",
+    "hostname": "xrpl.org",
+    "pathname": "/",
+    "light": "fc291ffa9dfc33ce4274d4f49ac2a78f1400d1cd1432ca1423602fe8b4c8c5e9.svg",
+    "tile": false
+  },
+  {
+    "title": "迅雷",
+    "hostname": "xunlei.com",
+    "pathname": "/",
+    "light": "a4b0e725cc598ae21cfa64eecf8877748ff7fa980af0505e8d966da7cce8e03d.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Yarn",
+    "hostname": "yarnpkg.com",
+    "pathname": "/",
+    "light": "683406caba9c47fb2ea29e6ffe7fc951da41e6678e40100acb7d62073a7c64a3.svg",
+    "tile": false
+  },
+  {
+    "title": "YGeeker",
+    "hostname": "ygeeker.com",
+    "pathname": "/",
+    "light": "ad2edca7c0405f78a9d99d458752e6d55622e9b7f9afbe4033c780110ed0f88d.svg",
+    "tile": false
+  },
+  {
+    "title": "优酷",
+    "hostname": "youku.com",
+    "pathname": "/",
+    "light": "2541cc25d03112f5d8ace4dd013b5dc16f8998cb7fb6d6f4da9a9a1da32082a1.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "YouTube",
+    "hostname": "youtube.com",
+    "pathname": "/",
+    "light": "419a6bc647bab83c249709bed0ae67c8f44ce42d8dda1be202ab5a3cdb187372.svg",
+    "tile": false
+  },
+  {
+    "title": "Zaia Endless",
+    "hostname": "zaia.app",
+    "pathname": "/",
+    "light": "70c0e8db6b2f1473633744725a9b09c906d96084961957cdd79731c76fffabcb.svg",
+    "tile": false
+  },
+  {
+    "title": "Zeabur",
+    "hostname": "zeabur.com",
+    "pathname": "/",
+    "light": "adc4b83f2d2cba88671d0eaf8070532d9c12fbe08cdfad768deb2d942eec3f69.svg",
+    "dark": "a397237d04cd77ebfc43dd7600895fe54dc19af79c6f45abdf2e03d9aae417f8.svg",
+    "tile": false
+  },
+  {
+    "title": "Zed",
+    "hostname": "zed.dev",
+    "pathname": "/",
+    "light": "0aebd721f51f600461fb666e755fc61ba911f649ce1b64599821a7d410861741.svg",
+    "dark": "462fa5fa81e61f269321265f09c3d01c9a45f17c0aa674fa5723d04389546c92.svg",
+    "tile": false
+  },
+  {
+    "title": "Zen Browser",
+    "hostname": "zen-browser.app",
+    "pathname": "/",
+    "light": "99bbaf838d1ba1788e694eebb140089aca627e5481ae017608065f75fd8de45a.svg",
+    "dark": "ce1d1bc2a1bdce9d97a3f1abaeeb4c678ea242f3433ec77754b29a1b7d25377c.svg",
+    "tile": false
+  },
+  {
+    "title": "BOSS直聘",
+    "hostname": "zhipin.com",
+    "pathname": "/",
+    "light": "6d7e1723372b83ce5f9ddbc48f9624ac21007da8733533e17bd0cdc8cd92040f.png",
+    "tile": true,
+    "width": 256,
+    "height": 256
+  },
+  {
+    "title": "Zig",
+    "hostname": "ziglang.org",
+    "pathname": "/",
+    "light": "ca06e8bd4abde6deecabdadd2d1d1f6d8a3eb012cda484720038b60912bb3a30.svg",
+    "tile": false
+  },
+  {
+    "title": "Zod",
+    "hostname": "zod.dev",
+    "pathname": "/",
+    "light": "368f4b87287244576e9eef4ecf06edee952da9cfc40ac1162c5d152a2b675a58.svg",
+    "tile": false
+  },
+  {
+    "title": "Zoom",
+    "hostname": "zoom.us",
+    "pathname": "/",
+    "light": "5d1bf4d38bc5fc437578292dafc3cb4a678682e3124f1e2910d817aee9658615.svg",
+    "tile": false
+  },
+  {
+    "title": "Zulip",
+    "hostname": "zulip.com",
+    "pathname": "/",
+    "light": "6708ac6877b10767a157f547f12c7c20d886fc85d9f7f20dec63f151cdf8b954.svg",
+    "tile": false
+  },
+  {
+    "title": "Zyft",
+    "hostname": "zyft.com",
+    "pathname": "/",
+    "light": "4f4f0e2398ba4a58607ad3d1f50e0fbf95938dd1c023f267b7916945829a7d76.svg",
+    "tile": false
+  }
+]

@@ -20,7 +20,9 @@ export default defineConfig({
           host_permissions: ['https://*/*', 'http://*/*'],
           optional_permissions: ['bookmarks'],
         }
-      : { optional_permissions: ['bookmarks'] }),
+      : {
+          optional_permissions: ['bookmarks'],
+        }),
     browser_specific_settings: {
       gecko: {
         id: 'raytab@raytab.app',
@@ -48,6 +50,13 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   zip: {
-    excludeSources: ['docs/plan/**', 'dist/**', 'artifacts/**', '.output/**'],
+    excludeSources: [
+      'docs/plan/**',
+      'dist/**',
+      'artifacts/**',
+      '.output/**',
+      'gecko.log',
+      'skills-lock.json',
+    ],
   },
 });

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { repository } from '@/storage/store';
+import { repository } from '@/storage/repository';
+import { useRayTabStore } from '@/storage/store';
 
 export function useResourceUrl(id?: string) {
-  const [resource, setResource] = useState<{ id: string; url: string }>();
+  const resourceVersion = useRayTabStore((store) => store.resourceVersion);
+  const [resource, setResource] = useState<{ id: string; version: number; url: string }>();
   useEffect(() => {
     let cancelled = false;
     let url: string | undefined;
@@ -12,7 +14,7 @@ export function useResourceUrl(id?: string) {
         .then((blob) => {
           if (blob && !cancelled) {
             url = URL.createObjectURL(blob);
-            setResource({ id, url });
+            setResource({ id, version: resourceVersion, url });
           }
         })
         .catch(() => {
@@ -22,6 +24,8 @@ export function useResourceUrl(id?: string) {
       cancelled = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [id]);
-  return resource && resource.id === id ? resource.url : undefined;
+  }, [id, resourceVersion]);
+  return resource && resource.id === id && resource.version === resourceVersion
+    ? resource.url
+    : undefined;
 }

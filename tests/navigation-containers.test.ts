@@ -146,7 +146,7 @@ describe('mixed navigation containers', () => {
         groupId,
         folderId: 'other-folder',
       }),
-    ).toThrow('文件夹');
+    ).toThrow('messages.theDestinationFolderDoesNotExist');
     expect(() =>
       applyCommand(state, {
         type: 'move-site',
@@ -156,7 +156,7 @@ describe('mixed navigation containers', () => {
         folderId: null,
         beforeId: 'other-folder',
       }),
-    ).toThrow('排序目标');
+    ).toThrow('messages.theSortTargetIsNotInTheDestination');
     expect(() =>
       applyCommand(state, {
         type: 'move-sites',
@@ -165,7 +165,7 @@ describe('mixed navigation containers', () => {
         groupId: 'target',
         folderId: null,
       }),
-    ).toThrow('网站');
+    ).toThrow('messages.theSiteDoesNotExist');
     expect(state).toEqual(before);
   });
 });

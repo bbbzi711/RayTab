@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { cn } from 'cn';
 import { AlertDialog } from 'radix-ui';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 
@@ -32,6 +33,7 @@ interface ConfirmState extends ConfirmOptions {
  * ```
  */
 export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, React.ReactNode] {
+  const { t } = useTranslation();
   const [state, setState] = React.useState<ConfirmState | null>(null);
 
   const confirm = React.useCallback((options: ConfirmOptions): Promise<boolean> => {
@@ -94,7 +96,7 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
                 className="cursor-pointer rounded-xl px-4"
                 onClick={() => respond(false)}
               >
-                {state.cancelText ?? '取消'}
+                {state.cancelText ?? t('messages.cancel')}
               </Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action asChild>
@@ -104,7 +106,7 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
                 className="cursor-pointer rounded-xl px-4"
                 onClick={() => respond(true)}
               >
-                {state.confirmText ?? '确定'}
+                {state.confirmText ?? t('messages.confirm')}
               </Button>
             </AlertDialog.Action>
           </div>

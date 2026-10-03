@@ -1,0 +1,42 @@
+[
+  { "title": "贴吧", "hostname": "tieba.baidu.com", "packageName": "com.baidu.tieba" },
+  {
+    "title": "京东",
+    "hostname": "jd.com",
+    "packageName": "com.jingdong.app.mall",
+    "iconSource": "https://storage.360buyimg.com/retail-mall/mall-common-component/favicon.ico"
+  },
+  { "title": "天猫", "hostname": "tmall.com", "packageName": "com.tmall.wireless" },
+  {
+    "title": "拼多多",
+    "hostname": "pinduoduo.com",
+    "packageName": "com.xunmeng.pinduoduo",
+    "iconSource": "https://cdn.pinduoduo.com/upload/home/img/common/pdd_logo_v2.png",
+    "cover": true
+  },
+  { "title": "QQ", "hostname": "im.qq.com", "packageName": "com.tencent.mobileqq" },
+  { "title": "QQ邮箱", "hostname": "mail.qq.com", "packageName": "com.tencent.androidqqmail" },
+  { "title": "豆瓣", "hostname": "douban.com", "packageName": "com.douban.frodo" },
+  { "title": "网易云音乐", "hostname": "music.163.com", "packageName": "com.netease.cloudmusic" },
+  { "title": "百度网盘", "hostname": "pan.baidu.com", "packageName": "com.baidu.netdisk" },
+  { "title": "百度地图", "hostname": "map.baidu.com", "packageName": "com.baidu.BaiduMap" },
+  { "title": "优酷", "hostname": "youku.com", "packageName": "com.youku.phone" },
+  { "title": "爱奇艺", "hostname": "iqiyi.com", "packageName": "com.qiyi.video" },
+  {
+    "title": "腾讯视频",
+    "hostname": "v.qq.com",
+    "packageName": "com.tencent.qqlive",
+    "iconSource": "https://vfiles.gtimg.cn/wuji_dashboard/xy/starter/4ea79867.png"
+  },
+  { "title": "迅雷", "hostname": "xunlei.com", "packageName": "com.xunlei.downloadprovider" },
+  { "title": "阿里云盘", "hostname": "alipan.com", "packageName": "com.alicloud.databox" },
+  { "title": "阿里云盘", "hostname": "aliyundrive.com", "packageName": "com.alicloud.databox" },
+  { "title": "夸克", "hostname": "quark.cn", "packageName": "com.quark.browser" },
+  { "title": "飞书", "hostname": "feishu.cn", "packageName": "com.ss.android.lark" },
+  { "title": "钉钉", "hostname": "dingtalk.com", "packageName": "com.alibaba.android.rimet" },
+  { "title": "美团", "hostname": "meituan.com", "packageName": "com.sankuai.meituan" },
+  { "title": "饿了么", "hostname": "ele.me", "packageName": "me.ele" },
+  { "title": "BOSS直聘", "hostname": "zhipin.com", "packageName": "com.hpbr.bosszhipin" },
+  { "title": "铁路12306", "hostname": "12306.cn", "packageName": "com.MobileTicket" },
+  { "title": "CSDN", "hostname": "csdn.net", "packageName": "net.csdn.csdnplus" }
+]

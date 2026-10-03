@@ -1,3 +1,4 @@
+import { AppError } from '@/lib/errors';
 import { z } from 'zod';
 
 export const spaceIdSchema = z.enum(['normal', 'private']);
@@ -7,24 +8,6 @@ const idSchema = z.string().min(1).max(100);
 const titleSchema = z.string().trim().min(1).max(80);
 const colorSchema = z.string().regex(/^#[0-9a-f]{6}$/i);
 const timestampSchema = z.number().int().nonnegative();
-const greetingListSchema = z.array(z.string().trim().min(1).max(120)).max(50);
-const homeTextColorsSchema = z.object({
-  clock: colorSchema,
-  date: colorSchema,
-  greeting: colorSchema,
-  search: colorSchema,
-  tabs: colorSchema,
-  cards: colorSchema,
-});
-export const customGreetingsSchema = z
-  .object({
-    morning: greetingListSchema.optional(),
-    noon: greetingListSchema.optional(),
-    afternoon: greetingListSchema.optional(),
-    evening: greetingListSchema.optional(),
-    night: greetingListSchema.optional(),
-  })
-  .refine((value) => Object.values(value).some((items) => items?.length), '至少需要一组问候语');
 export const searchEngineSchema = z.object({
   id: idSchema,
   name: titleSchema,
@@ -39,7 +22,7 @@ export const searchEngineSchema = z.object({
       } catch {
         return false;
       }
-    }, '搜索地址必须是包含 %s 的 http 或 https 地址'),
+    }, 'messages.theSearchUrlMustBeAnHttpOrHttpsAddressContainingS'),
 });
 const recordMeta = {
   id: idSchema,
@@ -59,6 +42,33 @@ export const folderSchema = z.object({
   name: titleSchema,
   order: z.number().int().nonnegative(),
 });
+export const siteIconSchema = z.discriminatedUnion('source', [
+  z.object({
+    source: z.literal('text'),
+    text: z
+      .string()
+      .trim()
+      .refine((value) => {
+        const length = Array.from(value).length;
+        return length >= 1 && length <= 4;
+      }, 'navigation.invalidIconText'),
+  }),
+  z.object({ source: z.literal('auto'), resourceId: idSchema.optional() }),
+  z.object({
+    source: z.literal('resource'),
+    resourceId: idSchema,
+  }),
+]);
+export const siteIconBackgroundSchema = z.union([
+  z.object({ mode: z.literal('auto') }),
+  // Read existing saved/backup data at the validation boundary; current output is always solid.
+  z.object({ mode: z.literal('transparent') }).transform(() => ({ mode: 'auto' as const })),
+  z.object({ mode: z.literal('color'), color: colorSchema }),
+]);
+export type SiteIconConfig = z.infer<typeof siteIconSchema>;
+export type SiteIconBackground = z.infer<typeof siteIconBackgroundSchema>;
+export const defaultSiteIcon: SiteIconConfig = { source: 'auto' };
+export const defaultSiteIconBackground: SiteIconBackground = { mode: 'auto' };
 export const siteSchema = z.object({
   ...recordMeta,
   groupId: idSchema,
@@ -67,9 +77,9 @@ export const siteSchema = z.object({
   url: z.url().refine((value) => {
     const url = new URL(value);
     return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password;
-  }, '只支持不含账号密码的 http 或 https 网址'),
-  color: colorSchema,
-  iconId: idSchema.optional(),
+  }, 'messages.onlyHttpOrHttpsUrlsWithoutEmbeddedCredentialsAreSupported'),
+  icon: siteIconSchema,
+  iconBackground: siteIconBackgroundSchema,
   order: z.number().int().nonnegative(),
 });
 export const tombstoneSchema = z.object({
@@ -89,17 +99,13 @@ export const spaceSettingsSchema = z.object({
   showDate: z.boolean(),
   showLunar: z.boolean(),
   showGreeting: z.boolean(),
-  customGreetings: customGreetingsSchema.optional(),
   showSiteTitle: z.boolean(),
-  showGroups: z.boolean(),
   hour12: z.boolean(),
   cardSize: z.number().int().min(80).max(160),
   iconSizeRatio: z.number().min(0.28).max(0.65),
   maxCardsPerRow: z.number().int().min(4).max(12),
   iconSpacing: z.number().int().min(8).max(48),
-  showCardBackground: z.boolean(),
-  cardOpacity: z.number().min(0.05).max(0.95),
-  navigationCollapsed: z.boolean(),
+  iconRadius: z.number().min(0).max(50),
   sidebarMode: z.enum(['always', 'auto', 'hidden']).default('always'),
   background: z.enum(['gradient', 'bing', 'unsplash', 'custom', 'color']),
   gradient: z.string().max(300),
@@ -108,8 +114,6 @@ export const spaceSettingsSchema = z.object({
   onlineWallpaperUrl: z.url().optional(),
   featuredPhotoUrl: z.url().optional(),
   overlay: z.number().min(0).max(0.8),
-  textColorMode: z.enum(['auto', 'light', 'dark', 'custom']),
-  textColors: homeTextColorsSchema,
 });
 
 const spaceDataBaseSchema = z.object({
@@ -123,34 +127,35 @@ export const spaceDataSchema = spaceDataBaseSchema.superRefine((space, ctx) => {
   const folderIds = new Set(space.folders.map((item) => item.id));
   const siteIds = new Set(space.sites.map((item) => item.id));
   const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
-  if (!space.groups.length) issue('空间必须至少保留一个分组');
-  if (groupIds.size !== space.groups.length) issue('分组 ID 重复');
-  if (folderIds.size !== space.folders.length) issue('文件夹 ID 重复');
-  if (siteIds.size !== space.sites.length) issue('网站 ID 重复');
-  if (space.sites.some((item) => folderIds.has(item.id))) issue('网站与文件夹 ID 重复');
+  if (!space.groups.length) issue('errors.model.groupRequired');
+  if (groupIds.size !== space.groups.length) issue('errors.model.duplicateGroupId');
+  if (folderIds.size !== space.folders.length) issue('errors.model.duplicateFolderId');
+  if (siteIds.size !== space.sites.length) issue('errors.model.duplicateSiteId');
+  if (space.sites.some((item) => folderIds.has(item.id)))
+    issue('errors.model.duplicateNavigationId');
   for (const folder of space.folders)
-    if (!groupIds.has(folder.groupId)) issue(`文件夹 ${folder.id} 引用了不存在的分组`);
+    if (!groupIds.has(folder.groupId)) issue('errors.model.missingFolderGroup');
   for (const site of space.sites) {
-    if (!groupIds.has(site.groupId)) issue(`网站 ${site.id} 引用了不存在的分组`);
+    if (!groupIds.has(site.groupId)) issue('errors.model.missingSiteGroup');
     if (
       site.folderId !== null &&
       !space.folders.some(
         (folder) => folder.id === site.folderId && folder.groupId === site.groupId,
       )
     )
-      issue(`网站 ${site.id} 引用了不存在的文件夹`);
+      issue('errors.model.missingSiteFolder');
   }
 });
 export const localStateSchema = z.object({
   activeSpace: spaceIdSchema,
   activeGroup: z.record(spaceIdSchema, idSchema),
   selectedFolder: z.record(spaceIdSchema, z.record(idSchema, idSchema.nullable())),
-  homeMode: z.enum(['focus', 'navigation']).default('focus'),
+  homeMode: z.enum(['focus', 'navigation']).default('navigation'),
   onboardingComplete: z.boolean(),
 });
 export const rayStateSchema = z
   .object({
-    schemaVersion: z.literal(4),
+    schemaVersion: z.literal(5),
     revision: z.number().int().nonnegative(),
     spaces: z.object({ normal: spaceDataSchema, private: spaceDataSchema }),
     normalSettings: spaceSettingsSchema,
@@ -166,17 +171,17 @@ export const rayStateSchema = z
       if (
         !state.spaces[spaceId].groups.some((item) => item.id === state.local.activeGroup[spaceId])
       )
-        ctx.addIssue({ code: 'custom', message: `${spaceId} 空间的当前分组不存在` });
+        ctx.addIssue({ code: 'custom', message: 'errors.model.missingActiveGroup' });
     }
-    const validateEngines = (settings: SpaceSettings, label: string) => {
+    const validateEngines = (settings: SpaceSettings) => {
       const ids = settings.searchEngines.map((engine) => engine.id);
       if (new Set(ids).size !== ids.length)
-        ctx.addIssue({ code: 'custom', message: `${label}搜索引擎 ID 重复` });
+        ctx.addIssue({ code: 'custom', message: 'errors.model.duplicateSearchEngineId' });
       if (!ids.includes(settings.searchEngine))
-        ctx.addIssue({ code: 'custom', message: `${label}当前搜索引擎不存在` });
+        ctx.addIssue({ code: 'custom', message: 'errors.model.missingSearchEngine' });
     };
-    validateEngines(state.normalSettings, '普通空间');
-    validateEngines(effectiveSettings(state, 'private'), '私密空间');
+    validateEngines(state.normalSettings);
+    validateEngines(effectiveSettings(state, 'private'));
   });
 
 export type Group = z.infer<typeof groupSchema>;
@@ -204,31 +209,18 @@ export const defaultSettings: SpaceSettings = {
   showDate: true,
   showLunar: true,
   showGreeting: true,
-  customGreetings: undefined,
   showSiteTitle: true,
-  showGroups: true,
   hour12: false,
   cardSize: 110,
   iconSizeRatio: 0.55,
   maxCardsPerRow: 8,
   iconSpacing: 20,
-  showCardBackground: false,
-  cardOpacity: 0.2,
-  navigationCollapsed: false,
+  iconRadius: 24,
   sidebarMode: 'always',
   background: 'custom',
   gradient: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)',
   solidColor: '#0b0f19',
   overlay: 0.1,
-  textColorMode: 'auto',
-  textColors: {
-    clock: '#ffffff',
-    date: '#ffffff',
-    greeting: '#ffffff',
-    search: '#ffffff',
-    tabs: '#ffffff',
-    cards: '#ffffff',
-  },
 };
 
 function meta(id: string, now = 0) {
@@ -237,23 +229,24 @@ function meta(id: string, now = 0) {
 function createSpace(prefix: SpaceId, withExamples: boolean): SpaceData {
   const groupId = `${prefix}-group-home`;
   const examples = [
-    ['GitHub', 'https://github.com', '#24292f'],
-    ['Google', 'https://www.google.com', '#4285f4'],
-    ['微博', 'https://weibo.com', '#e6162d'],
-    ['哔哩哔哩', 'https://www.bilibili.com', '#fb7299'],
-    ['YouTube', 'https://www.youtube.com', '#ff0033'],
+    ['GitHub', 'https://github.com'],
+    ['Google', 'https://www.google.com'],
+    ['微博', 'https://weibo.com'],
+    ['哔哩哔哩', 'https://www.bilibili.com'],
+    ['YouTube', 'https://www.youtube.com'],
   ];
   return {
     groups: [{ ...meta(groupId), name: '主页', order: 0 }],
     folders: [],
     sites: withExamples
-      ? examples.map(([title, url, color], order) => ({
+      ? examples.map(([title, url], order) => ({
           ...meta(`${prefix}-site-${order}`),
           groupId,
           folderId: null,
           title,
           url,
-          color,
+          icon: { ...defaultSiteIcon },
+          iconBackground: { ...defaultSiteIconBackground },
           order,
         }))
       : [],
@@ -265,7 +258,7 @@ export function createInitialState(): RayState {
   const normal = createSpace('normal', true);
   const privateSpace = createSpace('private', false);
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     revision: 0,
     spaces: { normal, private: privateSpace },
     normalSettings: { ...defaultSettings },
@@ -275,7 +268,7 @@ export function createInitialState(): RayState {
       activeSpace: 'normal',
       activeGroup: { normal: normal.groups[0].id, private: privateSpace.groups[0].id },
       selectedFolder: { normal: {}, private: {} },
-      homeMode: 'focus',
+      homeMode: 'navigation',
       onboardingComplete: false,
     },
   };
@@ -295,17 +288,20 @@ export function normalizeUrl(value: string) {
   const trimmed = value.trim();
   const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`);
   if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password)
-    throw new Error('请输入不含账号密码的 http 或 https 网址');
+    throw new AppError('messages.enterAnHttpOrHttpsUrlWithoutEmbeddedCredentials');
   return url.href;
 }
 export function resourceIds(state: RayState) {
-  const settings = [state.normalSettings, effectiveSettings(state, 'private')];
   return new Set(
-    [
-      ...settings.map((item) => item.wallpaperId),
-      ...spaceIdSchema.options.flatMap((spaceId) =>
-        state.spaces[spaceId].sites.map((site) => site.iconId),
-      ),
-    ].filter((value): value is string => Boolean(value)),
+    spaceIdSchema.options.flatMap((spaceId) => [
+      ...spaceResourceIds(state.spaces[spaceId], effectiveSettings(state, spaceId)),
+    ]),
   );
+}
+export function spaceResourceIds(space: SpaceData, settings: Pick<SpaceSettings, 'wallpaperId'>) {
+  const ids = new Set<string>();
+  for (const site of space.sites)
+    if ('resourceId' in site.icon && site.icon.resourceId) ids.add(site.icon.resourceId);
+  if (settings.wallpaperId) ids.add(settings.wallpaperId);
+  return ids;
 }

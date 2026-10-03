@@ -60,7 +60,12 @@ describe('navigation data model', () => {
       id: 'new-site',
       groupId: state.local.activeGroup.normal,
       folderId: source.id,
-      site: { title: 'Example', url: 'example.com', color: '#123456' },
+      site: {
+        title: 'Example',
+        url: 'example.com',
+        icon: { source: 'auto' },
+        iconBackground: { mode: 'color', color: '#123456' },
+      },
     });
     const created = state.spaces.normal.sites.find((item) => item.id === 'new-site')!;
     expect(created.url).toBe('https://example.com/');
@@ -109,7 +114,7 @@ describe('navigation data model', () => {
         spaceId: 'normal',
         ids: [originalIds[0], 'missing-site'],
       }),
-    ).toThrow('网站不存在');
+    ).toThrow('messages.theSiteDoesNotExist');
     expect(state.spaces.normal.sites.map((site) => site.id)).toEqual(originalIds);
     expect(state.spaces.normal.tombstones).toEqual([]);
   });
@@ -178,7 +183,7 @@ describe('navigation data model', () => {
         id: 'work',
         destinationGroupId: 'missing',
       }),
-    ).toThrow('至少保留');
+    ).toThrow('messages.keepAtLeastOneGroup');
     expect(rayStateSchema.safeParse(state).success).toBe(true);
   });
 
@@ -210,7 +215,7 @@ describe('navigation data model', () => {
     expect(effectiveSettings(state, 'private')).toMatchObject({ theme: 'dark', showClock: false });
     applyCommand(state, { type: 'settings', spaceId: 'private', patch: { showClock: true } });
     expect(effectiveSettings(state, 'private').showClock).toBe(true);
-    applyCommand(state, { type: 'reset-private-setting', key: 'showClock' });
+    applyCommand(state, { type: 'reset-private-setting', keys: ['showClock'] });
     expect(effectiveSettings(state, 'private').showClock).toBe(false);
   });
 });
@@ -228,7 +233,12 @@ describe('repository transactions', () => {
         id: 'original-url',
         groupId: groups[0].id,
         folderId: null,
-        site: { title: 'Original', url, color: '#123456' },
+        site: {
+          title: 'Original',
+          url,
+          icon: { source: 'auto' },
+          iconBackground: { mode: 'color', color: '#123456' },
+        },
       });
       applyCommand(state, {
         type: 'move-site',
@@ -275,7 +285,7 @@ describe('repository transactions', () => {
           site: { ...site, title: 'Stale' },
         }),
       ),
-    ).rejects.toThrow('另一个页面');
+    ).rejects.toThrow('messages.thisItemChangedInAnotherPageCloseTheEditorAndTryAgain');
     expect(
       (await second.read()).spaces.normal.sites.find((item) => item.id === site.id)?.title,
     ).toBe('Fresh');
@@ -303,7 +313,12 @@ describe('repository transactions', () => {
         id: 'docs',
         groupId: 'work',
         folderId: 'research',
-        site: { title: 'Docs', url: 'docs.example.com', color: '#123456' },
+        site: {
+          title: 'Docs',
+          url: 'docs.example.com',
+          icon: { source: 'auto' },
+          iconBackground: { mode: 'color', color: '#123456' },
+        },
       });
       applyCommand(state, {
         type: 'move-site',
@@ -341,7 +356,8 @@ describe('repository transactions', () => {
         folderId: null,
         title: `Site ${order}`,
         url: `https://example.com/${order}`,
-        color: '#4f7c68',
+        icon: { source: 'auto' },
+        iconBackground: { mode: 'color', color: '#4f7c68' },
         order,
         createdAt: order,
         updatedAt: order,
@@ -373,7 +389,7 @@ it('moves a selected batch atomically and preserves their relative order and URL
       groupId: state.local.activeGroup.normal,
       folderId: destination.id,
     }),
-  ).toThrow('网站不存在');
+  ).toThrow('messages.theSiteDoesNotExist');
   expect(state.spaces.normal.sites.slice(0, 2)).toEqual(original);
   applyCommand(state, {
     type: 'move-sites',

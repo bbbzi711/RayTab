@@ -1,33 +1,37 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { t } from '../src/locales';
+import i18n from '@/locales';
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) return sourceFiles(path);
-    return ['.ts', '.tsx'].includes(extname(path)) ? [path] : [];
+    return entry.isDirectory()
+      ? sourceFiles(path)
+      : ['.ts', '.tsx'].includes(extname(path))
+        ? [path]
+        : [];
   });
 }
 
 describe('interface translations', () => {
-  it('has an English translation for every Chinese literal passed to tr', () => {
-    const missing = new Set<string>();
+  it('has Chinese and English resources for every static product translation key', () => {
+    const missing: string[] = [];
     for (const path of sourceFiles(join(process.cwd(), 'src'))) {
       const source = readFileSync(path, 'utf8');
-      for (const match of source.matchAll(/tr\('([^']+)'\)/g)) {
-        const key = match[1];
-        if (/\p{Script=Han}/u.test(key) && t('en', key) === key) missing.add(key);
+      for (const match of source.matchAll(
+        /['"]((?:messages|errors|navigation|settings|clock|onboarding|errorBoundary|popup|counts)\.[\w.]+)['"]/g,
+      )) {
+        if (match[1].endsWith('.')) continue;
+        for (const language of ['zh-CN', 'en'])
+          if (
+            !i18n.exists(match[1], { lng: language, fallbackLng: false, count: 1 }) &&
+            !i18n.exists(match[1], { lng: language, fallbackLng: false })
+          )
+            missing.push(`${language}: ${match[1]} (${path})`);
       }
+      expect(source, path).not.toMatch(/\btr\(['"][^'"]*[\p{Script=Han}][^'"]*['"]/u);
     }
-    expect([...missing]).toEqual([]);
-  });
-
-  it('translates errors that include runtime details', () => {
-    expect(t('en', '备份需要的资源 image-1 不存在')).toBe(
-      'Required backup resource image-1 is missing',
-    );
-    expect(t('en', '远端服务返回 503')).toBe('The remote service returned 503');
+    expect(missing).toEqual([]);
   });
 });

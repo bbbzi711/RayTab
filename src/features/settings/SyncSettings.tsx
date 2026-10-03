@@ -1,8 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { CloudCog, GitBranch, RefreshCw, Server } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { Cloud, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   clearSyncConfig,
   loadSyncConfig,
@@ -13,27 +18,21 @@ import {
   type SyncStatus,
 } from '@/sync/core/engine';
 import type { SyncConnection } from '@/sync/providers';
-import { refresh } from '@/storage/store';
-import { t, type Language } from '@/locales';
-import { useConfirm } from '@/components/ui/confirm-dialog';
+import type { SyncConflict } from '@/sync/core/merge';
+import { useRayTabStore } from '@/storage/store';
+import { errorMessage, storedErrorMessage } from '@/lib/errors';
+import {
+  FormError,
+  SettingsSelect,
+  SettingsSection,
+  Toggle,
+  useDraftStatus,
+  type DraftReporter,
+} from './SettingsControls';
+import './sync-settings.css';
 
-type SyncDraft = {
-  type: SyncConnection['type'];
-  url: string;
-  username: string;
-  password: string;
-  token: string;
-  owner: string;
-  repo: string;
-  path: string;
-  branch: string;
-  automatic: boolean;
-  includePrivate: boolean;
-  privatePassword: string;
-};
-
-const emptyDraft: SyncDraft = {
-  type: 'webdav',
+const emptyDraft = {
+  type: 'webdav' as const,
   url: '',
   username: '',
   password: '',
@@ -46,7 +45,52 @@ const emptyDraft: SyncDraft = {
   includePrivate: false,
   privatePassword: '',
 };
-
+export const createSyncDraftSchema = (privateLocked: boolean) =>
+  z
+    .object({
+      type: z.enum(['webdav', 'github', 'gitee']),
+      url: z.string().trim(),
+      username: z.string(),
+      password: z.string(),
+      token: z.string(),
+      owner: z.string().trim(),
+      repo: z.string().trim(),
+      path: z.string().trim(),
+      branch: z.string().trim(),
+      automatic: z.boolean(),
+      includePrivate: z.boolean(),
+      privatePassword: z.string(),
+    })
+    .superRefine((draft, ctx) => {
+      if (draft.type === 'webdav') {
+        let valid = false;
+        try {
+          const url = new URL(draft.url);
+          valid = ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password;
+        } catch {
+          valid = false;
+        }
+        if (!valid)
+          ctx.addIssue({ code: 'custom', path: ['url'], message: 'settings.syncInvalidUrl' });
+      } else {
+        for (const key of ['token', 'owner', 'repo', 'path'] as const)
+          if (!draft[key])
+            ctx.addIssue({ code: 'custom', path: [key], message: 'settings.required' });
+      }
+      if (draft.includePrivate && privateLocked)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['privatePassword'],
+          message: 'settings.unlockPrivateForSync',
+        });
+      else if (draft.includePrivate && draft.privatePassword.length < 6)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['privatePassword'],
+          message: 'settings.passwordLength',
+        });
+    });
+type SyncDraft = z.infer<ReturnType<typeof createSyncDraftSchema>>;
 function draftFromConfig(config: Awaited<ReturnType<typeof loadSyncConfig>>): SyncDraft {
   if (!config) return emptyDraft;
   const common = {
@@ -72,413 +116,542 @@ function draftFromConfig(config: Awaited<ReturnType<typeof loadSyncConfig>>): Sy
         branch: config.connection.branch ?? '',
       };
 }
+const actionSchema = z.object({
+  operation: z.enum(['auto', 'push', 'pull', 'disconnect', 'resolve']),
+  choice: z.enum(['local', 'remote']),
+  conflict: z.custom<SyncConflict>().optional(),
+});
 
-export function SyncSettings({
-  language,
-  onError,
-}: {
-  language: Language;
-  onError: (message: string) => void;
-}) {
-  const tr = (text: string) => t(language, text);
+export function SyncSettings({ report }: { report: DraftReporter }) {
+  const { t, i18n } = useTranslation();
+  const refresh = useRayTabStore((store) => store.refresh);
+  const locked = useRayTabStore((store) => store.state?.privateSecurity.locked);
   const available =
     typeof browser !== 'undefined' &&
     Boolean(browser.storage?.local && browser.permissions?.request);
-  const [confirm, confirmDialog] = useConfirm();
-  const [draft, setDraft] = useState<SyncDraft>(emptyDraft);
-  const [connected, setConnected] = useState(false);
-  const [savedDraft, setSavedDraft] = useState<SyncDraft>();
+  const [confirm, confirmation] = useConfirm();
+  const [connectionInfo, setConnectionInfo] = useState<{
+    provider: SyncDraft['type'];
+    automatic: boolean;
+  } | null>(null);
+  const connected = connectionInfo !== null;
+  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const dirty = Boolean(savedDraft && JSON.stringify(savedDraft) !== JSON.stringify(draft));
-  const [status, setStatus] = useState<SyncStatus>({ conflicts: [] });
-  const [busy, setBusy] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [status, setStatus] = useState<SyncStatus>({ schemaVersion: 1, conflicts: [] });
+  const syncDraftSchema = useMemo(() => createSyncDraftSchema(Boolean(locked)), [locked]);
+  const form = useForm<SyncDraft>({
+    resolver: zodResolver(syncDraftSchema),
+    defaultValues: emptyDraft,
+  });
+  const actions = useForm<z.infer<typeof actionSchema>>({
+    resolver: zodResolver(actionSchema),
+    defaultValues: { operation: 'auto', choice: 'local' },
+  });
+  const { isDirty, isSubmitting, errors } = form.formState;
+  const busy = isSubmitting || actions.formState.isSubmitting;
+  const provider = useWatch({ control: form.control, name: 'type' });
+  const includePrivate = useWatch({ control: form.control, name: 'includePrivate' });
+  useDraftStatus('sync', isDirty, busy, report);
+  const { reset, resetField } = form;
   useEffect(() => {
+    let mounted = true;
+    let loadVersion = 0;
     if (!available) {
       setLoading(false);
       return;
     }
-    let mounted = true;
-    void Promise.all([loadSyncConfig(), loadSyncStatus()])
-      .then(([config, nextStatus]) => {
-        if (!mounted) return;
-        setConnected(Boolean(config));
-        setDraft(draftFromConfig(config));
-        setSavedDraft(config ? draftFromConfig(config) : undefined);
-        setStatus(nextStatus);
-      })
-      .catch((error: Error) => {
-        if (mounted) onError(error.message);
+    setLoading(true);
+    setLoadFailed(false);
+    form.clearErrors('root');
+    const reload = async () => {
+      const version = ++loadVersion;
+      let config: Awaited<ReturnType<typeof loadSyncConfig>>;
+      let nextStatus: SyncStatus;
+      try {
+        [config, nextStatus] = await Promise.all([loadSyncConfig(), loadSyncStatus()]);
+      } catch (reason) {
+        if (mounted && version === loadVersion) throw reason;
+        return;
+      }
+      if (!mounted || version !== loadVersion) return;
+      setConnectionInfo(
+        config ? { provider: config.connection.type, automatic: config.automatic } : null,
+      );
+      setStatus(nextStatus);
+      const values = draftFromConfig(config);
+      if (useRayTabStore.getState().state?.privateSecurity.locked) values.privatePassword = '';
+      reset(values, { keepDirtyValues: true });
+      if (useRayTabStore.getState().state?.privateSecurity.locked)
+        resetField('privatePassword', { defaultValue: '' });
+    };
+    void reload()
+      .catch((reason: unknown) => {
+        if (mounted) {
+          setLoadFailed(true);
+          form.setError('root', { message: errorMessage(reason) });
+        }
       })
       .finally(() => {
         if (mounted) setLoading(false);
       });
+    const changed: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
+      changes,
+      area,
+    ) => {
+      if (area === 'local' && (changes['raytab-sync-status'] || changes['raytab-sync-config']))
+        void reload().catch((reason: unknown) => {
+          if (mounted) toast.error(errorMessage(reason));
+        });
+    };
+    browser.storage.onChanged.addListener(changed);
     return () => {
       mounted = false;
+      browser.storage.onChanged.removeListener(changed);
+      reset(emptyDraft);
     };
-  }, [available]);
-  const update = <K extends keyof SyncDraft>(key: K, value: SyncDraft[K]) =>
-    setDraft((current) => ({ ...current, [key]: value }));
-  const save = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (busy || loading) return;
-    setBusy(true);
-    const common = {
-      token: draft.token,
-      owner: draft.owner,
-      repo: draft.repo,
-      path: draft.path || 'raytab.json',
-      branch: draft.branch || undefined,
-    };
-    const connection: SyncConnection =
-      draft.type === 'webdav'
-        ? {
-            type: draft.type,
-            url: draft.url,
-            username: draft.username,
-            password: draft.password,
-          }
-        : draft.type === 'github'
-          ? { type: draft.type, ...common }
-          : { type: draft.type, ...common };
-    try {
-      const origin =
-        draft.type === 'webdav'
-          ? `${new URL((connection as Extract<SyncConnection, { type: 'webdav' }>).url).origin}/*`
-          : draft.type === 'github'
-            ? 'https://api.github.com/*'
-            : 'https://gitee.com/*';
-      const allowed = await browser.permissions.request({ origins: [origin] });
-      if (!allowed) throw new Error(tr('未授予访问同步服务的权限'));
-      await saveSyncConfig({
-        connection,
-        includePrivate: draft.includePrivate,
-        privatePassword: draft.privatePassword || undefined,
-        automatic: draft.automatic,
-      });
-      setConnected(true);
-      setSavedDraft(draft);
-      await run('auto');
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const disconnect = async () => {
-    const ok = await confirm({
-      title: tr('清除当前同步连接？'),
-      description: tr('将清除本机的同步配置，已同步到云端的数据不受影响。'),
-      confirmText: tr('清除'),
-      cancelText: tr('取消'),
-      variant: 'destructive',
+  }, [available, reset, loadAttempt]);
+  useEffect(() => {
+    if (locked) resetField('privatePassword', { defaultValue: '' });
+    return useRayTabStore.subscribe((store, previous) => {
+      if (store.state?.privateSecurity.locked && !previous.state?.privateSecurity.locked)
+        resetField('privatePassword', { defaultValue: '' });
     });
-    if (!ok) return;
-    setBusy(true);
-    try {
-      await clearSyncConfig();
-      setDraft(emptyDraft);
-      setConnected(false);
-      setSavedDraft(undefined);
-      setStatus({ conflicts: [] });
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  }, [locked, resetField]);
+  const connectionFrom = (draft: SyncDraft): SyncConnection =>
+    draft.type === 'webdav'
+      ? { type: 'webdav', url: draft.url, username: draft.username, password: draft.password }
+      : {
+          type: draft.type,
+          token: draft.token,
+          owner: draft.owner,
+          repo: draft.repo,
+          path: draft.path,
+          branch: draft.branch || undefined,
+        };
+  const run = (
+    operation: z.infer<typeof actionSchema>['operation'],
+    conflict?: SyncConflict,
+    choice: 'local' | 'remote' = 'local',
+  ) => {
+    if (busy || loading) return;
+    actions.setValue('operation', operation);
+    actions.setValue('conflict', conflict);
+    actions.setValue('choice', choice);
+    void actions.handleSubmit(async (values) => {
+      actions.clearErrors();
+      if (
+        values.operation === 'disconnect' ||
+        values.operation === 'push' ||
+        values.operation === 'pull'
+      ) {
+        const confirmed = await confirm({
+          title: t('settings.syncConfirm.' + values.operation + '.title'),
+          description: t('settings.syncConfirm.' + values.operation + '.description'),
+          confirmText: t('settings.continue'),
+          cancelText: t('settings.cancel'),
+          variant: 'destructive',
+        });
+        if (!confirmed) return;
+      }
+      try {
+        if (values.operation === 'disconnect') {
+          await clearSyncConfig();
+          form.reset(emptyDraft);
+          setConnectionInfo(null);
+          setEditing(false);
+          setStatus({ schemaVersion: 1, conflicts: [] });
+        } else if (values.operation === 'resolve' && values.conflict) {
+          await resolveSyncConflict(values.conflict, values.choice);
+          await refresh();
+          setStatus(await loadSyncStatus());
+        } else if (
+          values.operation === 'auto' ||
+          values.operation === 'push' ||
+          values.operation === 'pull'
+        ) {
+          await synchronize(values.operation);
+          await refresh();
+          setStatus(await loadSyncStatus());
+        }
+        toast.success(
+          t(
+            values.operation === 'disconnect'
+              ? 'settings.syncDisconnected'
+              : 'settings.syncCompleted',
+          ),
+        );
+      } catch (reason) {
+        actions.setError('root', { message: errorMessage(reason) });
+        toast.error(errorMessage(reason));
+        try {
+          setStatus(await loadSyncStatus());
+        } catch (statusReason) {
+          toast.error(errorMessage(statusReason));
+        }
+      }
+    })();
   };
-  const run = async (mode: 'auto' | 'push' | 'pull') => {
-    setBusy(true);
-    try {
-      await synchronize(mode);
-      await refresh();
-      setStatus(await loadSyncStatus());
-    } catch (error) {
-      onError((error as Error).message);
-      setStatus(await loadSyncStatus());
-    } finally {
-      setBusy(false);
-    }
-  };
-  const resolve = async (index: number, choice: 'local' | 'remote') => {
-    setBusy(true);
-    try {
-      await resolveSyncConflict(index, choice);
-      await refresh();
-      setStatus(await loadSyncStatus());
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const fields = useMemo(
+    () =>
+      provider === 'webdav'
+        ? ([
+            ['url', 'fileAddress', 'url'],
+            ['username', 'username', 'text'],
+            ['password', 'password', 'password'],
+          ] as const)
+        : ([
+            ['token', 'token', 'password'],
+            ['owner', 'owner', 'text'],
+            ['repo', 'repo', 'text'],
+            ['path', 'path', 'text'],
+            ['branch', 'branch', 'text'],
+          ] as const),
+    [provider],
+  );
   return (
-    <form className="sync-settings" onSubmit={save}>
-      {!available && <p className="settings-help">{tr('云同步仅在已安装的浏览器扩展中可用。')}</p>}
-      <fieldset className="contents" disabled={busy || loading || !available}>
-        <div className="sync-intro">
-          <span aria-hidden="true">
-            <CloudCog size={19} />
+    <div className="sync-settings">
+      <section className="sync-overview" aria-label={t('settings.syncOverview.status')}>
+        <div className="sync-overview-heading">
+          <span className="sync-overview-icon" aria-hidden="true">
+            <Cloud size={26} />
           </span>
           <div>
-            <strong>{tr('同步')}</strong>
-            <p>{tr('将网站和设置同步到你自己的云端，连接信息只保存在本机。')}</p>
+            <h2>
+              {t(
+                loading
+                  ? 'settings.syncOverview.loading'
+                  : loadFailed
+                    ? 'settings.syncOverview.loadFailed'
+                    : connected
+                      ? 'settings.syncOverview.configured'
+                      : 'settings.syncOverview.notConfigured',
+                {
+                  provider:
+                    connectionInfo?.provider === 'webdav'
+                      ? 'WebDAV'
+                      : connectionInfo?.provider === 'github'
+                        ? 'GitHub'
+                        : 'Gitee',
+                },
+              )}
+            </h2>
+            <p className="settings-help">
+              {t(
+                !available
+                  ? 'settings.syncUnavailable'
+                  : connected
+                    ? connectionInfo.automatic
+                      ? 'settings.syncOverview.automatic'
+                      : 'settings.syncOverview.manual'
+                    : 'settings.syncHelp',
+              )}
+            </p>
           </div>
         </div>
-        <label className="sync-provider">
-          <span>
-            {draft.type === 'webdav' ? <Server size={16} /> : <GitBranch size={16} />}
-            {tr('服务')}
-          </span>
-          <Select
-            containerClassName="w-48"
-            value={draft.type}
-            onChange={(event) => update('type', event.target.value as SyncConnection['type'])}
-          >
-            <option value="webdav">WebDAV</option>
-            <option value="github">GitHub {tr('仓库')}</option>
-            <option value="gitee">Gitee {tr('仓库')}</option>
-          </Select>
-        </label>
-        {draft.type === 'webdav' ? (
-          <>
-            <label>
-              {tr('文件地址')}
-              <Input
-                name="url"
-                type="url"
-                required
-                placeholder="https://dav.example.com/raytab.json"
-                value={draft.url}
-                onChange={(event) => update('url', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-            <label>
-              {tr('用户名')}
-              <Input
-                name="username"
-                autoComplete="username"
-                value={draft.username}
-                onChange={(event) => update('username', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-            <label>
-              {tr('密码')}
-              <Input
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                value={draft.password}
-                onChange={(event) => update('password', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-          </>
-        ) : (
-          <>
-            <label>
-              {tr('访问令牌')}
-              <Input
-                name="token"
-                type="password"
-                required
-                value={draft.token}
-                onChange={(event) => update('token', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-            <div className="sync-pair">
-              <label>
-                {tr('所有者')}
-                <Input
-                  name="owner"
-                  required
-                  value={draft.owner}
-                  onChange={(event) => update('owner', event.target.value)}
-                  className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-                />
-              </label>
-              <label>
-                {tr('仓库')}
-                <Input
-                  name="repo"
-                  required
-                  value={draft.repo}
-                  onChange={(event) => update('repo', event.target.value)}
-                  className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-                />
-              </label>
-            </div>
-            <label>
-              {tr('文件路径')}
-              <Input
-                name="path"
-                value={draft.path}
-                onChange={(event) => update('path', event.target.value)}
-                required
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-            <label>
-              {tr('分支（可选）')}
-              <Input
-                name="branch"
-                value={draft.branch}
-                onChange={(event) => update('branch', event.target.value)}
-                className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-              />
-            </label>
-          </>
+        {connected && (
+          <p className="sync-last-success">
+            {status.lastSuccess
+              ? t('settings.lastSync', {
+                  date: new Date(status.lastSuccess).toLocaleString(i18n.language),
+                })
+              : t('settings.syncOverview.noSuccess')}
+          </p>
         )}
-        <label className="setting-row">
-          <span>{tr('自动双向同步')}</span>
-          <input
-            name="automatic"
-            type="checkbox"
-            checked={draft.automatic}
-            onChange={(event) => update('automatic', event.target.checked)}
-          />
-        </label>
-        <label className="setting-row">
-          <span>{tr('同步私密空间')}</span>
-          <input
-            name="includePrivate"
-            type="checkbox"
-            checked={draft.includePrivate}
-            onChange={(event) => update('includePrivate', event.target.checked)}
-          />
-        </label>
-        {draft.includePrivate && (
-          <label>
-            {tr('私密同步密码（启用私密空间时）')}
-            <Input
-              name="privatePassword"
-              type="password"
-              required
-              minLength={6}
-              value={draft.privatePassword}
-              onChange={(event) => update('privatePassword', event.target.value)}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          </label>
-        )}
-        <Button
-          type="submit"
-          size="sm"
-          disabled={busy}
-          className="w-full h-9 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs transition-all"
-        >
-          {busy ? tr('同步中…') : tr('保存并同步')}
-        </Button>
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy || !connected || dirty}
-            className="rounded-xl border-primary/30 bg-primary/5 hover:bg-primary/10 text-foreground cursor-pointer font-medium"
-            onClick={() => void run('auto')}
-          >
-            <RefreshCw size={13} className={busy ? 'spin' : ''} />
-            {tr('双向同步')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy || !connected || dirty}
-            className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
-            onClick={() => void run('push')}
-          >
-            {tr('本机覆盖云端')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={busy || !connected || dirty}
-            className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer text-xs"
-            onClick={() => void run('pull')}
-          >
-            {tr('云端恢复本机')}
-          </Button>
+        <div className="settings-form-actions sync-overview-actions">
           {connected && (
+            <Button type="button" disabled={busy || isDirty || loading} onClick={() => run('auto')}>
+              {t(actions.formState.isSubmitting ? 'settings.syncing' : 'settings.twoWaySync')}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant={connected || editing ? 'outline' : 'default'}
+            aria-expanded={editing}
+            disabled={busy || loading || loadFailed || !available}
+            onClick={() => setEditing((value) => !value)}
+          >
+            <Settings2 size={16} aria-hidden="true" />
+            {t(
+              editing
+                ? 'settings.syncOverview.collapse'
+                : connected
+                  ? 'settings.syncOverview.edit'
+                  : 'settings.syncOverview.configure',
+            )}
+          </Button>
+          {loadFailed && (
             <Button
               type="button"
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              className="rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer ml-auto text-xs"
-              onClick={() => void disconnect()}
+              variant="outline"
+              onClick={() => setLoadAttempt((value) => value + 1)}
             >
-              {tr('清除连接')}
+              {t('settings.syncOverview.retryLoad')}
             </Button>
           )}
         </div>
-        {dirty && <p className="settings-help">{tr('连接修改后请先保存，再执行同步。')}</p>}
-        {status.lastSuccess && (
-          <p className="settings-help">
-            {tr('上次成功：')}
-            {new Date(status.lastSuccess).toLocaleString()} · {tr('冲突')} {status.conflicts.length}
+        {isDirty && <p className="settings-help">{t('settings.syncDirtyHelp')}</p>}
+        <FormError error={errors.root} />
+        <FormError error={actions.formState.errors.root} />
+        {status.lastError && (
+          <p className="settings-form-error" role="alert">
+            {storedErrorMessage(status.lastError)}
           </p>
         )}
-        {status.lastError && <p className="sync-error">{status.lastError}</p>}
-        {status.nextRetryAt && status.retryCount ? (
+        {status.nextRetryAt && (
           <p className="settings-help">
-            {tr('自动重试')} {status.retryCount} {tr('次 · 下次不早于')}{' '}
-            {new Date(status.nextRetryAt).toLocaleString()}
+            {t('settings.syncRetry', {
+              count: status.retryCount ?? 0,
+              date: new Date(status.nextRetryAt).toLocaleString(i18n.language),
+            })}
           </p>
-        ) : null}
-        {status.conflicts.length > 0 && (
-          <section className="sync-conflicts" aria-label={tr('同步冲突')}>
-            <h4>{tr('待处理冲突')}</h4>
-            {status.conflicts.map((conflict, index) => (
-              <div
-                className="sync-conflict"
-                key={`${conflict.entity}-${conflict.id}-${conflict.field}`}
+        )}
+      </section>
+      <div className="sync-connection-editor" hidden={!editing}>
+        <h2>{t('settings.sections.connection')}</h2>
+        <form
+          className="settings-form"
+          noValidate
+          onSubmit={(event) => {
+            if (busy) {
+              event.preventDefault();
+              return;
+            }
+            void form.handleSubmit(async (draft) => {
+              form.clearErrors('root');
+              try {
+                const origin =
+                  draft.type === 'webdav'
+                    ? new URL(draft.url).origin + '/*'
+                    : draft.type === 'github'
+                      ? 'https://api.github.com/*'
+                      : 'https://gitee.com/*';
+                if (!(await browser.permissions.request({ origins: [origin] }))) {
+                  form.setError('root', { message: t('settings.syncPermission') });
+                  return;
+                }
+                if (
+                  draft.includePrivate &&
+                  useRayTabStore.getState().state?.privateSecurity.locked
+                ) {
+                  form.setError('root', { message: 'settings.unlockPrivateForSync' });
+                  return;
+                }
+                await saveSyncConfig({
+                  connection: connectionFrom(draft),
+                  automatic: draft.automatic,
+                  includePrivate: draft.includePrivate,
+                  privatePassword: useRayTabStore.getState().state?.privateSecurity.locked
+                    ? undefined
+                    : draft.privatePassword || undefined,
+                });
+                form.reset({
+                  ...draft,
+                  privatePassword: useRayTabStore.getState().state?.privateSecurity.locked
+                    ? ''
+                    : draft.privatePassword,
+                });
+                setConnectionInfo({ provider: draft.type, automatic: draft.automatic });
+                setEditing(false);
+                toast.success(t('settings.connectionSaved'));
+              } catch (reason) {
+                form.setError('root', { message: errorMessage(reason) });
+              }
+            })(event);
+          }}
+        >
+          <fieldset disabled={busy || loading || !available}>
+            <Controller
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <SettingsSelect
+                  label={t('settings.provider')}
+                  value={field.value}
+                  options={[
+                    ['webdav', 'WebDAV'],
+                    ['github', 'GitHub'],
+                    ['gitee', 'Gitee'],
+                  ]}
+                  onChange={field.onChange}
+                  disabled={busy || loading || !available}
+                />
+              )}
+            />
+            <div className="sync-connection-fields">
+              {fields.map(([name, label, type]) => (
+                <div
+                  className={name === 'url' || name === 'token' ? 'sync-field-wide' : undefined}
+                  key={name}
+                >
+                  <label>
+                    {t('settings.' + label)}
+                    <Input
+                      type={type}
+                      {...form.register(name)}
+                      autoComplete={
+                        name === 'username'
+                          ? 'username'
+                          : name === 'password'
+                            ? 'current-password'
+                            : undefined
+                      }
+                      placeholder={
+                        name === 'url' ? 'https://dav.example.com/raytab.json' : undefined
+                      }
+                      aria-invalid={Boolean(errors[name])}
+                    />
+                  </label>
+                  <FormError error={errors[name]} />
+                </div>
+              ))}
+            </div>
+            <div className="sync-connection-options">
+              <Controller
+                control={form.control}
+                name="automatic"
+                render={({ field }) => (
+                  <Toggle
+                    label={t('settings.automaticSync')}
+                    checked={field.value}
+                    onChange={field.onChange}
+                    disabled={busy || loading || !available}
+                  />
+                )}
+              />
+              <Controller
+                control={form.control}
+                name="includePrivate"
+                render={({ field }) => (
+                  <Toggle
+                    label={t('settings.includePrivate')}
+                    checked={field.value}
+                    onChange={field.onChange}
+                    disabled={busy || loading || !available || locked}
+                  />
+                )}
+              />
+              {locked && <p className="settings-help">{t('settings.unlockPrivateForSync')}</p>}
+              {includePrivate && (
+                <div>
+                  <label>
+                    {t('settings.privateSyncPassword')}
+                    <Input
+                      type="password"
+                      autoComplete="new-password"
+                      {...form.register('privatePassword')}
+                      aria-invalid={Boolean(errors.privatePassword)}
+                      disabled={locked}
+                    />
+                  </label>
+                  <FormError error={errors.privatePassword} />
+                </div>
+              )}
+            </div>
+            <div className="settings-form-actions">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={busy || loading || !available || (locked && includePrivate)}
               >
-                <p>
-                  <strong>{conflict.entity}</strong> · {conflict.field}
-                </p>
-                <small>
-                  {tr('本机：')}
-                  {summarize(conflict.local)}
-                </small>
-                <small>
-                  {tr('远端：')}
-                  {summarize(conflict.remote)}
-                </small>
-                <div className="data-actions">
+                {t(isSubmitting ? 'settings.saving' : 'settings.saveConnection')}
+              </Button>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+      {connected && (
+        <details className="settings-advanced">
+          <summary>{t('settings.advancedSync')}</summary>
+          <div className="settings-form-actions">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy || !connected || isDirty}
+              onClick={() => run('push')}
+            >
+              {t('settings.overwriteCloud')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy || !connected || isDirty}
+              onClick={() => run('pull')}
+            >
+              {t('settings.restoreCloud')}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={busy || !connected}
+              onClick={() => run('disconnect')}
+            >
+              {t('settings.disconnect')}
+            </Button>
+          </div>
+        </details>
+      )}
+      {status.conflicts.length > 0 && (
+        <SettingsSection title={t('settings.conflicts')}>
+          <div className="sync-conflicts">
+            {status.conflicts.map((conflict, index) => (
+              <div className="sync-conflict" key={conflict.key}>
+                <strong>{t('settings.conflictNumber', { number: index + 1 })}</strong>
+                <small>{t('settings.localValue', { value: summarize(conflict.local) })}</small>
+                <small>{t('settings.remoteValue', { value: summarize(conflict.remote) })}</small>
+                {conflict.id === 'private-space' && (
+                  <p className="settings-help">{t('settings.privateSyncConflictHelp')}</p>
+                )}
+                <div className="settings-form-actions">
                   <Button
                     type="button"
+                    variant="outline"
                     size="sm"
-                    disabled={busy}
-                    onClick={() => void resolve(index, 'local')}
+                    disabled={busy || (conflict.id === 'private-space' && isDirty)}
+                    onClick={() =>
+                      conflict.id === 'private-space'
+                        ? run('push')
+                        : run('resolve', conflict, 'local')
+                    }
                   >
-                    {tr('保留本机')}
+                    {t(
+                      conflict.id === 'private-space'
+                        ? 'settings.overwriteCloud'
+                        : 'settings.keepLocal',
+                    )}
                   </Button>
                   <Button
                     type="button"
-                    size="sm"
                     variant="outline"
-                    disabled={busy}
-                    onClick={() => void resolve(index, 'remote')}
+                    size="sm"
+                    disabled={busy || (conflict.id === 'private-space' && isDirty)}
+                    onClick={() =>
+                      conflict.id === 'private-space'
+                        ? run('pull')
+                        : run('resolve', conflict, 'remote')
+                    }
                   >
-                    {tr('采用远端')}
+                    {t(
+                      conflict.id === 'private-space'
+                        ? 'settings.restoreCloud'
+                        : 'settings.useRemote',
+                    )}
                   </Button>
                 </div>
               </div>
             ))}
-          </section>
-        )}
-      </fieldset>
-      {confirmDialog}
-    </form>
+          </div>
+        </SettingsSection>
+      )}
+      {confirmation}
+    </div>
   );
 }
-
 function summarize(value: unknown) {
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
-  return text.length > 100 ? `${text.slice(0, 97)}…` : text;
+  const text = typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
+  return text.length > 100 ? text.slice(0, 97) + '…' : text;
 }

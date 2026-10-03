@@ -1,4 +1,11 @@
-import { decodeBase64, encodeBase64, request } from './http';
+import {
+  decodeBase64,
+  encodeBase64,
+  request,
+  parseResponseJson,
+  gitFileResponseSchema,
+  gitWriteResponseSchema,
+} from './http';
 import { SyncProviderError, type GitHubConfig, type SyncProvider } from './types';
 
 export function createGitHubProvider(config: GitHubConfig): SyncProvider {
@@ -15,8 +22,9 @@ export function createGitHubProvider(config: GitHubConfig): SyncProvider {
           headers,
           cache: 'no-store',
         });
-        const data = (await response.json()) as { type: string; content: string; sha: string };
-        if (data.type !== 'file') throw new SyncProviderError('GitHub 路径不是文件', 'invalid');
+        const data = await parseResponseJson(response, gitFileResponseSchema);
+        if (data.type !== 'file')
+          throw new SyncProviderError('messages.theGithubPathIsNotAFile', 'invalid');
         return { content: decodeBase64(data.content), version: data.sha };
       } catch (error) {
         if (error instanceof SyncProviderError && error.code === 'not-found') return null;
@@ -35,8 +43,8 @@ export function createGitHubProvider(config: GitHubConfig): SyncProvider {
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = (await response.json()) as { content?: { sha?: string } };
-      return data.content?.sha ?? null;
+      const data = await parseResponseJson(response, gitWriteResponseSchema);
+      return data.content.sha;
     },
   };
 }

@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react';
-import { ArchiveRestore, BookOpenCheck } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, ArrowDownToLine, ArrowUpFromLine, ChevronRight, RotateCcw } from 'lucide-react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { t, type Language } from '@/locales';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   backupSummary,
   createBackup,
@@ -15,364 +19,697 @@ import {
   deduplicateBookmarks,
   parseBookmarkHtml,
   readBrowserBookmarks,
-  type BookmarkCandidate,
 } from '@/features/import/bookmarks';
-import { dispatch, refresh, repository } from '@/storage/store';
-import type { RayState, SpaceId } from '@/storage/model';
-import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRayTabStore } from '@/storage/store';
+import { repository } from '@/storage/repository';
+import type { SpaceId } from '@/storage/model';
+import { errorMessage } from '@/lib/errors';
+import {
+  FormError,
+  SettingsFilePicker,
+  SettingsSelect,
+  useDraftStatus,
+  type DraftReporter,
+} from './SettingsControls';
+import './data-settings.css';
 
-export function DataSettings({
-  state,
-  spaceId,
-  language,
-  onError,
-}: {
-  state: RayState;
-  spaceId: SpaceId;
-  language: Language;
-  onError: (message: string) => void;
-}) {
-  const tr = (text: string) => t(language, text);
-  const [confirm, confirmDialog] = useConfirm();
-  const [sourceCandidates, setSourceCandidates] = useState<BookmarkCandidate[]>([]);
-  const [duplicateMode, setDuplicateMode] = useState<'skip-url' | 'keep-all'>('skip-url');
-  const [organizeMode, setOrganizeMode] = useState<'folders' | 'flat'>('flat');
-  const [targetGroupId, setTargetGroupId] = useState(state.local.activeGroup[spaceId]);
-  const [document, setDocument] = useState<BackupDocument>();
-  const [password, setPassword] = useState('');
-  const [restorePassword, setRestorePassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [backupRange, setBackupRange] = useState<SpaceId | 'all'>('all');
-  const candidates = useMemo(() => {
-    const organized =
-      organizeMode === 'flat'
-        ? sourceCandidates.map(({ folder, ...item }) => item)
-        : sourceCandidates;
-    return deduplicateBookmarks(
-      organized,
-      state.spaces[spaceId].sites.map((item) => item.url),
-      duplicateMode,
-    );
-  }, [duplicateMode, organizeMode, sourceCandidates, spaceId, state.spaces]);
-  const preview = (items: BookmarkCandidate[]) => setSourceCandidates(items);
-  const importNow = async () => {
-    if (busy || !candidates.length) return;
-    setBusy(true);
-    try {
-      await dispatch({
-        type: 'import-bookmarks',
-        spaceId,
-        groupId: targetGroupId,
-        items: candidates,
-      });
-      setSourceCandidates([]);
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
+const fileListSchema = z.custom<FileList>(
+  (value) => typeof FileList !== 'undefined' && value instanceof FileList,
+);
+const candidateSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  folder: z.string().optional(),
+  path: z.array(z.string()),
+});
+export const bookmarkImportSchema = z
+  .object({
+    action: z.enum(['preview', 'import']),
+    source: z.enum(['browser', 'file']),
+    file: fileListSchema.optional(),
+    items: z.array(candidateSchema),
+    duplicateMode: z.enum(['skip-url', 'keep-all']),
+    organizeMode: z.enum(['folders', 'flat']),
+    groupId: z.string().min(1, 'settings.required'),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === 'preview' && value.source === 'file' && !value.file?.length)
+      ctx.addIssue({ code: 'custom', path: ['file'], message: 'settings.chooseBookmarkFile' });
+    if (value.action === 'import' && !value.items.length)
+      ctx.addIssue({ code: 'custom', path: ['items'], message: 'settings.noBookmarks' });
+  });
+const restoreSchema = z
+  .object({
+    action: z.enum(['preview', 'restore']),
+    file: fileListSchema.optional(),
+    document: z.custom<BackupDocument>().optional(),
+    mode: z.enum(['merge', 'replace']),
+    password: z.string(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === 'preview' && !value.file?.length)
+      ctx.addIssue({ code: 'custom', path: ['file'], message: 'settings.chooseBackupFile' });
+    if (value.action === 'restore' && !value.document)
+      ctx.addIssue({ code: 'custom', path: ['document'], message: 'settings.chooseBackupFile' });
+    if (value.action === 'restore' && value.document?.spaces.private?.protected && !value.password)
+      ctx.addIssue({ code: 'custom', path: ['password'], message: 'settings.required' });
+  });
+export const backupExportSchema = z.object({
+  range: z.enum(['normal', 'private', 'all']),
+  password: z.string(),
+});
+
+function usePrivateLockReset(reset: () => void, enabled = true) {
+  const version = useRef(0);
+  const resetLatest = useRef(reset);
+  resetLatest.current = reset;
+  useEffect(() => {
+    if (enabled && useRayTabStore.getState().state?.privateSecurity.locked) resetLatest.current();
+    const unsubscribe = useRayTabStore.subscribe((store, previous) => {
+      if (
+        enabled &&
+        store.state?.privateSecurity.locked &&
+        !previous.state?.privateSecurity.locked
+      ) {
+        version.current += 1;
+        resetLatest.current();
+      }
+    });
+    return () => {
+      version.current += 1;
+      unsubscribe();
+      resetLatest.current();
+    };
+  }, [enabled]);
+  return () => {
+    const startedAt = version.current;
+    return () => startedAt === version.current;
   };
-  const exportBackup = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const snapshot = await repository.snapshot(backupRange);
-      const backup = await createBackup(
-        snapshot.state,
-        snapshot.resources,
-        backupRange,
-        snapshot.state.privateSecurity.protected && backupRange !== 'normal' ? password : undefined,
-      );
-      download(
-        `raytab-${backupRange}-backup-${new Date().toISOString().slice(0, 10)}.json`,
-        JSON.stringify(backup, null, 2),
-      );
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const restore = async (mode: 'merge' | 'replace') => {
-    if (!document || busy) return;
-    if (mode === 'replace') {
-      const ok = await confirm({
-        title: tr('确定要替换恢复？'),
-        description: tr('此操作将覆盖现有空间的所有数据，未备份的内容将无法找回。'),
-        confirmText: tr('替换恢复'),
-        cancelText: tr('取消'),
-        variant: 'destructive',
-      });
-      if (!ok) return;
-    }
-    setBusy(true);
-    try {
-      const current = await repository.read();
-      const result = await restoreBackup(current, document, mode, restorePassword || undefined);
-      await repository.restore(result.state, result.resources, {
-        expectedRevision: current.revision,
-        range: document.spaces.private ? (document.spaces.normal ? 'all' : 'private') : 'normal',
-      });
-      await refresh();
-      setDocument(undefined);
-      setRestorePassword('');
-    } catch (error) {
-      onError((error as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+}
+
+export function DataSettings({ spaceId, report }: { spaceId: SpaceId; report: DraftReporter }) {
+  const { t } = useTranslation();
+  const [active, setActive] = useState<'import' | 'export' | 'restore' | null>(null);
+  const [visited, setVisited] = useState<Set<'import' | 'export' | 'restore'>>(() => new Set());
+  const [busyForms, setBusyForms] = useState<Record<string, boolean>>({});
+  const taskHeading = useRef<HTMLHeadingElement>(null);
+  const taskTrigger = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const target = active ? taskHeading.current : taskTrigger.current;
+    target?.focus({ preventScroll: true });
+  }, [active]);
+  const reportForm = useCallback<DraftReporter>(
+    (id, dirty, busy) => {
+      report(id, dirty, busy);
+      setBusyForms((previous) => (previous[id] === busy ? previous : { ...previous, [id]: busy }));
+    },
+    [report],
+  );
+  const tasks = [
+    {
+      id: 'import',
+      title: 'settings.importBookmarks',
+      description: 'settings.dataTasks.importHelp',
+      icon: ArrowDownToLine,
+    },
+    {
+      id: 'export',
+      title: 'settings.exportBackup',
+      description: 'settings.dataTasks.exportHelp',
+      icon: ArrowUpFromLine,
+    },
+    {
+      id: 'restore',
+      title: 'settings.restoreBackup',
+      description: 'settings.dataTasks.restoreHelp',
+      icon: RotateCcw,
+    },
+  ] as const;
   return (
     <div className="data-settings">
-      <section>
-        <div className="data-section-heading">
-          <span aria-hidden="true">
-            <BookOpenCheck size={18} />
-          </span>
-          <div>
-            <h3>{tr('导入书签')}</h3>
-            <p>{tr('先预览网站，默认平铺导入并跳过重复网址。')}</p>
-          </div>
-        </div>
-        <div className="data-actions">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={busy || typeof browser === 'undefined' || !browser.bookmarks?.getTree}
-            title={tr('请在扩展中读取浏览器书签；预览中可导入 HTML 文件。')}
-            onClick={() =>
-              void readBrowserBookmarks()
-                .then(preview)
-                .catch((error: Error) => onError(error.message))
-            }
+      <div className="data-task-list" hidden={active !== null}>
+        {tasks.map(({ id, title, description, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            className="data-task-link"
+            aria-label={t(title)}
+            onClick={(event) => {
+              taskTrigger.current = event.currentTarget;
+              setVisited((previous) => new Set(previous).add(id));
+              setActive(id);
+            }}
           >
-            {tr('读取浏览器书签')}
+            <Icon size={20} aria-hidden="true" />
+            <span>
+              <strong>{t(title)}</strong>
+              <small>{t(description)}</small>
+            </span>
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+      {active && (
+        <div className="data-task-heading">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={Object.values(busyForms).some(Boolean)}
+            onClick={() => setActive(null)}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            {t('settings.dataTasks.back')}
           </Button>
-          <label className="file-button">
-            {tr('选择 HTML')}
-            <input
-              type="file"
-              accept="text/html,.html"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                if (file)
-                  void file
-                    .text()
-                    .then(parseBookmarkHtml)
-                    .then(preview)
-                    .catch((error: Error) => onError(error.message));
-              }}
-            />
-          </label>
+          <h2 ref={taskHeading} tabIndex={-1}>
+            {t(tasks.find((task) => task.id === active)!.title)}
+          </h2>
         </div>
-        {sourceCandidates.length > 0 && (
-          <div className="data-preview rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-3.5 space-y-3">
-            <div className="import-options grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                {tr('整理方式')}
-                <Select
-                  value={organizeMode}
-                  onChange={(event) => setOrganizeMode(event.target.value as typeof organizeMode)}
-                >
-                  <option value="folders">{tr('保留书签文件夹')}</option>
-                  <option value="flat">{tr('直接平铺')}</option>
-                </Select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                {tr('重复网址')}
-                <Select
-                  value={duplicateMode}
-                  onChange={(event) => setDuplicateMode(event.target.value as typeof duplicateMode)}
-                >
-                  <option value="skip-url">{tr('跳过重复网址')}</option>
-                  <option value="keep-all">{tr('全部保留')}</option>
-                </Select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                {tr('目标分组')}
-                <Select
-                  value={targetGroupId}
-                  onChange={(event) => setTargetGroupId(event.target.value)}
-                >
-                  {[...state.spaces[spaceId].groups]
-                    .sort((a, b) => a.order - b.order)
-                    .map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
-                    ))}
-                </Select>
-              </label>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-black/5 dark:border-white/5">
-              <div className="text-xs text-muted-foreground space-y-0.5">
-                <strong className="text-foreground block">
-                  {tr('准备导入')} {candidates.length} {tr('个网站')}
-                </strong>
-                <div>
-                  {sourceCandidates.length !== candidates.length && (
-                    <span>
-                      {tr('已跳过')} {sourceCandidates.length - candidates.length}{' '}
-                      {tr('个重复网址')} ·{' '}
-                    </span>
-                  )}
-                  <span>
-                    {new Set(candidates.map((item) => item.folder).filter(Boolean)).size}{' '}
-                    {tr('个文件夹，将保存到所选分组')}
-                  </span>
-                </div>
-              </div>
-              <Button
-                size="sm"
-                className="rounded-xl px-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs"
-                disabled={busy || !candidates.length}
-                onClick={() => void importNow()}
-              >
-                {tr('确认导入')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </section>
-      <section>
-        <div className="data-section-heading">
-          <span aria-hidden="true">
-            <ArchiveRestore size={18} />
-          </span>
-          <div>
-            <h3>{tr('备份与恢复')}</h3>
-            <p>{tr('备份包含两个空间、设置和本地图片，不包含同步凭据。')}</p>
-          </div>
+      )}
+      {visited.has('import') && (
+        <div className="data-task-body" hidden={active !== 'import'}>
+          <BookmarkImport spaceId={spaceId} report={reportForm} />
         </div>
-        <div className="space-y-3">
-          <label className="data-select-row flex items-center justify-between gap-3 text-xs">
-            <span className="text-muted-foreground font-medium">{tr('导出范围')}</span>
-            <Select
-              containerClassName="w-36"
-              value={backupRange}
-              onChange={(event) => setBackupRange(event.target.value as SpaceId | 'all')}
-            >
-              <option value="all">{tr('全部空间')}</option>
-              <option value="normal">{tr('普通空间')}</option>
-              <option value="private">{tr('私密空间')}</option>
-            </Select>
-          </label>
-          {state.privateSecurity.protected && backupRange !== 'normal' && (
-            <Input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              minLength={6}
-              aria-label={tr('私密空间备份密码')}
-              placeholder={tr('私密空间备份密码')}
-              className="rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5"
-            />
-          )}
-          {backupRange !== 'normal' && state.privateSecurity.locked && (
-            <p className="settings-help">{tr('请先解锁私密空间，或仅导出普通空间。')}</p>
-          )}
-          <div className="data-actions">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer font-medium"
-              disabled={busy || (backupRange !== 'normal' && state.privateSecurity.locked)}
-              onClick={() => void exportBackup()}
-            >
-              {tr('导出所选备份')}
-            </Button>
-            <label className="file-button">
-              {tr('选择备份文件')}
-              <input
-                type="file"
-                accept="application/json,.json"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = '';
-                  if (file)
-                    void file
-                      .text()
-                      .then(parseBackup)
-                      .then((backup) => {
-                        setDocument(backup);
-                        setRestorePassword('');
-                      })
-                      .catch((error: Error) => onError(error.message));
-                }}
-              />
-            </label>
-          </div>
+      )}
+      {visited.has('export') && (
+        <div className="data-task-body" hidden={active !== 'export'}>
+          <BackupExport report={reportForm} />
         </div>
-        {document &&
-          (() => {
-            const summary = backupSummary(document);
-            return (
-              <div className="data-preview rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-3.5 space-y-2 mt-3">
-                <strong className="text-xs font-semibold text-foreground block">
-                  {tr('备份内容预览')}
-                </strong>
-                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                  {summary.normal && (
-                    <div>
-                      <span className="font-medium text-foreground">{tr('普通空间')}</span>：
-                      {summary.normal.groups} {tr('个分组')} · {summary.normal.folders}{' '}
-                      {tr('个文件夹')} · {summary.normal.sites} {tr('个网站')}
-                    </div>
-                  )}
-                  {summary.private && (
-                    <div>
-                      <span className="font-medium text-foreground">{tr('私密空间')}</span>：
-                      {'protected' in summary.private
-                        ? tr('已受密码加密保护')
-                        : `${summary.private.groups} ${tr('个分组')} · ${summary.private.folders} ${tr('个文件夹')} · ${summary.private.sites} ${tr('个网站')}`}
-                    </div>
-                  )}
-                </div>
-                <span className="text-[11px] text-muted-foreground block">
-                  {tr('合并会保留较新的记录；替换会覆盖备份包含的空间。')}
-                </span>
-                {document.spaces.private?.protected && (
-                  <Input
-                    type="password"
-                    value={restorePassword}
-                    onChange={(event) => setRestorePassword(event.target.value)}
-                    aria-label={tr('备份解密密码')}
-                    placeholder={tr('备份解密密码')}
-                  />
-                )}
-                <div className="data-actions pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="rounded-xl border-black/10 dark:border-white/15 cursor-pointer"
-                    disabled={busy || (document.spaces.private?.protected && !restorePassword)}
-                    onClick={() => void restore('merge')}
-                  >
-                    {tr('合并恢复')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="rounded-xl cursor-pointer"
-                    disabled={busy || (document.spaces.private?.protected && !restorePassword)}
-                    onClick={() => void restore('replace')}
-                  >
-                    {tr('替换恢复')}
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
-      </section>
-      {confirmDialog}
+      )}
+      {visited.has('restore') && (
+        <div className="data-task-body" hidden={active !== 'restore'}>
+          <BackupRestore report={reportForm} />
+        </div>
+      )}
     </div>
   );
 }
 
-function download(name: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
-  const anchor = window.document.createElement('a');
+function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftReporter }) {
+  const { t } = useTranslation();
+  const dispatch = useRayTabStore((store) => store.dispatch);
+  const space = useRayTabStore((store) => store.state?.spaces[spaceId])!;
+  const activeGroup = useRayTabStore((store) => store.state?.local.activeGroup[spaceId])!;
+  const defaults = {
+    action: 'preview' as const,
+    source: 'file' as const,
+    file: undefined,
+    items: [],
+    duplicateMode: 'skip-url' as const,
+    organizeMode: 'flat' as const,
+    groupId: activeGroup,
+  };
+  const form = useForm<z.infer<typeof bookmarkImportSchema>>({
+    resolver: zodResolver(bookmarkImportSchema),
+    defaultValues: defaults,
+  });
+  const { isDirty, isSubmitting, errors } = form.formState;
+  useDraftStatus('bookmark-import', isDirty, isSubmitting, report);
+  const [items, duplicateMode, organizeMode, file] = useWatch({
+    control: form.control,
+    name: ['items', 'duplicateMode', 'organizeMode', 'file'],
+  });
+  const candidates = useMemo(
+    () =>
+      deduplicateBookmarks(
+        organizeMode === 'flat' ? items.map(({ folder, ...item }) => item) : items,
+        space.sites.map((item) => item.url),
+        duplicateMode,
+      ),
+    [items, organizeMode, duplicateMode, space.sites],
+  );
+  const operationBoundary = usePrivateLockReset(
+    () => form.reset({ ...defaults, file: undefined, items: [] }),
+    spaceId === 'private',
+  );
+  const submit = form.handleSubmit(async (values) => {
+    const isCurrent = operationBoundary();
+    try {
+      if (values.action === 'preview') {
+        const parsed =
+          values.source === 'browser'
+            ? await readBrowserBookmarks()
+            : parseBookmarkHtml(await values.file![0].text());
+        if (!isCurrent()) return;
+        form.setValue('items', parsed, { shouldDirty: true });
+        form.clearErrors();
+        return;
+      }
+      await dispatch({
+        type: 'import-bookmarks',
+        spaceId,
+        groupId: values.groupId,
+        items: candidates,
+      });
+      if (!isCurrent()) return;
+      form.reset(defaults);
+      toast.success(t('settings.bookmarksImported', { count: candidates.length }));
+    } catch (reason) {
+      if (isCurrent()) form.setError('root', { message: errorMessage(reason) });
+    }
+  });
+  return (
+    <form className="settings-form" noValidate onSubmit={submit}>
+      <p className="settings-help">{t('settings.bookmarkHelp')}</p>
+      <SettingsFilePicker
+        label={t('settings.bookmarkFile')}
+        hint={t('settings.dataTasks.bookmarkFileHint')}
+        file={file}
+        accept="text/html,.html"
+        registration={form.register('file', {
+          onChange: () => form.setValue('items', [], { shouldDirty: true }),
+        })}
+        disabled={isSubmitting}
+        invalid={Boolean(errors.file)}
+      />
+      <FormError error={errors.file} />
+      <div className="data-form-actions">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isSubmitting}
+          onClick={() => {
+            form.setValue('source', 'file');
+            form.setValue('action', 'preview');
+          }}
+        >
+          {t('settings.previewFile')}
+        </Button>
+        <Button
+          type="submit"
+          variant="outline"
+          size="sm"
+          disabled={isSubmitting || typeof browser === 'undefined' || !browser.bookmarks?.getTree}
+          onClick={() => {
+            form.setValue('source', 'browser');
+            form.setValue('action', 'preview');
+          }}
+        >
+          {t('settings.readBookmarks')}
+        </Button>
+      </div>
+      {items.length > 0 && (
+        <div className="data-preview">
+          <div className="data-preview-options">
+            <Controller
+              control={form.control}
+              name="organizeMode"
+              render={({ field }) => (
+                <SettingsSelect
+                  label={t('settings.organize')}
+                  value={field.value}
+                  options={[
+                    ['flat', t('settings.flat')],
+                    ['folders', t('settings.keepFolders')],
+                  ]}
+                  onChange={field.onChange}
+                  disabled={isSubmitting}
+                />
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="duplicateMode"
+              render={({ field }) => (
+                <SettingsSelect
+                  label={t('settings.duplicates')}
+                  value={field.value}
+                  options={[
+                    ['skip-url', t('settings.skipDuplicates')],
+                    ['keep-all', t('settings.keepAll')],
+                  ]}
+                  onChange={field.onChange}
+                  disabled={isSubmitting}
+                />
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="groupId"
+              render={({ field }) => (
+                <SettingsSelect
+                  label={t('settings.targetGroup')}
+                  value={field.value}
+                  options={[...space.groups]
+                    .sort((a, b) => a.order - b.order)
+                    .map((group) => [group.id, group.name])}
+                  onChange={field.onChange}
+                  disabled={isSubmitting}
+                />
+              )}
+            />
+          </div>
+          <div className="data-preview-content">
+            <strong>{t('settings.bookmarkPreview')}</strong>
+            <p className="settings-help">
+              {t('settings.importSummary', {
+                count: candidates.length,
+                duplicates: items.length - candidates.length,
+                folders: new Set(candidates.map((item) => item.folder).filter(Boolean)).size,
+              })}
+            </p>
+            <ul className="settings-bookmark-preview" aria-label={t('settings.bookmarkPreview')}>
+              {candidates.slice(0, 8).map((item, index) => (
+                <li key={item.url + ':' + index}>
+                  <span title={item.title}>{item.title}</span>
+                  <small title={item.url}>{item.url}</small>
+                </li>
+              ))}
+            </ul>
+            {candidates.length > 8 && (
+              <p className="settings-help">
+                {t('settings.remainingBookmarks', { count: candidates.length - 8 })}
+              </p>
+            )}
+          </div>
+          <div className="data-form-actions data-preview-actions">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSubmitting || !candidates.length}
+              onClick={() => form.setValue('action', 'import')}
+            >
+              {t(isSubmitting ? 'settings.importing' : 'settings.confirmImport')}
+            </Button>
+          </div>
+        </div>
+      )}
+      <FormError error={errors.items} />
+      <FormError error={errors.groupId} />
+      <FormError error={errors.root} />
+    </form>
+  );
+}
+
+function BackupExport({ report }: { report: DraftReporter }) {
+  const { t } = useTranslation();
+  const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
+  const locked = useRayTabStore((store) => store.state?.privateSecurity.locked);
+  const schema = useMemo(
+    () =>
+      backupExportSchema.superRefine((value, ctx) => {
+        if (protectedPrivate && value.range !== 'normal' && value.password.length < 6)
+          ctx.addIssue({ code: 'custom', path: ['password'], message: 'settings.passwordLength' });
+      }),
+    [protectedPrivate],
+  );
+  const defaults = { range: locked ? ('normal' as const) : ('all' as const), password: '' };
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    defaultValues: defaults,
+  });
+  const { isDirty, isSubmitting, errors } = form.formState;
+  const range = useWatch({ control: form.control, name: 'range' });
+  useDraftStatus('backup-export', isDirty, isSubmitting, report);
+  const operationBoundary = usePrivateLockReset(() =>
+    form.reset({ range: 'normal', password: '' }),
+  );
+  return (
+    <form
+      className="settings-form"
+      noValidate
+      onSubmit={form.handleSubmit(async (values) => {
+        const isCurrent = operationBoundary();
+        try {
+          const snapshot = await repository.snapshot(values.range);
+          if (!isCurrent()) return;
+          const backup = await createBackup(
+            snapshot.state,
+            snapshot.resources,
+            values.range,
+            snapshot.state.privateSecurity.protected && values.range !== 'normal'
+              ? values.password
+              : undefined,
+          );
+          if (!isCurrent()) return;
+          download(
+            'raytab-' + values.range + '-backup-' + new Date().toISOString().slice(0, 10) + '.json',
+            JSON.stringify(backup, null, 2),
+          );
+          form.reset({ range: values.range, password: '' });
+          toast.success(t('settings.backupExported'));
+        } catch (reason) {
+          if (isCurrent()) form.setError('root', { message: errorMessage(reason) });
+        }
+      })}
+    >
+      <Controller
+        control={form.control}
+        name="range"
+        render={({ field }) => (
+          <SettingsSelect
+            label={t('settings.exportRange')}
+            value={field.value}
+            options={[
+              ['all', t('settings.allSpaces')],
+              ['normal', t('settings.normalSpace')],
+              ['private', t('settings.privateSpace')],
+            ]}
+            onChange={field.onChange}
+            disabled={isSubmitting}
+          />
+        )}
+      />
+      <p className="settings-help">
+        {t('settings.backupRangeHelp', { range: t('settings.ranges.' + range) })}
+      </p>
+      {protectedPrivate && range !== 'normal' && (
+        <label className="data-input-field">
+          <span>{t('settings.backupPassword')}</span>
+          <Input
+            type="password"
+            autoComplete="new-password"
+            {...form.register('password')}
+            aria-invalid={Boolean(errors.password)}
+            disabled={isSubmitting}
+          />
+        </label>
+      )}
+      {protectedPrivate && range !== 'normal' && (
+        <p className="settings-help">{t('settings.backupPasswordHelp')}</p>
+      )}
+      {locked && range !== 'normal' && (
+        <p className="settings-help">{t('settings.unlockForBackup')}</p>
+      )}
+      <FormError error={errors.password} />
+      <FormError error={errors.root} />
+      <div className="data-form-actions">
+        <Button type="submit" size="sm" disabled={isSubmitting || (locked && range !== 'normal')}>
+          {t(isSubmitting ? 'settings.exporting' : 'settings.exportSelected')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function BackupRestore({ report }: { report: DraftReporter }) {
+  const { t } = useTranslation();
+  const refresh = useRayTabStore((store) => store.refresh);
+  const [confirm, confirmation] = useConfirm();
+  const defaults = {
+    action: 'preview' as const,
+    file: undefined,
+    document: undefined,
+    mode: 'merge' as const,
+    password: '',
+  };
+  const form = useForm<z.infer<typeof restoreSchema>>({
+    resolver: zodResolver(restoreSchema),
+    defaultValues: defaults,
+  });
+  const { isDirty, isSubmitting, errors } = form.formState;
+  const [backup, mode, file] = useWatch({
+    control: form.control,
+    name: ['document', 'mode', 'file'],
+  });
+  const summary = backup ? backupSummary(backup) : undefined;
+  useDraftStatus('backup-restore', isDirty, isSubmitting, report);
+  const operationBoundary = usePrivateLockReset(() => form.reset(defaults));
+  return (
+    <form
+      className="settings-form"
+      noValidate
+      onSubmit={form.handleSubmit(async (values) => {
+        const isCurrent = operationBoundary();
+        try {
+          if (values.action === 'preview') {
+            form.setValue('document', undefined);
+            form.resetField('password', { defaultValue: '' });
+            const document = await parseBackup(await values.file![0].text());
+            if (!isCurrent()) return;
+            if (
+              document.spaces.private &&
+              useRayTabStore.getState().state?.privateSecurity.locked
+            ) {
+              form.setError('root', { message: t('settings.unlockForRestore') });
+              return;
+            }
+            form.setValue('document', document, {
+              shouldDirty: true,
+            });
+            form.resetField('password', { defaultValue: '' });
+            form.clearErrors();
+            return;
+          }
+          if (!values.document) return;
+          if (
+            values.mode === 'replace' &&
+            !(await confirm({
+              title: t('settings.replaceTitle'),
+              description: t('settings.replaceHelp', {
+                range: t(
+                  values.document.spaces.private
+                    ? values.document.spaces.normal
+                      ? 'settings.ranges.all'
+                      : 'settings.ranges.private'
+                    : 'settings.ranges.normal',
+                ),
+              }),
+              confirmText: t('settings.replaceRestore'),
+              cancelText: t('settings.cancel'),
+              variant: 'destructive',
+            }))
+          )
+            return;
+          if (!isCurrent()) return;
+          const current = await repository.read();
+          if (!isCurrent()) return;
+          const result = await restoreBackup(
+            current,
+            values.document,
+            values.mode,
+            values.password || undefined,
+          );
+          if (!isCurrent()) return;
+          await repository.restore(result.state, result.resources, {
+            expectedRevision: current.revision,
+            range: values.document.spaces.private
+              ? values.document.spaces.normal
+                ? 'all'
+                : 'private'
+              : 'normal',
+          });
+          await refresh();
+          if (!isCurrent()) return;
+          form.reset(defaults);
+          toast.success(t('settings.backupRestored'));
+        } catch (reason) {
+          if (isCurrent()) form.setError('root', { message: errorMessage(reason) });
+        }
+      })}
+    >
+      <SettingsFilePicker
+        label={t('settings.backupFile')}
+        hint={t('settings.dataTasks.backupFileHint')}
+        file={file}
+        accept="application/json,.json"
+        registration={form.register('file', {
+          onChange: () => {
+            form.setValue('document', undefined, { shouldDirty: true });
+            form.resetField('password', { defaultValue: '' });
+          },
+        })}
+        disabled={isSubmitting}
+        invalid={Boolean(errors.file)}
+      />
+      <FormError error={errors.file} />
+      <div className="data-form-actions">
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isSubmitting}
+          onClick={() => form.setValue('action', 'preview')}
+        >
+          {t('settings.previewBackup')}
+        </Button>
+      </div>
+      {backup && summary && (
+        <div className="data-preview">
+          <div className="data-preview-content">
+            <strong>{t('settings.backupPreview')}</strong>
+            {summary.normal && (
+              <p className="settings-help">
+                {t('settings.spaceSummary', {
+                  space: t('settings.normalSpace'),
+                  groups: summary.normal.groups,
+                  folders: summary.normal.folders,
+                  sites: summary.normal.sites,
+                })}
+              </p>
+            )}
+            {summary.private && (
+              <p className="settings-help">
+                {'protected' in summary.private
+                  ? t('settings.encryptedPrivate')
+                  : t('settings.spaceSummary', {
+                      space: t('settings.privateSpace'),
+                      groups: summary.private.groups,
+                      folders: summary.private.folders,
+                      sites: summary.private.sites,
+                    })}
+              </p>
+            )}
+          </div>
+          <Controller
+            control={form.control}
+            name="mode"
+            render={({ field }) => (
+              <SettingsSelect
+                label={t('settings.restoreMode')}
+                value={field.value}
+                options={[
+                  ['merge', t('settings.mergeRestore')],
+                  ['replace', t('settings.replaceRestore')],
+                ]}
+                onChange={field.onChange}
+                disabled={isSubmitting}
+              />
+            )}
+          />
+          <p className="settings-help">
+            {t(mode === 'merge' ? 'settings.mergeHelp' : 'settings.replaceModeHelp')}
+          </p>
+          {backup.spaces.private?.protected && (
+            <label className="data-input-field">
+              <span>{t('settings.restorePassword')}</span>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                {...form.register('password')}
+                aria-invalid={Boolean(errors.password)}
+                disabled={isSubmitting}
+              />
+            </label>
+          )}
+          <FormError error={errors.password} />
+          <div className="data-form-actions data-preview-actions">
+            <Button
+              type="submit"
+              size="sm"
+              variant={mode === 'replace' ? 'destructive' : 'default'}
+              disabled={isSubmitting}
+              onClick={() => form.setValue('action', 'restore')}
+            >
+              {t(
+                isSubmitting
+                  ? 'settings.restoring'
+                  : mode === 'replace'
+                    ? 'settings.replaceRestore'
+                    : 'settings.mergeRestore',
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+      <FormError error={errors.document} />
+      <FormError error={errors.root} />
+      {confirmation}
+    </form>
+  );
+}
+function download(name: string, contents: string) {
+  const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
+  const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = name;
   anchor.click();

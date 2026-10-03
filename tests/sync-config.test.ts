@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearSyncConfig,
   loadSyncConfig,
   loadSyncStatus,
   saveSyncConfig,
 } from '../src/sync/core/engine';
+import { createTestLockManager } from './helpers/locks';
 
 function storageArea(values: Record<string, unknown>) {
   return {
@@ -27,9 +28,30 @@ describe('sync connection storage', () => {
   beforeEach(() => {
     local = {};
     session = {};
+    vi.stubGlobal('navigator', { locks: createTestLockManager() });
     vi.stubGlobal('browser', {
       storage: { local: storageArea(local), session: storageArea(session) },
     });
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('releases the configuration lock after a failed save', async () => {
+    const config = {
+      connection: {
+        type: 'webdav' as const,
+        url: 'https://dav.test/backup.json',
+        username: 'user',
+        password: 'password',
+      },
+      includePrivate: false,
+      automatic: true,
+    };
+    vi.spyOn(browser.storage.local, 'set').mockRejectedValueOnce(new Error('save failed'));
+    await expect(saveSyncConfig(config)).rejects.toThrow('save failed');
+    expect(local).toEqual({});
+    await saveSyncConfig(config);
+    await expect(loadSyncConfig()).resolves.toMatchObject(config);
   });
 
   it('restores the saved connection and keeps the private password in session storage', async () => {
@@ -63,17 +85,16 @@ describe('sync connection storage', () => {
     });
   });
 
-  it('clears connection, baseline, status, lease and session password', async () => {
+  it('clears connection, baseline, status and session password', async () => {
     local['raytab-sync-config'] = { connection: { type: 'webdav' } };
     local['raytab-sync-baseline'] = { document: {} };
     local['raytab-sync-status'] = { conflicts: [], lastSuccess: 'today' };
-    local['raytab-sync-lease'] = { owner: 'tab' };
     session['raytab-sync-private-password'] = 'private-password';
 
     await clearSyncConfig();
 
     await expect(loadSyncConfig()).resolves.toBeUndefined();
-    await expect(loadSyncStatus()).resolves.toEqual({ conflicts: [] });
+    await expect(loadSyncStatus()).resolves.toEqual({ schemaVersion: 1, conflicts: [] });
     expect(local).toEqual({});
     expect(session).toEqual({});
   });

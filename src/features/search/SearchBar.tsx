@@ -1,228 +1,113 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Check, ChevronDown, Search, X } from 'lucide-react';
-import { dispatch } from '@/storage/store';
-import type { SpaceId, SpaceSettings } from '@/storage/model';
-import { t } from '@/locales';
-import { cn } from '@/lib/utils';
+import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
+import { toast } from 'sonner';
+import { ChevronDown, Search, X } from 'lucide-react';
+import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
+import type { SpaceId } from '@/storage/model';
+import { errorMessage } from '@/lib/errors';
 import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
 import { Tooltip } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '@/components/ui/dropdown-menu';
 
-export function SearchBar({
-  settings,
-  spaceId,
-  onError,
-}: {
-  settings: SpaceSettings;
-  spaceId: SpaceId;
-  onError: (message: string) => void;
-}) {
-  const tr = (text: string) => t(settings.language, text);
+export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
+  const { t } = useTranslation();
+  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
+  const dispatch = useRayTabStore((store) => store.dispatch);
   const [query, setQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const engineRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
       if (document.querySelector('[role="dialog"]')) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+      if (
+        (event.target as HTMLElement | null)?.matches(
+          'input, textarea, select, [contenteditable="true"]',
+        )
+      )
+        return;
       event.preventDefault();
       inputRef.current?.focus();
     };
     window.addEventListener('keydown', focusSearch);
     return () => window.removeEventListener('keydown', focusSearch);
   }, []);
-
-  // 点击外部自动关闭下拉菜单
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node | null;
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(target) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(target)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const closeMenu = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setMenuOpen(false);
-      triggerRef.current?.focus();
-    };
-    window.addEventListener('keydown', closeMenu);
-    return () => window.removeEventListener('keydown', closeMenu);
-  }, [menuOpen]);
-
-  function search(event: FormEvent) {
+  const engine =
+    settings.searchEngines.find((item) => item.id === settings.searchEngine) ??
+    settings.searchEngines[0];
+  const search = (event: FormEvent) => {
     event.preventDefault();
     if (!query.trim()) return;
-    const engine =
-      settings.searchEngines.find((item) => item.id === settings.searchEngine) ??
-      settings.searchEngines[0];
     const url = engine.url.replace('%s', encodeURIComponent(query.trim()));
     if (settings.openInNewTab) window.open(url, '_blank', 'noopener,noreferrer');
     else window.location.assign(url);
-  }
-
-  const currentEngine =
-    settings.searchEngines.find((item) => item.id === settings.searchEngine) ??
-    settings.searchEngines[0];
-
-  const focusEngine = (index: number) => {
-    const count = settings.searchEngines.length;
-    if (!count) return;
-    engineRefs.current[(index + count) % count]?.focus();
   };
-
   return (
-    <form
-      className={cn('search-shell', menuOpen ? 'z-50' : 'z-20')}
-      onSubmit={search}
-      role="search"
-    >
-      {/* 自定义毛玻璃引擎切换器（彻底消灭原生白底 select） */}
-      <div className="relative flex shrink-0">
-        <Tooltip content={tr('切换搜索引擎')} side="bottom" open={menuOpen ? false : undefined}>
-          <button
-            ref={triggerRef}
-            type="button"
-            className="search-engine-trigger"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-              event.preventDefault();
-              setMenuOpen(true);
-              const selectedIndex = settings.searchEngines.findIndex(
-                (engine) => engine.id === settings.searchEngine,
-              );
-              requestAnimationFrame(() =>
-                focusEngine(
-                  event.key === 'ArrowUp' ? settings.searchEngines.length - 1 : selectedIndex,
-                ),
-              );
-            }}
-            aria-label={tr('切换搜索引擎')}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-          >
-            {getSearchEngineIcon(currentEngine.id, currentEngine.name)}
-            <ChevronDown
-              size={13}
-              aria-hidden="true"
-              className={cn('search-engine-chevron', menuOpen && 'search-engine-chevron--open')}
-            />
-          </button>
+    <form className="search-shell" onSubmit={search} role="search">
+      <DropdownMenu>
+        <Tooltip content={t('messages.switchSearchEngine')} side="bottom">
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="search-engine-trigger"
+              aria-label={t('messages.switchSearchEngine')}
+            >
+              {getSearchEngineIcon(engine.id, engine.name)}
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
         </Tooltip>
-
-        {menuOpen && (
-          <div
-            ref={menuRef}
-            role="menu"
-            className="search-engine-menu"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(event) => {
-              const activeIndex = engineRefs.current.indexOf(
-                document.activeElement as HTMLButtonElement,
+        <DropdownMenuContent align="start" className="min-w-48">
+          <DropdownMenuRadioGroup
+            value={settings.searchEngine}
+            onValueChange={(value) => {
+              void dispatch({ type: 'settings', spaceId, patch: { searchEngine: value } }).catch(
+                (reason) => toast.error(errorMessage(reason)),
               );
-              if (event.key === 'Escape') {
-                event.preventDefault();
-                setMenuOpen(false);
-                triggerRef.current?.focus();
-              } else if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                focusEngine(activeIndex + 1);
-              } else if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                focusEngine(activeIndex - 1);
-              } else if (event.key === 'Home') {
-                event.preventDefault();
-                focusEngine(0);
-              } else if (event.key === 'End') {
-                event.preventDefault();
-                focusEngine(settings.searchEngines.length - 1);
-              }
             }}
           >
-            {settings.searchEngines.map((engine, index) => {
-              const isSelected = engine.id === settings.searchEngine;
-              return (
-                <button
-                  ref={(node) => {
-                    engineRefs.current[index] = node;
-                  }}
-                  key={engine.id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={isSelected}
-                  className={cn(
-                    'search-engine-option',
-                    isSelected && 'search-engine-option--selected',
-                  )}
-                  onClick={() => {
-                    void dispatch({
-                      type: 'settings',
-                      spaceId,
-                      patch: { searchEngine: engine.id as SpaceSettings['searchEngine'] },
-                    }).catch((error) => onError(String(error.message)));
-                    setMenuOpen(false);
-                    requestAnimationFrame(() => triggerRef.current?.focus());
-                  }}
-                >
-                  <span className="flex items-center gap-2.5">
-                    {getSearchEngineIcon(engine.id, engine.name)}
-                    <span>{engine.name}</span>
-                  </span>
-                  {isSelected && <Check size={14} className="text-blue-500 shrink-0" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
+            {settings.searchEngines.map((item) => (
+              <DropdownMenuRadioItem key={item.id} value={item.id}>
+                {getSearchEngineIcon(item.id, item.name)}
+                <span>{item.name}</span>
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <input
         ref={inputRef}
         name="q"
-        aria-label={tr('搜索内容')}
-        placeholder={tr('输入搜索内容')}
+        aria-label={t('messages.searchQuery')}
+        placeholder={t('messages.searchTheWeb')}
         className="search-input"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(event) => setQuery(event.target.value)}
         autoComplete="off"
       />
-
-      {/* 一键清空按钮 */}
       {query.length > 0 && (
-        <Tooltip content={tr('清空')} side="top">
+        <Tooltip content={t('messages.clear')} side="top">
           <button
             type="button"
-            aria-label={tr('清空')}
+            aria-label={t('messages.clear')}
+            className="search-action search-action--clear"
             onClick={() => {
               setQuery('');
               inputRef.current?.focus();
             }}
-            className="search-action search-action--clear"
           >
             <X size={13} />
           </button>
         </Tooltip>
       )}
-
-      <Tooltip content={tr('搜索')} side="bottom">
-        <button type="submit" aria-label={tr('搜索')} className="search-action">
+      <Tooltip content={t('messages.search')} side="bottom">
+        <button type="submit" aria-label={t('messages.search')} className="search-action">
           <Search size={17} />
         </button>
       </Tooltip>

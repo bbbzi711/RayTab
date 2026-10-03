@@ -1,0 +1,150 @@
+.menu-surface {
+  --menu-destructive: color-mix(in srgb, var(--color-destructive) 82%, var(--surface-text));
+  z-index: 50;
+  min-width: 176px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(
+    calc(100vh - 16px),
+    var(
+      --radix-dropdown-menu-content-available-height,
+      var(--radix-context-menu-content-available-height, calc(100vh - 16px))
+    )
+  );
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--surface-divider);
+  border-radius: 12px;
+  background: var(--surface-popover);
+  color: var(--surface-text);
+  box-shadow: var(--elevation-popover);
+  backdrop-filter: blur(20px);
+  font-size: 13px;
+  line-height: 20px;
+  transform-origin: var(
+    --radix-dropdown-menu-content-transform-origin,
+    var(--radix-context-menu-content-transform-origin)
+  );
+}
+
+.menu-surface[data-state='open'] {
+  animation: menu-appear var(--motion-fast) var(--ease-standard);
+}
+
+.menu-surface[data-state='closed'] {
+  animation: menu-disappear var(--motion-fast) var(--ease-standard);
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  outline: none;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.menu-item[data-highlighted],
+.menu-item[data-state='open'] {
+  background: var(--dialog-hover);
+}
+
+.menu-item[data-disabled] {
+  pointer-events: none;
+  opacity: 0.45;
+}
+
+.menu-item[data-inset],
+.menu-item--checkable {
+  padding-left: 32px;
+}
+
+.menu-item[data-variant='destructive'] {
+  color: var(--menu-destructive);
+}
+
+.menu-item[data-variant='destructive'][data-highlighted] {
+  background: color-mix(in srgb, var(--menu-destructive) 12%, transparent);
+}
+
+.menu-item svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.menu-indicator {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.menu-indicator .menu-radio-mark {
+  width: 7px;
+  height: 7px;
+  fill: currentColor;
+}
+
+.menu-label {
+  padding: 5px 10px;
+  color: var(--surface-muted);
+  font-size: 11px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.menu-label[data-inset] {
+  padding-left: 32px;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--surface-divider);
+}
+
+.menu-shortcut {
+  margin-left: auto;
+  color: var(--surface-muted);
+  font-size: 11px;
+}
+
+@keyframes menu-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes menu-disappear {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-surface,
+  .menu-item {
+    animation: none;
+    transition: none;
+  }
+}

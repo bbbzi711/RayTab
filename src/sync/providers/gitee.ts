@@ -1,4 +1,11 @@
-import { decodeBase64, encodeBase64, request } from './http';
+import {
+  decodeBase64,
+  encodeBase64,
+  request,
+  parseResponseJson,
+  gitFileResponseSchema,
+  gitWriteResponseSchema,
+} from './http';
 import { SyncProviderError, type GiteeConfig, type SyncProvider } from './types';
 
 export function createGiteeProvider(config: GiteeConfig): SyncProvider {
@@ -9,8 +16,9 @@ export function createGiteeProvider(config: GiteeConfig): SyncProvider {
         const params = new URLSearchParams({ access_token: config.token });
         if (config.branch) params.set('ref', config.branch);
         const response = await request(`${endpoint}?${params}`, { cache: 'no-store' });
-        const data = (await response.json()) as { type: string; content: string; sha: string };
-        if (data.type !== 'file') throw new SyncProviderError('Gitee 路径不是文件', 'invalid');
+        const data = await parseResponseJson(response, gitFileResponseSchema);
+        if (data.type !== 'file')
+          throw new SyncProviderError('messages.theGiteePathIsNotAFile', 'invalid');
         return { content: decodeBase64(data.content), version: data.sha };
       } catch (error) {
         if (error instanceof SyncProviderError && error.code === 'not-found') return null;
@@ -30,8 +38,8 @@ export function createGiteeProvider(config: GiteeConfig): SyncProvider {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body,
       });
-      const data = (await response.json()) as { content?: { sha?: string } };
-      return data.content?.sha ?? null;
+      const data = await parseResponseJson(response, gitWriteResponseSchema);
+      return data.content.sha;
     },
   };
 }

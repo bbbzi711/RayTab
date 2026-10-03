@@ -1,0 +1,133 @@
+.sync-settings {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+.sync-settings [hidden] {
+  display: none;
+}
+.sync-overview {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.sync-overview-heading {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.sync-overview-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--preferences-line);
+  border-radius: 12px;
+  background: var(--preferences-field);
+  color: var(--preferences-muted);
+}
+.sync-overview h2,
+.sync-connection-editor > h2 {
+  margin: 0 0 6px;
+  color: var(--preferences-text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 26px;
+}
+.sync-last-success {
+  margin: 0;
+  color: var(--preferences-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+.sync-settings .sync-overview-actions {
+  gap: 10px;
+}
+.sync-connection-editor {
+  display: grid;
+  gap: 18px;
+  padding-top: 24px;
+  border-top: 1px solid var(--preferences-line);
+}
+.sync-connection-editor > h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+.sync-connection-editor .settings-form fieldset {
+  gap: 20px;
+}
+.sync-connection-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 16px;
+  min-width: 0;
+}
+.sync-field-wide {
+  grid-column: 1 / -1;
+}
+.sync-connection-options {
+  display: grid;
+  gap: 8px;
+  padding-block: 12px;
+  border-top: 1px solid var(--preferences-line);
+  border-bottom: 1px solid var(--preferences-line);
+}
+.sync-settings > .settings-advanced {
+  padding-top: 12px;
+  border-top: 1px solid var(--preferences-line);
+}
+.sync-settings .settings-advanced > .settings-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.sync-conflicts {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+.sync-conflict {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-block: 18px;
+  border-bottom: 1px solid var(--preferences-line);
+}
+.sync-conflict:first-child {
+  padding-top: 0;
+}
+.sync-conflict:last-child {
+  border-bottom: 0;
+}
+.sync-conflict > strong {
+  color: var(--preferences-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+}
+.sync-conflict small {
+  display: block;
+  color: var(--preferences-muted);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.sync-conflict p {
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .sync-overview-heading {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px;
+  }
+  .sync-overview-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+  .sync-connection-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

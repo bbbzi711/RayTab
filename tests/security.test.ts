@@ -13,9 +13,13 @@ describe('private-space encryption', () => {
   });
 
   it('rejects weak and incorrect passwords', async () => {
-    await expect(encryptJson({}, '123')).rejects.toThrow('6 个字符');
+    await expect(encryptJson({}, '123')).rejects.toThrow(
+      'messages.thePasswordMustContainAtLeast6Characters',
+    );
     const encrypted = await encryptJson({ secret: true }, 'right-password');
-    await expect(decryptJson(encrypted, 'wrong-password')).rejects.toThrow('密码错误');
+    await expect(decryptJson(encrypted, 'wrong-password')).rejects.toThrow(
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
+    );
   });
 });
 
@@ -40,7 +44,9 @@ describe('private vault repository', () => {
     });
     try {
       const unlocking = repo.unlockPrivate('vault-password');
-      const rejected = expect(unlocking).rejects.toThrow('私密空间状态已变化');
+      const rejected = expect(unlocking).rejects.toThrow(
+        'messages.thePrivateSpaceStateChangedTryAgain',
+      );
       await decrypting;
       await repo.lockPrivate();
       release();
@@ -86,7 +92,9 @@ describe('private vault repository', () => {
             : operation === 'change'
               ? repo.changePrivatePassword('vault-password', 'next-password')
               : repo.removePrivatePassword('vault-password');
-        const rejected = expect(changing).rejects.toThrow('另一个页面');
+        const rejected = expect(changing).rejects.toThrow(
+          'messages.dataChangedInAnotherPageTryAgain',
+        );
         await working;
         const saved = await other.update((state) => {
           if (operation === 'protect') state.normalSettings.showClock = false;
@@ -144,11 +152,13 @@ describe('private vault repository', () => {
       repo.update((state) => {
         state.privateSettingOverrides.showClock = false;
       }),
-    ).rejects.toThrow('请先解锁');
+    ).rejects.toThrow('messages.unlockThePrivateSpaceFirst');
     await repo.update((state) => {
       state.normalSettings.showClock = false;
     });
-    await expect(repo.unlockPrivate('vault-password')).rejects.toThrow('密码错误');
+    await expect(repo.unlockPrivate('vault-password')).rejects.toThrow(
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
+    );
     expect((await repo.unlockPrivate('next-password')).privateSettingOverrides).toEqual(
       before.privateSettingOverrides,
     );
@@ -179,7 +189,9 @@ describe('private vault repository', () => {
       const saving = repo.update((state) => {
         state.privateSettingOverrides.showClock = false;
       });
-      const rejected = expect(saving).rejects.toThrow('私密空间状态已变化');
+      const rejected = expect(saving).rejects.toThrow(
+        'messages.thePrivateSpaceStateChangedTryAgain',
+      );
       await encrypting;
       await repo.lockPrivate();
       release();
@@ -212,12 +224,12 @@ describe('private vault repository', () => {
           site: {
             title: 'Unsaved',
             url: 'https://example.com/',
-            color: '#123456',
-            iconId: 'missing-image',
+            icon: { source: 'resource', resourceId: 'missing-image' },
+            iconBackground: { mode: 'color', color: '#123456' },
           },
         }),
       ),
-    ).rejects.toThrow('私密空间图片缺失');
+    ).rejects.toThrow('messages.aPrivateSpaceImageIsMissingNoChangesWereSaved');
 
     expect(await repo.read()).toEqual(before);
     await repo.lockPrivate();
@@ -242,8 +254,8 @@ describe('private vault repository', () => {
           site: {
             title: 'Private',
             url: 'https://private.example',
-            color: '#123456',
-            iconId: 'private-icon',
+            icon: { source: 'resource', resourceId: 'private-icon' },
+            iconBackground: { mode: 'color', color: '#123456' },
           },
         }),
       new Map([['private-icon', new Blob(['secret image'], { type: 'image/webp' })]]),
@@ -253,7 +265,9 @@ describe('private vault repository', () => {
     expect(locked.privateSecurity).toEqual({ protected: true, locked: true });
     expect(locked.spaces.private.sites).toHaveLength(0);
     expect(await repo.resource('private-icon')).toBeUndefined();
-    await expect(repo.unlockPrivate('wrong-password')).rejects.toThrow('密码错误');
+    await expect(repo.unlockPrivate('wrong-password')).rejects.toThrow(
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
+    );
     const unlocked = await repo.unlockPrivate('vault-password');
     expect(unlocked.spaces.private.sites[0].url).toBe('https://private.example/');
     expect(await (await repo.resource('private-icon'))?.text()).toBe('secret image');
@@ -277,7 +291,12 @@ describe('private vault repository', () => {
         id: 'protected-site',
         groupId: initial.spaces.private.groups[0].id,
         folderId: null,
-        site: { title: 'Protected', url: 'https://protected.example', color: '#123456' },
+        site: {
+          title: 'Protected',
+          url: 'https://protected.example',
+          icon: { source: 'auto' },
+          iconBackground: { mode: 'color', color: '#123456' },
+        },
       }),
     );
     const beforeProtection = await repo.read();
@@ -285,12 +304,16 @@ describe('private vault repository', () => {
     expect(protectedState.revision).toBe(beforeProtection.revision + 1);
     await repo.changePrivatePassword('first-password', 'second-password');
     expect((await repo.read()).revision).toBe(protectedState.revision + 1);
-    await expect(repo.unlockPrivate('first-password')).rejects.toThrow('密码错误');
+    await expect(repo.unlockPrivate('first-password')).rejects.toThrow(
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
+    );
     await expect(repo.unlockPrivate('second-password')).resolves.toMatchObject({
       privateSecurity: { protected: true, locked: false },
     });
     await repo.lockPrivate();
-    await expect(repo.removePrivatePassword('first-password')).rejects.toThrow('密码错误');
+    await expect(repo.removePrivatePassword('first-password')).rejects.toThrow(
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
+    );
     const unprotected = await repo.removePrivatePassword('second-password');
     expect(unprotected.revision).toBe(protectedState.revision + 2);
     expect(unprotected.privateSecurity).toEqual({ protected: false, locked: false });

@@ -1,4 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useId, type Ref } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -10,77 +15,162 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { errorMessage } from '@/lib/errors';
 import type { Group, Folder } from '@/storage/model';
+import { destinationSchema, nameSchema, type Destination } from './navigation-form-schemas';
+
+export function DestinationSelect({
+  groups,
+  folders,
+  value,
+  onChange,
+  onBlur,
+  name,
+  inputRef,
+  disabled,
+  id,
+}: {
+  groups: Group[];
+  folders: Folder[];
+  value: Destination;
+  onChange: (value: Destination) => void;
+  onBlur?: () => void;
+  name?: string;
+  inputRef?: Ref<HTMLSelectElement>;
+  disabled?: boolean;
+  id?: string;
+}) {
+  const { t } = useTranslation();
+  const destinations = groups.flatMap((group) => [
+    { groupId: group.id, folderId: null },
+    ...folders
+      .filter((folder) => folder.groupId === group.id)
+      .map((folder) => ({ groupId: group.id, folderId: folder.id })),
+  ]);
+  return (
+    <Select
+      id={id}
+      ref={inputRef}
+      name={name}
+      value={JSON.stringify(value)}
+      onBlur={onBlur}
+      disabled={disabled || !groups.length}
+      onChange={(event) => {
+        const selected = destinations.find((item) => JSON.stringify(item) === event.target.value);
+        if (selected) onChange(selected);
+      }}
+    >
+      {groups.map((group) => (
+        <optgroup key={group.id} label={group.name}>
+          <option value={JSON.stringify({ groupId: group.id, folderId: null })}>
+            {group.name}
+          </option>
+          {folders
+            .filter((folder) => folder.groupId === group.id)
+            .sort((a, b) => a.order - b.order)
+            .map((folder) => (
+              <option
+                key={folder.id}
+                value={JSON.stringify({ groupId: group.id, folderId: folder.id })}
+              >
+                {group.name} / {folder.name}
+              </option>
+            ))}
+        </optgroup>
+      ))}
+    </Select>
+  );
+}
 
 export interface NameDialogProps {
   title: string;
   initialName?: string;
   onSave: (name: string) => Promise<void>;
   onClose: () => void;
-  onError: (message: string) => void;
-  tr: (text: string) => string;
 }
 
-export function NameDialog({
-  title,
-  initialName = '',
-  onSave,
-  onClose,
-  onError,
-  tr,
-}: NameDialogProps) {
-  const [name, setName] = useState(initialName);
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (saving || !name.trim()) return;
-    setSaving(true);
-    try {
-      await onSave(name.trim());
-      onClose();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : String(err));
-      setSaving(false);
-    }
+export function NameDialog({ title, initialName = '', onSave, onClose }: NameDialogProps) {
+  const { t } = useTranslation();
+  const id = useId();
+  const [confirm, confirmDialog] = useConfirm();
+  const { register, handleSubmit, setError, formState } = useForm<z.infer<typeof nameSchema>>({
+    resolver: zodResolver(nameSchema),
+    defaultValues: { name: initialName },
+  });
+  const { isSubmitting, isDirty, errors } = formState;
+  const requestClose = async () => {
+    if (isSubmitting) return;
+    if (
+      isDirty &&
+      !(await confirm({
+        title: t('messages.discardUnsavedChanges'),
+        description: t('messages.yourChangesWillNotBeSaved'),
+        confirmText: t('messages.discardChanges'),
+        cancelText: t('messages.keepEditing'),
+        variant: 'destructive',
+      }))
+    )
+      return;
+    onClose();
   };
-
   return (
-    <Dialog open onOpenChange={(open) => !open && !saving && onClose()}>
-      <DialogContent closeLabel={tr('关闭')} showCloseButton={!saving} aria-describedby={undefined}>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <Dialog open onOpenChange={(open) => !open && void requestClose()}>
+      <DialogContent
+        closeLabel={t('messages.close')}
+        showCloseButton={!isSubmitting}
+        aria-describedby={undefined}
+      >
+        <form
+          onSubmit={handleSubmit(async ({ name }) => {
+            try {
+              await onSave(name);
+              toast.success(t('navigation.saved'));
+              onClose();
+            } catch (reason) {
+              setError('root', { message: errorMessage(reason) });
+            }
+          })}
+          className="form-stack"
+          noValidate
+        >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
-          <div className="py-2">
-            <Input
-              aria-label={tr('名称')}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={80}
-              autoFocus
-            />
-          </div>
+          <label htmlFor={id}>{t('messages.name')}</label>
+          <Input
+            id={id}
+            {...register('name')}
+            aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? `${id}-error` : undefined}
+            autoFocus
+            disabled={isSubmitting}
+          />
+          {errors.name && (
+            <p id={`${id}-error`} className="form-error" role="alert">
+              {t(errors.name.message!)}
+            </p>
+          )}
+          {errors.root && (
+            <p className="form-error" role="alert">
+              {errors.root.message}
+            </p>
+          )}
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-xl px-4 py-2 cursor-pointer border-black/10 dark:border-white/15"
+              onClick={() => void requestClose()}
+              disabled={isSubmitting}
             >
-              {tr('取消')}
+              {t('messages.cancel')}
             </Button>
-            <Button
-              type="submit"
-              disabled={saving || !name.trim()}
-              className="rounded-xl px-5 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs"
-            >
-              {tr('保存')}
+            <Button type="submit" disabled={isSubmitting}>
+              {t('messages.save')}
             </Button>
           </DialogFooter>
         </form>
+        {confirmDialog}
       </DialogContent>
     </Dialog>
   );
@@ -95,10 +185,9 @@ export interface MoveDialogProps {
   title: string;
   description?: string;
   confirmLabel?: string;
+  destructive?: boolean;
   onMove: (groupId: string, folderId: string | null) => Promise<void>;
   onClose: () => void;
-  onError: (message: string) => void;
-  tr: (text: string) => string;
 }
 
 export function MoveDialog({
@@ -110,106 +199,125 @@ export function MoveDialog({
   title,
   description,
   confirmLabel,
+  destructive = false,
   onMove,
   onClose,
-  onError,
-  tr,
 }: MoveDialogProps) {
+  const { t } = useTranslation();
+  const id = useId();
   const validGroups = groups
-    .filter((g) => g.id !== excludeGroupId)
+    .filter((group) => group.id !== excludeGroupId)
     .sort((a, b) => a.order - b.order);
-  const foldersByGroup = folders.reduce(
-    (acc, f) => {
-      if (!acc[f.groupId]) acc[f.groupId] = [];
-      acc[f.groupId].push(f);
-      return acc;
+  const schema = z.object({
+    location: destinationSchema.refine(
+      (value) =>
+        validGroups.some((group) => group.id === value.groupId) &&
+        (value.folderId === null ||
+          (allowFolders &&
+            folders.some(
+              (folder) => folder.id === value.folderId && folder.groupId === value.groupId,
+            ))),
+      'navigation.chooseLocation',
+    ),
+  });
+  const { control, handleSubmit, setError, formState } = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      location: {
+        groupId:
+          validGroups.find((group) => group.id === initialGroupId)?.id ?? validGroups[0]?.id ?? '',
+        folderId: null,
+      },
     },
-    {} as Record<string, Folder[]>,
-  );
-  Object.values(foldersByGroup).forEach((fs) => fs.sort((a, b) => a.order - b.order));
-
-  const firstValidGroup = validGroups[0];
-  let defaultLocation = '';
-  if (validGroups.some((g) => g.id === initialGroupId)) {
-    defaultLocation = JSON.stringify({ groupId: initialGroupId, folderId: null });
-  } else if (firstValidGroup) {
-    defaultLocation = JSON.stringify({ groupId: firstValidGroup.id, folderId: null });
-  }
-
-  const [location, setLocation] = useState(defaultLocation);
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (saving || !location) return;
-    setSaving(true);
-    try {
-      const parsed = JSON.parse(location);
-      await onMove(parsed.groupId, parsed.folderId);
-      onClose();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : String(err));
-      setSaving(false);
-    }
+  });
+  const { isSubmitting, errors } = formState;
+  const [confirm, confirmDialog] = useConfirm();
+  const requestClose = async () => {
+    if (isSubmitting) return;
+    if (
+      formState.isDirty &&
+      !(await confirm({
+        title: t('messages.discardUnsavedChanges'),
+        description: t('messages.yourChangesWillNotBeSaved'),
+        confirmText: t('messages.discardChanges'),
+        cancelText: t('messages.keepEditing'),
+        variant: 'destructive',
+      }))
+    )
+      return;
+    onClose();
   };
-
   return (
-    <Dialog open onOpenChange={(open) => !open && !saving && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && void requestClose()}>
       <DialogContent
-        closeLabel={tr('关闭')}
-        showCloseButton={!saving}
+        closeLabel={t('messages.close')}
+        showCloseButton={!isSubmitting}
         {...(!description ? { 'aria-describedby': undefined } : {})}
       >
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form
+          onSubmit={handleSubmit(async ({ location }) => {
+            try {
+              await onMove(location.groupId, location.folderId);
+              toast.success(t(destructive ? 'messages.deleted' : 'navigation.moved'));
+              onClose();
+            } catch (reason) {
+              setError('root', { message: errorMessage(reason) });
+            }
+          })}
+          className="form-stack"
+          noValidate
+        >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
-          <div className="py-2">
-            <Select
-              aria-label={tr('存入位置')}
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-              disabled={!validGroups.length}
-            >
-              {validGroups.map((group) => (
-                <optgroup key={group.id} label={group.name}>
-                  <option value={JSON.stringify({ groupId: group.id, folderId: null })}>
-                    {tr('直接平铺')}
-                  </option>
-                  {allowFolders &&
-                    (foldersByGroup[group.id] || []).map((folder) => (
-                      <option
-                        key={folder.id}
-                        value={JSON.stringify({ groupId: group.id, folderId: folder.id })}
-                      >
-                        {folder.name}
-                      </option>
-                    ))}
-                </optgroup>
-              ))}
-            </Select>
-          </div>
+          <label htmlFor={id}>{t('messages.saveTo')}</label>
+          <Controller
+            control={control}
+            name="location"
+            render={({ field }) => (
+              <DestinationSelect
+                id={id}
+                groups={validGroups}
+                folders={allowFolders ? folders : []}
+                value={field.value}
+                onChange={field.onChange}
+                onBlur={field.onBlur}
+                name={field.name}
+                inputRef={field.ref}
+                disabled={isSubmitting}
+              />
+            )}
+          />
+          {errors.location && (
+            <p className="form-error" role="alert">
+              {t('navigation.chooseLocation')}
+            </p>
+          )}
+          {errors.root && (
+            <p className="form-error" role="alert">
+              {errors.root.message}
+            </p>
+          )}
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
-              disabled={saving}
-              className="rounded-xl px-4 py-2 cursor-pointer border-black/10 dark:border-white/15"
+              onClick={() => void requestClose()}
+              disabled={isSubmitting}
             >
-              {tr('取消')}
+              {t('messages.cancel')}
             </Button>
             <Button
               type="submit"
-              disabled={saving || !validGroups.length}
-              className="rounded-xl px-5 py-2 bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs"
+              variant={destructive ? 'destructive' : 'default'}
+              disabled={isSubmitting || !validGroups.length}
             >
-              {confirmLabel || tr('保存')}
+              {confirmLabel ?? t('messages.save')}
             </Button>
           </DialogFooter>
         </form>
+        {confirmDialog}
       </DialogContent>
     </Dialog>
   );

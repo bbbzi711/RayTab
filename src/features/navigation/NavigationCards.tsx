@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
+import { NavigationMenuItems, type NavigationAction } from './NavigationMenu';
 import { useSortable } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
-import { Check, Folder as FolderIcon, MoreHorizontal } from 'lucide-react';
+import { Check, Folder as FolderIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Site, Folder } from '@/storage/model';
 import { SiteIcon } from '@/features/navigation/SiteIcon';
@@ -21,23 +21,18 @@ type DragPresentation = Partial<
 >;
 
 export type CardBaseProps = {
-  showCardBackground: boolean;
-  cardOpacity: number;
   showTitle: boolean;
   manageMode: boolean;
   disabledDrag?: boolean;
-  editLabel?: string;
   selected?: boolean;
   dragOverlay?: boolean;
   onToggleSelection?: () => void;
-  onEdit?: () => void;
-  contextMenu?: ReactNode;
+  menuActions?: NavigationAction[];
 };
 
 export type SiteCardProps = CardBaseProps & {
   site: Site;
   openInNewTab: boolean;
-  onClick?: (e: React.MouseEvent) => void;
 };
 
 export type FolderCardProps = CardBaseProps & {
@@ -62,27 +57,23 @@ export function SiteTitle({ title }: { title: string }) {
 export function SiteCardView({
   site,
   openInNewTab,
-  showCardBackground,
-  cardOpacity,
   showTitle,
   manageMode,
   selected = false,
   dragOverlay = false,
   isDragging = false,
   onToggleSelection,
-  onEdit,
-  editLabel = 'Edit',
-  onClick,
   setNodeRef,
   setActivatorNodeRef,
   attributes,
   listeners,
   transform,
   transition,
-  contextMenu,
+  menuActions,
 }: SiteCardProps & DragPresentation) {
   const cardNode = (
     <article
+      data-navigation-object
       ref={setNodeRef}
       {...listeners}
       onDragStart={(event) => event.preventDefault()}
@@ -90,9 +81,6 @@ export function SiteCardView({
       aria-hidden={dragOverlay || undefined}
       className={cn(
         'site-card group relative',
-        showCardBackground
-          ? 'backdrop-blur-md shadow-sm border border-white/10 hover:border-white/25 hover:-translate-y-1'
-          : 'hover:bg-white/10 hover:backdrop-blur-sm hover:-translate-y-1',
         isDragging && !dragOverlay && 'opacity-45 scale-95 z-50',
         dragOverlay && 'scale-105 z-50 shadow-xl opacity-90',
         manageMode && 'site-card--managing',
@@ -101,7 +89,6 @@ export function SiteCardView({
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         transition: dragOverlay ? undefined : transition,
-        backgroundColor: showCardBackground ? `rgba(255, 255, 255, ${cardOpacity})` : undefined,
       }}
     >
       {manageMode ? (
@@ -129,7 +116,6 @@ export function SiteCardView({
           rel={openInNewTab ? 'noreferrer' : undefined}
           aria-label={site.title}
           className="site-card-main no-underline"
-          onClick={onClick}
         >
           <SiteIcon site={site} interactive />
           {showTitle && <SiteTitle title={site.title} />}
@@ -140,35 +126,19 @@ export function SiteCardView({
           {selected && <Check size={15} />}
         </span>
       )}
-      {onEdit && (
-        <button
-          type="button"
-          className={cn(
-            'site-card-action site-card-action--edit',
-            manageMode && 'site-card-action--visible',
-          )}
-          aria-label={editLabel}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          <MoreHorizontal size={17} />
-        </button>
-      )}
     </article>
   );
 
-  if (manageMode || !contextMenu || dragOverlay) {
+  if (manageMode || !menuActions || dragOverlay) {
     return cardNode;
   }
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{cardNode}</ContextMenuTrigger>
-      <ContextMenuContent>{contextMenu}</ContextMenuContent>
+      <ContextMenuContent>
+        <NavigationMenuItems actions={menuActions} />
+      </ContextMenuContent>
     </ContextMenu>
   );
 }
@@ -206,22 +176,23 @@ export function SiteCard(props: SiteCardProps) {
 export function FolderPreview({ sites }: { sites: Site[] }) {
   return (
     <div
-      className="relative flex items-center justify-center transition-transform group-hover:scale-105 duration-300 pointer-events-none"
+      className="relative flex items-center justify-center pointer-events-none"
       style={{ width: 'var(--site-icon-size, 48px)', height: 'var(--site-icon-size, 48px)' }}
     >
       <div
-        className="absolute inset-0 bg-white/10 border border-white/20 shadow-inner flex flex-wrap content-start justify-center gap-[6%] p-[6%] overflow-hidden"
-        style={{ borderRadius: 'clamp(12px, calc(var(--site-icon-size, 48px) * 0.31), 22px)' }}
+        className="folder-icon-frame absolute inset-0 flex flex-wrap content-start justify-center gap-[6%] p-[6%] overflow-hidden"
+        style={{ borderRadius: 'var(--site-icon-radius, 24%)' }}
       >
         {sites.length === 0 ? (
-          <div className="w-full h-full flex items-center justify-center text-white/50">
+          <div className="w-full h-full flex items-center justify-center">
             <FolderIcon size="50%" strokeWidth={1.5} />
           </div>
         ) : (
           sites.slice(0, 4).map((site) => (
             <div
               key={site.id}
-              className="relative w-[44%] aspect-square overflow-hidden rounded-[20%] bg-black/10 dark:bg-white/10"
+              className="relative w-[44%] aspect-square overflow-hidden"
+              style={{ borderRadius: 'var(--site-icon-radius, 24%)' }}
             >
               <div
                 className="absolute inset-0 origin-top-left flex items-center justify-center"
@@ -240,8 +211,6 @@ export function FolderPreview({ sites }: { sites: Site[] }) {
 export function FolderCardView({
   folder,
   previewSites,
-  showCardBackground,
-  cardOpacity,
   showTitle,
   manageMode,
   selected = false,
@@ -249,8 +218,6 @@ export function FolderCardView({
   isDragging = false,
   isCenterOver = false,
   onToggleSelection,
-  onEdit,
-  editLabel = 'Edit',
   onClick,
   setNodeRef,
   setActivatorNodeRef,
@@ -259,7 +226,7 @@ export function FolderCardView({
   listeners,
   transform,
   transition,
-  contextMenu,
+  menuActions,
 }: FolderCardProps &
   DragPresentation & {
     isCenterOver?: boolean;
@@ -267,6 +234,7 @@ export function FolderCardView({
   }) {
   const cardNode = (
     <article
+      data-navigation-object
       ref={setNodeRef}
       {...listeners}
       onDragStart={(event) => event.preventDefault()}
@@ -274,9 +242,6 @@ export function FolderCardView({
       aria-hidden={dragOverlay || undefined}
       className={cn(
         'site-card group relative',
-        showCardBackground
-          ? 'backdrop-blur-md shadow-sm border border-white/10 hover:border-white/25 hover:-translate-y-1'
-          : 'hover:bg-white/10 hover:backdrop-blur-sm hover:-translate-y-1',
         isDragging && !dragOverlay && 'opacity-45 scale-95 z-50',
         dragOverlay && 'scale-105 z-50 shadow-xl opacity-90',
         manageMode && 'site-card--managing',
@@ -286,7 +251,6 @@ export function FolderCardView({
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         transition: dragOverlay ? undefined : transition,
-        backgroundColor: showCardBackground ? `rgba(255, 255, 255, ${cardOpacity})` : undefined,
       }}
     >
       {!manageMode && !isDragging && !dragOverlay && (
@@ -322,36 +286,19 @@ export function FolderCardView({
           {selected && <Check size={15} />}
         </span>
       )}
-
-      {onEdit && (
-        <button
-          type="button"
-          className={cn(
-            'site-card-action site-card-action--edit',
-            manageMode && 'site-card-action--visible',
-          )}
-          aria-label={editLabel}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onEdit();
-          }}
-        >
-          <MoreHorizontal size={17} />
-        </button>
-      )}
     </article>
   );
 
-  if (manageMode || !contextMenu || dragOverlay) {
+  if (manageMode || !menuActions || dragOverlay) {
     return cardNode;
   }
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{cardNode}</ContextMenuTrigger>
-      <ContextMenuContent>{contextMenu}</ContextMenuContent>
+      <ContextMenuContent>
+        <NavigationMenuItems actions={menuActions} />
+      </ContextMenuContent>
     </ContextMenu>
   );
 }

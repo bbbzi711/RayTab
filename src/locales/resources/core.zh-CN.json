@@ -1,0 +1,65 @@
+{
+  "errors": {
+    "localRead": "本地数据暂时无法读取。请重试；不要清除浏览器数据。",
+    "model": {
+      "groupRequired": "空间必须至少保留一个分组",
+      "duplicateGroupId": "分组 ID 重复",
+      "duplicateFolderId": "文件夹 ID 重复",
+      "duplicateSiteId": "网站 ID 重复",
+      "duplicateNavigationId": "网站与文件夹 ID 重复",
+      "missingFolderGroup": "文件夹引用了不存在的分组",
+      "missingSiteGroup": "网站引用了不存在的分组",
+      "missingSiteFolder": "网站引用了不存在的文件夹",
+      "missingActiveGroup": "当前分组不存在",
+      "duplicateSearchEngineId": "搜索引擎 ID 重复",
+      "missingSearchEngine": "当前搜索引擎不存在"
+    },
+    "backup": {
+      "missingResource": "备份需要的资源 {{id}} 不存在"
+    },
+    "sync": {
+      "privateConflictRequiresChoice": "两侧私密空间都已修改，同步已停止。请确认后选择本机覆盖云端或云端恢复本机。",
+      "conflictChanged": "冲突已变化，请刷新后重试",
+      "invalidRemoteResponse": "同步服务返回的数据格式无效，请检查服务响应后重试。",
+      "invalidConflict": "无法识别当前冲突数据，原数据未改变"
+    },
+    "remoteStatus": "远端服务返回 {{status}}",
+    "missingBackupResource": "备份需要的资源 {{id}} 不存在",
+    "invalidInput": "输入格式不正确，请检查后重试"
+  },
+  "onboarding": {
+    "welcome": "欢迎使用 RayTab",
+    "title": "从常用网站开始，整理你的浏览入口",
+    "description": "先把每天会打开的网站放进来。布局、外观和同步方式都可以稍后在设置中调整。",
+    "action": "进入首页",
+    "quickTitle": "快速抵达",
+    "quickDescription": "集中管理网站、分组和文件夹，搜索也随手可用。",
+    "organizeTitle": "按你的方式整理",
+    "organizeDescription": "用分组和文件夹梳理内容，拖动网站完成排序。",
+    "privacyTitle": "数据由你掌控",
+    "privacyDescription": "数据默认保存在本机，私密空间和同步均按需启用。"
+  },
+  "clock": {
+    "label": "时钟",
+    "night": "夜深了，早点休息哦",
+    "morning": "早上好，开启新的一天",
+    "noon": "中午好，记得好好吃饭",
+    "afternoon": "下午好，继续加油",
+    "evening": "晚上好，放松一下吧"
+  },
+  "errorBoundary": {
+    "title": "页面暂时无法显示",
+    "description": "请重新加载。若问题持续，请保留以下诊断信息。",
+    "reload": "重新加载"
+  },
+  "popup": {
+    "tabReadFailed": "无法读取当前标签页，请手动填写网址。",
+    "saveFailed": "网站未保存，请检查后重试。",
+    "saving": "保存中…"
+  },
+  "counts": {
+    "sites": "{{count}} 个网站",
+    "folders": "{{count}} 个文件夹",
+    "selected": "已选择 {{count}} 项"
+  }
+}

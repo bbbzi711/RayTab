@@ -1,6 +1,9 @@
 import type { SpaceSettings } from '@/storage/model';
 
-export type HomeTextColors = SpaceSettings['textColors'];
+export type HomeTextColors = Record<
+  'clock' | 'date' | 'greeting' | 'search' | 'tabs' | 'cards',
+  string
+>;
 
 const light: HomeTextColors = {
   clock: '#ffffff',
@@ -21,9 +24,6 @@ const dark: HomeTextColors = {
 };
 
 export function resolveHomeTextColors(settings: SpaceSettings): HomeTextColors {
-  if (settings.textColorMode === 'light') return light;
-  if (settings.textColorMode === 'dark') return dark;
-  if (settings.textColorMode === 'custom') return settings.textColors;
   return estimatedBackgroundLuminance(settings) > 0.62 ? dark : light;
 }
 

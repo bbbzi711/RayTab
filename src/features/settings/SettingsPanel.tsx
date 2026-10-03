@@ -1,5 +1,8 @@
-import { Cloud, Database, Palette, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Cloud, Database, Grid2X2, Palette, SlidersHorizontal, Clock3 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -8,936 +11,572 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { dispatch, privateVault } from '@/storage/store';
-import { prepareImage } from '@/lib/images';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
+import { errorMessage } from '@/lib/errors';
 import { gradientPresets, nextFeaturedPhoto } from '@/features/appearance/wallpapers';
+import { effectiveSettings, type SpaceId, type SpaceSettings } from '@/storage/model';
 import { DataSettings } from './DataSettings';
 import { SyncSettings } from './SyncSettings';
 import {
-  customGreetingsSchema,
-  effectiveSettings,
-  searchEngineSchema,
-  type RayState,
-  type SpaceId,
-  type SpaceSettings,
-} from '@/storage/model';
-import { t } from '@/locales';
+  LocalWallpaperForm,
+  PasswordForm,
+  SearchEngineSettings,
+  WallpaperForm,
+  type SaveSettings,
+} from './SettingsForms';
+import {
+  RangeSetting,
+  SettingsSection,
+  SettingsSelect,
+  Toggle,
+  type DraftReporter,
+} from './SettingsControls';
+import type { SettingsTarget } from './settings-target';
+import './settings.css';
+
+const tabs = [
+  ['general', SlidersHorizontal],
+  ['icons', Grid2X2],
+  ['appearance', Palette],
+  ['widgets', Clock3],
+  ['sync', Cloud],
+  ['data', Database],
+] as const;
 
 export default function SettingsPanel({
-  state,
   spaceId,
   open,
   onClose,
-  onError,
+  target = 'general',
 }: {
-  state: RayState;
   spaceId: SpaceId;
   open: boolean;
   onClose: () => void;
-  onError: (message: string) => void;
+  target?: SettingsTarget;
 }) {
-  const [activeTab, setActiveTab] = useState<'appearance' | 'preferences' | 'sync' | 'backup'>(
-    'appearance',
+  const { t } = useTranslation();
+  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
+  const savedSettings = useRayTabStore(
+    useShallow((store) => store.state && effectiveSettings(store.state, spaceId)),
+  )!;
+  const dispatch = useRayTabStore((store) => store.dispatch);
+  const previewSettings = useRayTabStore((store) => store.previewSettings);
+  const clearPreview = useRayTabStore((store) => store.clearSettingsPreview);
+  const overrides = useRayTabStore((store) => store.state?.privateSettingOverrides)!;
+  const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
+  const privateLocked = useRayTabStore((store) => store.state?.privateSecurity.locked);
+  const [activeTab, setActiveTab] = useState<SettingsTarget>(target);
+  const [visited, setVisited] = useState<Set<SettingsTarget>>(() => new Set([target]));
+  const [drafts, setDrafts] = useState<Record<string, { dirty: boolean; busy: boolean }>>({});
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string>();
+  const [failedPatch, setFailedPatch] = useState<Partial<SpaceSettings>>({});
+  const [hasSaved, setHasSaved] = useState(false);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const [confirm, confirmation] = useConfirm();
+  const content = useRef<HTMLDivElement>(null);
+  const category = useRef<HTMLButtonElement>(null);
+  const language = useRef<HTMLButtonElement>(null);
+
+  const changeTab = useCallback((tab: SettingsTarget) => {
+    setActiveTab(tab);
+    setVisited((current) => new Set([...current, tab]));
+    content.current?.scrollTo({ top: 0 });
+  }, []);
+  useEffect(() => {
+    changeTab(target);
+    if (target === 'general') language.current?.focus();
+  }, [target, changeTab]);
+  useEffect(() => {
+    if (!open) return;
+    const revealCategory = () =>
+      category.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    revealCategory();
+    window.addEventListener('resize', revealCategory);
+    return () => window.removeEventListener('resize', revealCategory);
+  }, [activeTab, open]);
+  useEffect(
+    () => () => {
+      clearPreview(spaceId);
+    },
+    [spaceId, clearPreview],
   );
-  const overrides = state.privateSettingOverrides;
-  const settings = effectiveSettings(state, spaceId);
-  const tr = (text: string) => t(settings.language, text);
-  const update = async (patch: Partial<SpaceSettings>) => {
+  const report: DraftReporter = useCallback((id, dirty, busy) => {
+    setDrafts((current) =>
+      current[id]?.dirty === dirty && current[id]?.busy === busy
+        ? current
+        : { ...current, [id]: { dirty, busy } },
+    );
+  }, []);
+  const persistSettings = useCallback(
+    async (patch: Partial<SpaceSettings>, assets?: Map<string, Blob>, retryable = false) => {
+      if (retryable || 'background' in patch) previewSettings(spaceId, patch);
+      setSaving(true);
+      const persist = () => dispatch({ type: 'settings', spaceId, patch }, assets);
+      const operation = queue.current.then(persist, persist);
+      queue.current = operation;
+      try {
+        await operation;
+        clearPreview(spaceId, patch);
+        setFailedPatch((current) =>
+          Object.fromEntries(Object.entries(current).filter(([key]) => !(key in patch))),
+        );
+        setFailure(undefined);
+        setHasSaved(true);
+      } catch (reason) {
+        setFailure(errorMessage(reason));
+        setFailedPatch((current) =>
+          retryable
+            ? { ...current, ...patch }
+            : Object.fromEntries(Object.entries(current).filter(([key]) => !(key in patch))),
+        );
+        throw reason;
+      } finally {
+        if (queue.current === operation) setSaving(false);
+      }
+    },
+    [spaceId, dispatch, previewSettings, clearPreview],
+  );
+  const save: SaveSettings = persistSettings;
+  const update = (patch: Partial<SpaceSettings>) =>
+    void persistSettings(patch, undefined, true).catch((reason: unknown) =>
+      toast.error(errorMessage(reason)),
+    );
+  const preview = (patch: Partial<SpaceSettings>) => previewSettings(spaceId, patch);
+  const resetPrivatePreferences = async () => {
+    if (
+      !(await confirm({
+        title: t('settings.resetPrivateTitle'),
+        description: t('settings.resetPrivateDescription'),
+        confirmText: t('settings.followNormal'),
+      }))
+    )
+      return;
+    setSaving(true);
+    // Read after queued saves so all current overrides participate in the reset.
+    const persist = () =>
+      dispatch({
+        type: 'reset-private-setting',
+        keys: Object.keys(
+          useRayTabStore.getState().state!.privateSettingOverrides,
+        ) as (keyof SpaceSettings)[],
+      });
+    const operation = queue.current.then(persist, persist);
+    queue.current = operation;
     try {
-      await dispatch({ type: 'settings', spaceId, patch });
-      return true;
-    } catch (error) {
-      onError((error as Error).message);
-      return false;
+      await operation;
+      clearPreview(spaceId);
+      setFailedPatch({});
+      setFailure(undefined);
+      setHasSaved(true);
+    } catch (reason) {
+      setFailure(errorMessage(reason));
+      toast.error(errorMessage(reason));
+    } finally {
+      if (queue.current === operation) setSaving(false);
     }
   };
+  const requestClose = async () => {
+    if (saving || Object.values(drafts).some((draft) => draft.busy)) {
+      toast.info(t('settings.waitForSave'));
+      return;
+    }
+    const unsavedPreview = useRayTabStore.getState().settingsPreview;
+    if (Object.values(drafts).some((draft) => draft.dirty) || unsavedPreview?.spaceId === spaceId) {
+      if (
+        !(await confirm({
+          title: t('settings.discardTitle'),
+          description: t('settings.discardDescription'),
+          confirmText: t('settings.discard'),
+          cancelText: t('settings.keepEditing'),
+          variant: 'destructive',
+        }))
+      )
+        return;
+    }
+    clearPreview(spaceId);
+    onClose();
+  };
+  const numberRange = (
+    key: 'maxCardsPerRow' | 'iconSpacing' | 'overlay' | 'iconRadius',
+    min: number,
+    max: number,
+    step: number,
+    format?: (value: number) => string,
+  ) => (
+    <RangeSetting
+      label={t('settings.fields.' + key)}
+      value={settings[key]}
+      min={min}
+      max={max}
+      step={step}
+      format={format}
+      onPreview={(value) => preview({ [key]: value })}
+      onCommit={(value) => update({ [key]: value })}
+    />
+  );
+  const toggle = (
+    key:
+      | 'showSiteTitle'
+      | 'showSearch'
+      | 'showClock'
+      | 'showDate'
+      | 'showLunar'
+      | 'showGreeting'
+      | 'hour12'
+      | 'openInNewTab',
+  ) => (
+    <Toggle
+      label={t('settings.fields.' + key)}
+      checked={settings[key]}
+      onChange={(value) => update({ [key]: value })}
+    />
+  );
+  const iconSizePatch = (size: number) => {
+    const cardSize = Math.max(80, Math.min(160, Math.round((size * 2) / 5) * 5));
+    return { cardSize, iconSizeRatio: Math.max(0.28, size / cardSize) };
+  };
+  const retry = () => {
+    const pending = useRayTabStore.getState().settingsPreview;
+    const patch = { ...failedPatch };
+    if (pending?.spaceId === spaceId)
+      for (const key of Object.keys(patch) as (keyof SpaceSettings)[])
+        if (key in pending.patch) Object.assign(patch, { [key]: pending.patch[key] });
+    void persistSettings(patch, undefined, true).catch((reason: unknown) =>
+      toast.error(errorMessage(reason)),
+    );
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent variant="workspace" className="settings-workspace" closeLabel={tr('关闭')}>
-        <DialogHeader className="settings-workspace-header">
-          <DialogTitle>{tr('设置')}</DialogTitle>
-          <DialogDescription>
-            {spaceId === 'normal'
-              ? tr('普通空间的外观与使用偏好。')
-              : tr('私密空间默认跟随普通空间，可单独覆盖每项设置。')}
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) void requestClose();
+      }}
+    >
+      <DialogContent
+        variant="settings"
+        className="settings-workspace"
+        closeLabel={t('settings.close')}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          if (target === 'general') language.current?.focus();
+          else {
+            category.current?.focus({ preventScroll: true });
+            category.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+          }
+        }}
+      >
         <div className="settings-layout">
-          <nav className="settings-tabs" aria-label={tr('设置分类')}>
-            {(
-              [
-                ['appearance', tr('外观'), Palette],
-                ['preferences', tr('偏好'), SlidersHorizontal],
-                ['sync', tr('同步'), Cloud],
-                ['backup', tr('备份与迁移'), Database],
-              ] as const
-            ).map(([value, label, Icon]) => (
-              <button
-                type="button"
-                key={value}
-                className={activeTab === value ? 'active' : ''}
-                onClick={() => setActiveTab(value)}
-              >
-                <Icon size={17} />
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="settings-content">
-            {activeTab === 'preferences' && (
-              <SettingsSection title={tr('语言')}>
-                <Segmented
-                  label={tr('语言')}
-                  value={settings.language}
-                  options={[
-                    ['zh-CN', tr('中文')],
-                    ['en', tr('英文')],
-                  ]}
-                  onChange={(language) =>
-                    update({ language: language as SpaceSettings['language'] })
-                  }
-                />
-              </SettingsSection>
-            )}
-            {activeTab === 'appearance' && (
-              <>
-                <SettingsSection title={tr('布局')}>
-                  <RangeSetting
-                    label={tr('卡片大小')}
-                    value={settings.cardSize}
-                    min={80}
-                    max={160}
-                    step={5}
-                    suffix="px"
-                    onChange={(cardSize) => update({ cardSize })}
-                  />
-                  <RangeSetting
-                    label={tr('图标比例')}
-                    value={settings.iconSizeRatio}
-                    min={0.28}
-                    max={0.65}
-                    step={0.01}
-                    format={(value) => `${Math.round(value * 100)}%`}
-                    onChange={(iconSizeRatio) => update({ iconSizeRatio })}
-                  />
-                  <RangeSetting
-                    label={tr('每行最多')}
-                    value={settings.maxCardsPerRow}
-                    min={4}
-                    max={12}
-                    step={1}
-                    suffix={` ${tr('个')}`}
-                    onChange={(maxCardsPerRow) => update({ maxCardsPerRow })}
-                  />
-                  <RangeSetting
-                    label={tr('图标间距')}
-                    value={settings.iconSpacing}
-                    min={8}
-                    max={48}
-                    step={2}
-                    suffix="px"
-                    onChange={(iconSpacing) => update({ iconSpacing })}
-                  />
-                  <Toggle
-                    label={tr('显示卡片背景')}
-                    checked={settings.showCardBackground}
-                    onChange={(showCardBackground) => update({ showCardBackground })}
-                  />
-                  {settings.showCardBackground && (
-                    <RangeSetting
-                      label={tr('卡片透明度')}
-                      value={settings.cardOpacity}
-                      min={0.05}
-                      max={0.95}
-                      step={0.05}
-                      format={(value) => `${Math.round(value * 100)}%`}
-                      onChange={(cardOpacity) => update({ cardOpacity })}
-                    />
+          <aside className="settings-sidebar">
+            <div className="settings-brand">
+              <span className="settings-brand-mark" aria-hidden="true">
+                R
+              </span>
+              <div className="settings-brand-copy">
+                <span className="settings-brand-name">{t('settings.title')}</span>
+                <span className="settings-space-label">
+                  {t(spaceId === 'normal' ? 'messages.personalSpace' : 'messages.privateSpace')}
+                </span>
+              </div>
+            </div>
+            <nav className="settings-tabs" aria-label={t('settings.categories')}>
+              {tabs.map(([tab, Icon]) => (
+                <button
+                  type="button"
+                  key={tab}
+                  ref={activeTab === tab ? category : undefined}
+                  aria-current={activeTab === tab ? 'page' : undefined}
+                  className={activeTab === tab ? 'active' : ''}
+                  title={t('settings.tabs.' + tab)}
+                  onClick={() => changeTab(tab)}
+                >
+                  <span className="settings-tab-icon" aria-hidden="true">
+                    <Icon size={15} />
+                  </span>
+                  <span>{t('settings.tabs.' + tab)}</span>
+                </button>
+              ))}
+            </nav>
+          </aside>
+          <div className="settings-main">
+            <DialogHeader className="settings-workspace-header">
+              <DialogTitle className="sr-only">{t('settings.title')}</DialogTitle>
+              <div className="settings-header-line">
+                <h2 className="settings-category-title">{t('settings.tabs.' + activeTab)}</h2>
+                <div
+                  className="settings-autosave"
+                  role="status"
+                  aria-live="polite"
+                  title={t('settings.autoSaveHelp')}
+                >
+                  <span>
+                    {t(
+                      saving
+                        ? 'settings.saving'
+                        : failure || Object.keys(failedPatch).length
+                          ? 'settings.unsaved'
+                          : hasSaved
+                            ? 'settings.saved'
+                            : 'settings.autoSave',
+                    )}
+                  </span>
+                  {Object.keys(failedPatch).length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={saving}
+                      onClick={retry}
+                    >
+                      {t('settings.retry')}
+                    </Button>
                   )}
-                </SettingsSection>
-                <SettingsSection title={tr('侧边栏')}>
-                  <Segmented
-                    label={tr('侧边栏显示')}
-                    value={settings.sidebarMode}
-                    options={[
-                      ['always', tr('常驻显示')],
-                      ['auto', tr('自动隐藏')],
-                      ['hidden', tr('完全隐藏')],
-                    ]}
-                    onChange={(sidebarMode) =>
-                      update({ sidebarMode: sidebarMode as SpaceSettings['sidebarMode'] })
-                    }
-                  />
-                  <p className="text-[12px] text-[var(--dialog-muted)] -mt-1 leading-relaxed">
-                    {settings.sidebarMode === 'auto' &&
-                      tr('鼠标移至屏幕左侧边缘自动滑出，移开后平滑收起。')}
-                    {settings.sidebarMode === 'hidden' &&
-                      tr('侧边栏完全收起，可通过左下角触点或快捷键唤出。')}
-                    {settings.sidebarMode === 'always' && tr('侧边栏固定停靠在屏幕左侧。')}
-                  </p>
-                </SettingsSection>
-                <SettingsSection title={tr('外观')}>
-                  <Segmented
-                    label={tr('主题')}
-                    value={settings.theme}
-                    options={[
-                      ['system', tr('跟随系统')],
-                      ['light', tr('明亮')],
-                      ['dark', tr('深色')],
-                    ]}
-                    onChange={(theme) => update({ theme: theme as SpaceSettings['theme'] })}
-                  />
-                  <div className="background-options">
-                    {(['gradient', 'bing', 'unsplash', 'custom', 'color'] as const).map(
-                      (background) => (
-                        <button
-                          key={background}
+                </div>
+              </div>
+              <p className="settings-category-description">
+                {t('settings.categoryDescriptions.' + activeTab)}
+              </p>
+              <DialogDescription className="sr-only">
+                {t(
+                  spaceId === 'normal'
+                    ? 'settings.normalDescription'
+                    : 'settings.privateDescription',
+                )}
+              </DialogDescription>
+              {failure && Object.keys(failedPatch).length > 0 && (
+                <p className="settings-save-failed" role="alert">
+                  {failure}
+                </p>
+              )}
+            </DialogHeader>
+            <div className="settings-content" ref={content}>
+              {visited.has('general') && (
+                <div className="settings-panel-content" hidden={activeTab !== 'general'}>
+                  <SettingsSection title={t('settings.sections.preferences')}>
+                    <SettingsSelect
+                      label={t('settings.fields.language')}
+                      value={settings.language}
+                      options={[
+                        ['zh-CN', '简体中文'],
+                        ['en', 'English'],
+                      ]}
+                      onChange={(value) => update({ language: value as SpaceSettings['language'] })}
+                      triggerRef={language}
+                    />
+                    {toggle('openInNewTab')}
+                    <SettingsSelect
+                      label={t('settings.fields.sidebarMode')}
+                      value={settings.sidebarMode}
+                      options={['always', 'auto', 'hidden'].map(
+                        (value) => [value, t('settings.sidebarModes.' + value)] as const,
+                      )}
+                      onChange={(value) =>
+                        update({ sidebarMode: value as SpaceSettings['sidebarMode'] })
+                      }
+                    />
+                  </SettingsSection>
+                  <SettingsSection title={t('settings.privateProtection')}>
+                    <p className="settings-help">
+                      {t(
+                        protectedPrivate
+                          ? privateLocked
+                            ? 'settings.lockedHelp'
+                            : 'settings.unlockedHelp'
+                          : 'settings.protectionHelp',
+                      )}
+                    </p>
+                    {!privateLocked && (
+                      <details className="settings-advanced">
+                        <summary>
+                          {t(
+                            protectedPrivate
+                              ? 'settings.managePassword'
+                              : 'settings.enableProtection',
+                          )}
+                        </summary>
+                        <div>
+                          {!protectedPrivate ? (
+                            <PasswordForm mode="protect" report={report} />
+                          ) : (
+                            <>
+                              <PasswordForm mode="change" report={report} />
+                              <PasswordForm mode="remove" report={report} />
+                            </>
+                          )}
+                        </div>
+                      </details>
+                    )}
+                  </SettingsSection>
+                  {spaceId === 'private' && (
+                    <SettingsSection title={t('settings.privateInheritance')}>
+                      <p className="settings-help">
+                        {t('settings.privateInheritanceHelp', {
+                          count: Object.keys(overrides).length,
+                        })}
+                      </p>
+                      <Button
+                        variant="outline"
+                        disabled={saving || !Object.keys(overrides).length}
+                        onClick={() => void resetPrivatePreferences()}
+                      >
+                        {t('settings.followNormal')}
+                      </Button>
+                    </SettingsSection>
+                  )}
+                </div>
+              )}
+              {visited.has('icons') && (
+                <div className="settings-panel-content" hidden={activeTab !== 'icons'}>
+                  <SettingsSection title={t('settings.sections.iconAppearance')}>
+                    <RangeSetting
+                      label={t('settings.iconSize')}
+                      value={Math.round(settings.cardSize * settings.iconSizeRatio)}
+                      min={22}
+                      max={104}
+                      step={1}
+                      format={(value) => value + 'px'}
+                      onPreview={(value) => preview(iconSizePatch(value))}
+                      onCommit={(value) => update(iconSizePatch(value))}
+                    />
+                    {numberRange('iconRadius', 0, 50, 1, (value) => value + '%')}
+                    {toggle('showSiteTitle')}
+                  </SettingsSection>
+                  <SettingsSection title={t('settings.sections.layout')}>
+                    {numberRange('maxCardsPerRow', 4, 12, 1)}
+                    {numberRange('iconSpacing', 8, 48, 2, (value) => value + 'px')}
+                  </SettingsSection>
+                </div>
+              )}
+              {visited.has('appearance') && (
+                <div className="settings-panel-content" hidden={activeTab !== 'appearance'}>
+                  <SettingsSection title={t('settings.fields.theme')}>
+                    <SettingsSelect
+                      label={t('settings.fields.theme')}
+                      value={settings.theme}
+                      options={['system', 'light', 'dark'].map(
+                        (value) => [value, t('settings.themes.' + value)] as const,
+                      )}
+                      onChange={(value) => update({ theme: value as SpaceSettings['theme'] })}
+                    />
+                  </SettingsSection>
+                  <SettingsSection title={t('settings.sections.wallpaper')}>
+                    <SettingsSelect
+                      label={t('settings.wallpaperSource')}
+                      value={settings.background}
+                      options={['gradient', 'bing', 'unsplash', 'custom', 'color'].map(
+                        (value) => [value, t('settings.backgrounds.' + value)] as const,
+                      )}
+                      onChange={(value) =>
+                        update({ background: value as SpaceSettings['background'] })
+                      }
+                    />
+                    {settings.background === 'gradient' && (
+                      <>
+                        <div className="gradient-options" aria-label={t('settings.gradient')}>
+                          {gradientPresets.map((gradient, index) => (
+                            <button
+                              type="button"
+                              key={gradient}
+                              style={{ backgroundImage: gradient }}
+                              aria-label={t('settings.gradientNamed', { number: index + 1 })}
+                              aria-pressed={settings.gradient === gradient}
+                              onClick={() => update({ gradient })}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {settings.background === 'unsplash' && (
+                      <>
+                        <Button
                           type="button"
-                          className={`background-swatch background-preview-${background}`}
-                          aria-pressed={settings.background === background}
+                          variant="outline"
+                          size="sm"
                           onClick={() =>
                             update({
-                              background,
+                              featuredPhotoUrl: nextFeaturedPhoto(settings.featuredPhotoUrl),
                             })
                           }
                         >
-                          <span>
-                            {tr(
-                              {
-                                gradient: '渐变',
-                                bing: '每日图片',
-                                unsplash: '精选摄影',
-                                custom: '自定义',
-                                color: '纯色',
-                              }[background],
-                            )}
-                          </span>
-                        </button>
-                      ),
+                          {t('settings.nextPhoto')}
+                        </Button>
+                      </>
                     )}
-                  </div>
-                  {settings.background === 'gradient' && (
-                    <div className="gradient-options" aria-label={tr('渐变背景')}>
-                      {gradientPresets.map((gradient, index) => (
-                        <button
-                          type="button"
-                          key={gradient}
-                          style={{ backgroundImage: gradient }}
-                          aria-label={`${tr('渐变背景')} ${index + 1}`}
-                          aria-pressed={settings.gradient === gradient}
-                          onClick={() => update({ gradient })}
+                    {settings.background === 'color' && (
+                      <div className="setting-row">
+                        <div>
+                          <label htmlFor="settings-solid-color">
+                            {t('settings.fields.solidColor')}
+                          </label>
+                        </div>
+                        <input
+                          id="settings-solid-color"
+                          className="settings-color-input"
+                          type="color"
+                          value={settings.solidColor}
+                          onChange={(event) => preview({ solidColor: event.target.value })}
+                          onBlur={(event) => update({ solidColor: event.target.value })}
                         />
-                      ))}
-                    </div>
-                  )}
-                  {settings.background === 'unsplash' && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        update({
-                          featuredPhotoUrl: nextFeaturedPhoto(settings.featuredPhotoUrl),
-                        })
-                      }
-                    >
-                      {tr('换一张')}
-                    </Button>
-                  )}
-                  {settings.background === 'color' && (
-                    <label className="setting-row">
-                      <span>{tr('背景颜色')}</span>
-                      <input
-                        type="color"
-                        value={settings.solidColor}
-                        onChange={(event) => update({ solidColor: event.target.value })}
-                      />
-                    </label>
-                  )}
-                  <label className="setting-row">
-                    <span>{tr('遮罩强度')}</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="0.8"
-                      step="0.05"
-                      value={settings.overlay}
-                      onChange={(event) => update({ overlay: Number(event.target.value) })}
-                    />
-                  </label>
-                  {settings.background === 'custom' && (
-                    <label className="setting-row">
-                      <span>{tr('本地壁纸')}</span>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = '';
-                          if (!file) return;
-                          void prepareImage(file, 'wallpaper')
-                            .then(({ id, blob }) =>
-                              dispatch(
-                                {
-                                  type: 'settings',
-                                  spaceId,
-                                  patch: {
-                                    background: 'custom',
-                                    wallpaperId: id,
-                                    onlineWallpaperUrl: undefined,
-                                  },
-                                },
-                                new Map([[id, blob]]),
-                              ),
-                            )
-                            .catch((error: Error) => onError(error.message));
-                        }}
-                      />
-                    </label>
-                  )}
-                  {settings.background === 'custom' && (
-                    <form
-                      className="online-wallpaper"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const url = String(new FormData(event.currentTarget).get('url')).trim();
-                        try {
-                          if (!['https:', 'http:'].includes(new URL(url).protocol))
-                            throw new Error();
-                          update({
-                            background: 'custom',
-                            onlineWallpaperUrl: url,
-                            wallpaperId: undefined,
-                          });
-                        } catch {
-                          onError(tr('请输入有效的在线壁纸地址'));
-                        }
-                      }}
-                    >
-                      <input
-                        key={settings.onlineWallpaperUrl ?? ''}
-                        name="url"
-                        type="url"
-                        required
-                        aria-label={tr('在线壁纸地址')}
-                        defaultValue={settings.onlineWallpaperUrl}
-                        placeholder="https://example.com/wallpaper.jpg"
-                      />
-                      <Button type="submit" variant="outline" size="sm">
-                        {tr('使用在线壁纸')}
-                      </Button>
-                    </form>
-                  )}
-                  <TextColorSettings settings={settings} update={update} tr={tr} />
-                </SettingsSection>
-              </>
-            )}
-            {activeTab === 'preferences' && (
-              <>
-                <SettingsSection title={tr('组件')}>
-                  <Toggle
-                    label={tr('显示搜索')}
-                    checked={settings.showSearch}
-                    onChange={(showSearch) => update({ showSearch })}
-                  />
-                  <Toggle
-                    label={tr('显示时钟')}
-                    checked={settings.showClock}
-                    onChange={(showClock) => update({ showClock })}
-                  />
-                  <Toggle
-                    label={tr('显示日期')}
-                    checked={settings.showDate}
-                    onChange={(showDate) => update({ showDate })}
-                  />
-                  <Toggle
-                    label={tr('显示农历')}
-                    checked={settings.showLunar}
-                    onChange={(showLunar) => update({ showLunar })}
-                  />
-                  <Toggle
-                    label={tr('显示问候语')}
-                    checked={settings.showGreeting}
-                    onChange={(showGreeting) => update({ showGreeting })}
-                  />
-                  {settings.showGreeting && (
-                    <div className="greeting-settings">
-                      <p>{tr('可导入分时段的自定义问候语，导入后每天稳定轮换。')}</p>
-                      <div className="data-actions">
-                        <label className="file-button">
-                          {tr('导入问候语')}
-                          <input
-                            type="file"
-                            accept="application/json,.json"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              event.target.value = '';
-                              if (!file) return;
-                              void file
-                                .text()
-                                .then((content) => customGreetingsSchema.parse(JSON.parse(content)))
-                                .then((customGreetings) => update({ customGreetings }))
-                                .catch(() => onError(tr('问候语文件格式不正确')));
-                            }}
-                          />
-                        </label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => downloadGreetingTemplate(settings.language)}
-                        >
-                          {tr('下载模板')}
-                        </Button>
-                        {settings.customGreetings && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => update({ customGreetings: undefined })}
-                          >
-                            {tr('恢复默认')}
-                          </Button>
-                        )}
                       </div>
-                    </div>
-                  )}
-                  <Toggle
-                    label={tr('12 小时制')}
-                    checked={settings.hour12}
-                    onChange={(hour12) => update({ hour12 })}
-                  />
-                  <Toggle
-                    label={tr('新标签页打开网站')}
-                    checked={settings.openInNewTab}
-                    onChange={(openInNewTab) => update({ openInNewTab })}
-                  />
-                  <Toggle
-                    label={tr('显示网站标题')}
-                    checked={settings.showSiteTitle}
-                    onChange={(showSiteTitle) => update({ showSiteTitle })}
-                  />
-                </SettingsSection>
-                <SettingsSection title={tr('搜索引擎')}>
-                  <SearchEngineSettings
-                    settings={settings}
-                    update={update}
-                    onError={onError}
-                    tr={tr}
-                  />
-                </SettingsSection>
-                <SettingsSection title={tr('私密空间保护')}>
-                  {!state.privateSecurity.protected ? (
-                    <PasswordForm
-                      label={tr('设置密码')}
-                      submit={tr('启用密码保护')}
-                      onSubmit={async (password) => {
-                        await privateVault.protect(password);
-                        onClose();
-                      }}
-                      onError={onError}
-                      tr={tr}
-                    />
-                  ) : state.privateSecurity.locked ? (
-                    <p className="settings-help">
-                      {tr('私密空间已加密并锁定。进入私密空间解锁后可修改或取消密码。')}
-                    </p>
-                  ) : (
-                    <>
-                      <p className="settings-help">
-                        {tr(
-                          '私密网站、设置和图片已加密保存。返回普通空间或刷新页面会清除解锁状态。',
-                        )}
-                      </p>
-                      <PasswordForm
-                        label={tr('修改密码')}
-                        submit={tr('更换密码')}
-                        requireNext
-                        onSubmit={async (current, next) => {
-                          await privateVault.changePassword(current, next!);
-                          onClose();
-                        }}
-                        onError={onError}
-                        tr={tr}
+                    )}
+                    {numberRange('overlay', 0, 0.8, 0.05, (value) => Math.round(value * 100) + '%')}
+                    <div
+                      className="settings-panel-content settings-form"
+                      hidden={settings.background !== 'custom'}
+                    >
+                      <LocalWallpaperForm save={save} report={report} />
+                      <WallpaperForm
+                        url={savedSettings.onlineWallpaperUrl}
+                        save={save}
+                        report={report}
                       />
-                      <PasswordForm
-                        label={tr('取消密码')}
-                        submit={tr('取消密码保护')}
-                        destructive
-                        onSubmit={async (password) => {
-                          await privateVault.removePassword(password);
-                        }}
-                        onError={onError}
-                        tr={tr}
-                      />
-                    </>
-                  )}
-                </SettingsSection>
-                {spaceId === 'private' && Object.keys(overrides).length > 0 && (
-                  <SettingsSection title={tr('私密空间覆盖')}>
-                    <p className="settings-help">
-                      {tr('已覆盖')} {Object.keys(overrides).length}{' '}
-                      {tr('项。可逐项恢复跟随普通空间。')}
-                    </p>
-                    <div className="override-list">
-                      {(Object.keys(overrides) as (keyof SpaceSettings)[]).map((key) => (
-                        <Button
-                          key={key}
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            void dispatch({ type: 'reset-private-setting', key }).catch(
-                              (error: Error) => onError(error.message),
-                            )
-                          }
-                        >
-                          <RotateCcw size={14} /> {tr(settingLabels[key] ?? key)}
-                        </Button>
-                      ))}
                     </div>
                   </SettingsSection>
-                )}
-              </>
-            )}
-            {activeTab === 'backup' && (
-              <SettingsSection title={tr('数据')}>
-                <DataSettings
-                  state={state}
-                  spaceId={spaceId}
-                  language={settings.language}
-                  onError={onError}
-                />
-              </SettingsSection>
-            )}
-            {activeTab === 'sync' && (
-              <SettingsSection title={tr('同步')}>
-                <SyncSettings language={settings.language} onError={onError} />
-              </SettingsSection>
-            )}
-            <p className="settings-help">{tr('外观与偏好修改后自动保存。')}</p>
-            <p className="settings-about">{tr('RayTab 0.1 · 数据默认保存在当前浏览器')}</p>
+                </div>
+              )}
+              {visited.has('widgets') && (
+                <div className="settings-panel-content" hidden={activeTab !== 'widgets'}>
+                  <SettingsSection title={t('settings.search')}>
+                    {toggle('showSearch')}
+                    <div className="settings-panel-content" hidden={!settings.showSearch}>
+                      <SearchEngineSettings settings={savedSettings} save={save} report={report} />
+                    </div>
+                  </SettingsSection>
+                  <SettingsSection title={t('settings.sections.clock')}>
+                    {toggle('showClock')}
+                    <div className="settings-panel-content" hidden={!settings.showClock}>
+                      {toggle('hour12')}
+                    </div>
+                    {toggle('showDate')}
+                    {toggle('showLunar')}
+                  </SettingsSection>
+                  <SettingsSection title={t('settings.sections.greetings')}>
+                    {toggle('showGreeting')}
+                  </SettingsSection>
+                </div>
+              )}
+              {visited.has('sync') && (
+                <div className="settings-panel-content" hidden={activeTab !== 'sync'}>
+                  <SyncSettings report={report} />
+                </div>
+              )}
+              {visited.has('data') && (
+                <div className="settings-panel-content" hidden={activeTab !== 'data'}>
+                  <DataSettings spaceId={spaceId} report={report} />
+                </div>
+              )}
+              {Object.values(drafts).some((draft) => draft.dirty) && (
+                <p className="settings-draft-note" role="status">
+                  {t('settings.draftHelp')}
+                </p>
+              )}
+            </div>
           </div>
         </div>
+        {confirmation}
       </DialogContent>
     </Dialog>
   );
-}
-
-function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="settings-section">
-      <h2>{title}</h2>
-      {children}
-    </section>
-  );
-}
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="setting-row">
-      <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-    </label>
-  );
-}
-function Segmented({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: [string, string][];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="setting-row">
-      <span>{label}</span>
-      <div className="settings-buttons">
-        {options.map(([option, text]) => (
-          <button
-            type="button"
-            key={option}
-            aria-pressed={value === option}
-            onClick={() => onChange(option)}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TextColorSettings({
-  settings,
-  update,
-  tr,
-}: {
-  settings: SpaceSettings;
-  update: (patch: Partial<SpaceSettings>) => void;
-  tr: (text: string) => string;
-}) {
-  const targets: [keyof SpaceSettings['textColors'], string][] = [
-    ['clock', '时钟'],
-    ['date', '日期'],
-    ['greeting', '问候语'],
-    ['search', '搜索栏'],
-    ['tabs', '分组标签'],
-    ['cards', '网站卡片'],
-  ];
-  return (
-    <div className="text-color-settings">
-      <Segmented
-        label={tr('主页文字')}
-        value={settings.textColorMode}
-        options={[
-          ['auto', tr('自动适应')],
-          ['light', tr('亮白')],
-          ['dark', tr('墨黑')],
-          ['custom', tr('自定义')],
-        ]}
-        onChange={(textColorMode) =>
-          update({ textColorMode: textColorMode as SpaceSettings['textColorMode'] })
-        }
-      />
-      {settings.textColorMode === 'custom' && (
-        <div className="text-color-grid">
-          {targets.map(([key, label]) => (
-            <label key={key}>
-              <span>{tr(label)}</span>
-              <input
-                type="color"
-                value={settings.textColors[key]}
-                onChange={(event) =>
-                  update({ textColors: { ...settings.textColors, [key]: event.target.value } })
-                }
-              />
-            </label>
-          ))}
-        </div>
-      )}
-      <p className="settings-help">
-        {settings.textColorMode === 'auto'
-          ? tr('纯色和渐变背景会按亮度自动选择文字，图片背景使用高对比亮白。')
-          : tr('主页文字颜色会实时更新。')}
-      </p>
-    </div>
-  );
-}
-
-function RangeSetting({
-  label,
-  value,
-  min,
-  max,
-  step,
-  suffix = '',
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  suffix?: string;
-  format?: (value: number) => string;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="setting-range">
-      <span>
-        {label}
-        <strong>{format ? format(value) : `${value}${suffix}`}</strong>
-      </span>
-      <input
-        type="range"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-function SearchEngineSettings({
-  settings,
-  update,
-  onError,
-  tr,
-}: {
-  settings: SpaceSettings;
-  update: (patch: Partial<SpaceSettings>) => Promise<boolean>;
-  onError: (message: string) => void;
-  tr: (text: string) => string;
-}) {
-  const [editingId, setEditingId] = useState<string>();
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [saving, setSaving] = useState(false);
-  const reset = () => {
-    setEditingId(undefined);
-    setName('');
-    setUrl('');
-  };
-  const remove = async (id: string) => {
-    if (settings.searchEngines.length === 1) return;
-    setSaving(true);
-    const searchEngines = settings.searchEngines.filter((engine) => engine.id !== id);
-    const saved = await update({
-      searchEngines,
-      searchEngine: settings.searchEngine === id ? searchEngines[0].id : settings.searchEngine,
-    });
-    if (saved && editingId === id) reset();
-    setSaving(false);
-  };
-  return (
-    <div className="search-engine-settings">
-      <div className="search-engine-list">
-        {settings.searchEngines.map((engine) => (
-          <div key={engine.id}>
-            <button
-              type="button"
-              className={settings.searchEngine === engine.id ? 'active' : ''}
-              aria-pressed={settings.searchEngine === engine.id}
-              disabled={saving}
-              onClick={() => update({ searchEngine: engine.id })}
-            >
-              {engine.name}
-            </button>
-            <code>{engine.url}</code>
-            <button
-              type="button"
-              aria-label={`${tr('编辑')} ${engine.name}`}
-              disabled={saving}
-              onClick={() => {
-                setEditingId(engine.id);
-                setName(engine.name);
-                setUrl(engine.url);
-              }}
-            >
-              {tr('编辑')}
-            </button>
-            <button
-              type="button"
-              aria-label={`${tr('删除')} ${engine.name}`}
-              disabled={saving || settings.searchEngines.length === 1}
-              onClick={() => void remove(engine.id)}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-      <form
-        className="search-engine-add"
-        onSubmit={async (event) => {
-          event.preventDefault();
-          if (saving) return;
-          const parsed = searchEngineSchema.safeParse({
-            id: editingId ?? crypto.randomUUID(),
-            name,
-            url,
-          });
-          if (!parsed.success) {
-            onError(tr(parsed.error.issues[0]?.message ?? '搜索引擎格式不正确'));
-            return;
-          }
-          setSaving(true);
-          const saved = await update({
-            searchEngines: editingId
-              ? settings.searchEngines.map((engine) =>
-                  engine.id === editingId ? parsed.data : engine,
-                )
-              : [...settings.searchEngines, parsed.data],
-            searchEngine: editingId ? settings.searchEngine : parsed.data.id,
-          });
-          if (saved) reset();
-          setSaving(false);
-        }}
-      >
-        <input
-          name="name"
-          required
-          maxLength={80}
-          value={name}
-          disabled={saving}
-          onChange={(event) => setName(event.target.value)}
-          aria-label={tr('搜索引擎名称')}
-          placeholder={tr('名称')}
-        />
-        <input
-          name="url"
-          required
-          value={url}
-          disabled={saving}
-          onChange={(event) => setUrl(event.target.value)}
-          aria-label={tr('搜索引擎地址')}
-          placeholder="https://example.com/search?q=%s"
-        />
-        <Button
-          type="submit"
-          variant="outline"
-          size="sm"
-          disabled={saving || (!editingId && settings.searchEngines.length >= 20)}
-        >
-          {editingId ? tr('保存') : tr('添加')}
-        </Button>
-        {editingId && (
-          <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={reset}>
-            {tr('取消')}
-          </Button>
-        )}
-      </form>
-      <p className="settings-help">
-        {tr('使用')} <code>%s</code> {tr('表示搜索关键词。')}
-      </p>
-    </div>
-  );
-}
-
-function PasswordForm({
-  label,
-  submit,
-  requireNext = false,
-  destructive = false,
-  onSubmit,
-  onError,
-  tr,
-}: {
-  label: string;
-  submit: string;
-  requireNext?: boolean;
-  destructive?: boolean;
-  onSubmit: (password: string, next?: string) => Promise<void>;
-  onError: (message: string) => void;
-  tr: (text: string) => string;
-}) {
-  return (
-    <form
-      className="password-form"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const form = event.currentTarget;
-        const data = new FormData(form);
-        const password = String(data.get('password'));
-        const next = requireNext ? String(data.get('next')) : undefined;
-        if (next && next !== String(data.get('confirm'))) {
-          onError(tr('两次输入的新密码不一致'));
-          return;
-        }
-        void onSubmit(password, next)
-          .then(() => form.reset())
-          .catch((error: Error) => onError(error.message));
-      }}
-    >
-      <strong>{label}</strong>
-      <input
-        name="password"
-        type="password"
-        minLength={6}
-        required
-        aria-label={tr(requireNext || destructive ? '当前密码' : '密码')}
-        placeholder={requireNext || destructive ? tr('当前密码') : tr('至少 6 个字符')}
-      />
-      {requireNext && (
-        <>
-          <input
-            name="next"
-            type="password"
-            minLength={6}
-            required
-            aria-label={tr('新密码')}
-            placeholder={tr('新密码')}
-          />
-          <input
-            name="confirm"
-            type="password"
-            minLength={6}
-            required
-            aria-label={tr('再次输入新密码')}
-            placeholder={tr('再次输入新密码')}
-          />
-        </>
-      )}
-      <Button type="submit" variant={destructive ? 'destructive' : 'outline'} size="sm">
-        {submit}
-      </Button>
-    </form>
-  );
-}
-const settingLabels: Partial<Record<keyof SpaceSettings, string>> = {
-  language: '语言',
-  theme: '主题',
-  searchEngine: '搜索引擎',
-  searchEngines: '搜索引擎列表',
-  openInNewTab: '打开方式',
-  showClock: '时钟',
-  showSearch: '搜索',
-  showDate: '日期',
-  showLunar: '农历',
-  showGreeting: '问候语',
-  customGreetings: '自定义问候语',
-  showSiteTitle: '网站标题',
-  showGroups: '分组导航',
-  hour12: '时间制式',
-  cardSize: '卡片大小',
-  iconSizeRatio: '图标比例',
-  maxCardsPerRow: '每行网站',
-  iconSpacing: '图标间距',
-  showCardBackground: '卡片背景',
-  cardOpacity: '卡片透明度',
-  navigationCollapsed: '分组导航',
-  sidebarMode: '侧边栏',
-  background: '背景',
-  gradient: '渐变',
-  solidColor: '纯色',
-  wallpaperId: '壁纸',
-  onlineWallpaperUrl: '在线壁纸',
-  featuredPhotoUrl: '精选摄影',
-  overlay: '遮罩',
-  textColorMode: '主页文字',
-  textColors: '自定义文字颜色',
-};
-
-function downloadGreetingTemplate(language: SpaceSettings['language']) {
-  const template =
-    language === 'en'
-      ? {
-          morning: ['Good morning.'],
-          noon: ['Have a good afternoon.'],
-          afternoon: ['Keep going.'],
-          evening: ['Good evening.'],
-          night: ['It is late. Get some rest.'],
-        }
-      : {
-          morning: ['早上好，开启新的一天'],
-          noon: ['中午好，记得好好吃饭'],
-          afternoon: ['下午好，继续加油'],
-          evening: ['晚上好，放松一下吧'],
-          night: ['夜深了，早点休息哦'],
-        };
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' }),
-  );
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'raytab-greetings.json';
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
 import { pointerWithin, closestCenter, useDroppable, type CollisionDetection } from '@dnd-kit/core';
 import { FolderUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -50,18 +51,34 @@ export function createNavigationCollision({
     });
 
     if (pointerCoordinates) {
+      if (activeDrag?.type === 'site') {
+        const folderCenter = filtered.find((container) => {
+          const id = String(container.id);
+          if (!id.startsWith('folder-center:')) return false;
+          const rect = args.droppableRects.get(`folder:${id.replace('folder-center:', '')}`);
+          if (!rect) return false;
+          // Use the sortable slot, whose coordinates stay stable while its
+          // inner center node moves with the sorting animation.
+          return (
+            pointerCoordinates.x >= rect.left + rect.width * 0.25 &&
+            pointerCoordinates.x <= rect.left + rect.width * 0.75 &&
+            pointerCoordinates.y >= rect.top + rect.height * 0.25 &&
+            pointerCoordinates.y <= rect.top + rect.height * 0.75
+          );
+        });
+        if (folderCenter)
+          return [{ id: folderCenter.id, data: { droppableContainer: folderCenter, value: 0 } }];
+      }
+
       const collisions = pointerWithin({
         ...args,
-        droppableContainers: filtered,
+        droppableContainers: filtered.filter(
+          (container) => !String(container.id).startsWith('folder-center:'),
+        ),
       });
 
       if (collisions.length === 0) {
         return [];
-      }
-
-      if (activeDrag?.type === 'site') {
-        const folderCenter = collisions.find((c) => String(c.id).startsWith('folder-center:'));
-        if (folderCenter) return [folderCenter];
       }
 
       const itemCollision = collisions.find(
@@ -182,12 +199,11 @@ export function DroppableGroupTab({
 export function FolderModalDropTargets({
   activeGroupId,
   groups,
-  tr,
 }: {
   activeGroupId: string;
   groups: Group[];
-  tr: (text: string) => string;
 }) {
+  const { t } = useTranslation();
   const { setNodeRef: setOutRef, isOver: isOutOver } = useDroppable({
     id: 'container:out-of-folder',
     data: {
@@ -211,7 +227,7 @@ export function FolderModalDropTargets({
         )}
       >
         <FolderUp size={14} />
-        <span>{tr('移出文件夹')}</span>
+        <span>{t('messages.moveOutOfFolder')}</span>
       </div>
       {groups
         .filter((g) => g.id !== activeGroupId)

@@ -18,12 +18,12 @@ describe('versioned backup', () => {
       folderId: null,
       title: 'Secret',
       url: 'https://secret.example/',
-      color: '#123456',
+      iconBackground: { mode: 'color', color: '#123456' },
       order: 0,
       createdAt: 1,
       updatedAt: 1,
       changeId: 'secret-change',
-      iconId: 'secret-icon',
+      icon: { source: 'resource', resourceId: 'secret-icon' },
     });
     const document = await createBackup(
       state,
@@ -59,9 +59,13 @@ describe('versioned backup', () => {
     await repo.read();
     await repo.protectPrivate('vault-password');
     const locked = await repo.read();
-    await expect(createBackup(locked, new Map(), 'all', 'backup-password')).rejects.toThrow('解锁');
+    await expect(createBackup(locked, new Map(), 'all', 'backup-password')).rejects.toThrow(
+      'messages.unlockThePrivateSpaceFirst',
+    );
     const unlocked = await repo.unlockPrivate('vault-password');
-    await expect(createBackup(unlocked, new Map(), 'all')).rejects.toThrow('备份加密密码');
+    await expect(createBackup(unlocked, new Map(), 'all')).rejects.toThrow(
+      'messages.enterTheBackupEncryptionPassword',
+    );
     await repo.close();
   });
 
@@ -70,7 +74,10 @@ describe('versioned backup', () => {
     await repo.update(
       (state) => {
         state.normalSettings.wallpaperId = 'shared-wallpaper';
-        state.spaces.normal.sites[0].iconId = 'normal-icon';
+        state.spaces.normal.sites[0].icon = {
+          source: 'auto',
+          resourceId: 'normal-icon',
+        };
       },
       new Map([
         ['shared-wallpaper', new Blob(['wallpaper'])],
@@ -84,7 +91,9 @@ describe('versioned backup', () => {
     expect(
       (await createBackup(normal.state, normal.resources, 'normal')).spaces.private,
     ).toBeUndefined();
-    await expect(repo.snapshot('private')).rejects.toThrow('解锁');
+    await expect(repo.snapshot('private')).rejects.toThrow(
+      'messages.unlockThePrivateSpaceBeforeCreatingABackupThatIncludesIt',
+    );
     await repo.close();
   });
 
@@ -93,7 +102,9 @@ describe('versioned backup', () => {
     const incoming = await repo.read();
     incoming.privateSettingOverrides.showClock = false;
     await repo.protectPrivate('vault-password');
-    await expect(repo.restore(incoming, new Map())).rejects.toThrow('解锁');
+    await expect(repo.restore(incoming, new Map())).rejects.toThrow(
+      'messages.unlockThePrivateSpaceFirst',
+    );
     await repo.unlockPrivate('vault-password');
     await repo.restore(incoming, new Map());
     await repo.lockPrivate();
@@ -107,81 +118,111 @@ describe('versioned backup', () => {
   it('rejects corrupt, future and wrong-password backups without mutating input', async () => {
     const state = createInitialState();
     const before = structuredClone(state);
-    await expect(parseBackup('{oops')).rejects.toThrow('JSON');
-    await expect(parseBackup({ format: 'raytab-backup', version: 99 })).rejects.toThrow('版本');
+    await expect(parseBackup('{oops')).rejects.toThrow('messages.theBackupFileIsNotValidJson');
+    await expect(parseBackup({ format: 'raytab-backup', version: 99 })).rejects.toThrow(
+      'messages.theBackupFormatIsInvalidOrItsVersionIsUnsupported',
+    );
     const document = await createBackup(state, new Map(), 'private', 'private-pass');
     await expect(restoreBackup(state, document, 'replace', 'wrong-pass')).rejects.toThrow(
-      '密码错误',
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
     );
     expect(state).toEqual(before);
   });
 
-  it('restores settings, navigation data, and image resources into an empty repository', async () => {
-    const source = createRepository(crypto.randomUUID());
-    const initial = await source.read();
-    const groupId = initial.spaces.normal.groups[0].id;
-    await source.update(
-      (state) => {
-        applyCommand(state, {
-          type: 'save-site',
-          spaceId: 'normal',
-          id: 'resource-site',
-          groupId,
-          folderId: null,
-          site: {
-            title: 'Resource site',
-            url: 'https://resource.example',
-            color: '#123456',
-            iconId: 'resource-icon',
-          },
-        });
-        applyCommand(state, {
-          type: 'settings',
-          spaceId: 'normal',
-          patch: { theme: 'dark', showClock: false },
-        });
-        applyCommand(state, {
-          type: 'save-folder',
-          spaceId: 'normal',
-          id: 'backup-folder',
-          groupId,
-          name: 'Saved links',
-        });
-        applyCommand(state, {
-          type: 'move-site',
-          spaceId: 'normal',
-          id: 'resource-site',
-          groupId,
-          folderId: 'backup-folder',
-        });
-      },
-      new Map([['resource-icon', new Blob(['icon bytes'], { type: 'image/webp' })]]),
-    );
-    const snapshot = await source.snapshot();
-    const document = await createBackup(snapshot.state, snapshot.resources, 'all');
-    const destination = createRepository(crypto.randomUUID());
-    const restored = await restoreBackup(await destination.read(), document, 'replace');
-    await destination.restore(restored.state, restored.resources);
+  it.each(['auto', 'resource'] as const)(
+    'restores settings, navigation data, and %s image resources into an empty repository',
+    async (sourceKind) => {
+      const source = createRepository(crypto.randomUUID());
+      const initial = await source.read();
+      const groupId = initial.spaces.normal.groups[0].id;
+      await source.update(
+        (state) => {
+          applyCommand(state, {
+            type: 'save-site',
+            spaceId: 'normal',
+            id: 'resource-site',
+            groupId,
+            folderId: null,
+            site: {
+              title: 'Resource site',
+              url: 'https://resource.example',
+              iconBackground: { mode: 'color', color: '#123456' },
+              icon: { source: sourceKind, resourceId: 'resource-icon' },
+            },
+          });
+          applyCommand(state, {
+            type: 'settings',
+            spaceId: 'normal',
+            patch: { theme: 'dark', showClock: false },
+          });
+          applyCommand(state, {
+            type: 'save-folder',
+            spaceId: 'normal',
+            id: 'backup-folder',
+            groupId,
+            name: 'Saved links',
+          });
+          applyCommand(state, {
+            type: 'move-site',
+            spaceId: 'normal',
+            id: 'resource-site',
+            groupId,
+            folderId: 'backup-folder',
+          });
+        },
+        new Map([['resource-icon', new Blob(['icon bytes'], { type: 'image/webp' })]]),
+      );
+      const snapshot = await source.snapshot();
+      const document = await createBackup(snapshot.state, snapshot.resources, 'all');
+      const destination = createRepository(crypto.randomUUID());
+      const restored = await restoreBackup(await destination.read(), document, 'replace');
+      await destination.restore(restored.state, restored.resources);
 
-    const reopened = await destination.read();
-    expect(reopened.spaces).toEqual(snapshot.state.spaces);
-    expect(reopened.normalSettings).toMatchObject({ theme: 'dark', showClock: false });
-    expect(reopened.spaces.normal.sites).toContainEqual(
-      expect.objectContaining({ id: 'resource-site', iconId: 'resource-icon' }),
+      const reopened = await destination.read();
+      expect(reopened.spaces).toEqual(snapshot.state.spaces);
+      expect(reopened.normalSettings).toMatchObject({ theme: 'dark', showClock: false });
+      expect(reopened.spaces.normal.sites).toContainEqual(
+        expect.objectContaining({
+          id: 'resource-site',
+          icon: { source: sourceKind, resourceId: 'resource-icon' },
+        }),
+      );
+      expect(await (await destination.resource('resource-icon'))?.text()).toBe('icon bytes');
+      await source.close();
+      await destination.close();
+    },
+  );
+
+  it('preserves text icons in a backup without adding image resources', async () => {
+    const state = createInitialState();
+    state.spaces.normal.sites[0].icon = { source: 'text', text: 'Ray中' };
+    const document = await createBackup(state, new Map(), 'normal');
+    expect(document.spaces.normal!.resources).toEqual([]);
+    const restored = await restoreBackup(
+      createInitialState(),
+      await parseBackup(document),
+      'replace',
     );
-    expect(await (await destination.resource('resource-icon'))?.text()).toBe('icon bytes');
-    await source.close();
-    await destination.close();
+    expect(restored.state.spaces.normal.sites[0].icon).toEqual({ source: 'text', text: 'Ray中' });
+    expect(restored.resources.size).toBe(0);
   });
 
-  it('rolls back a restore when a referenced resource is missing', async () => {
-    const repo = createRepository(crypto.randomUUID());
-    const before = await repo.read();
-    const invalid = structuredClone(before);
-    invalid.spaces.normal.sites[0].iconId = 'missing-icon';
+  it.each(['auto', 'resource'] as const)(
+    'rolls back a restore when a referenced %s resource is missing',
+    async (source) => {
+      const repo = createRepository(crypto.randomUUID());
+      const before = await repo.read();
+      const invalid = structuredClone(before);
+      invalid.spaces.normal.sites[0].icon = {
+        source,
+        resourceId: 'missing-icon',
+      };
 
-    await expect(repo.restore(invalid, new Map())).rejects.toThrow('图片资源缺失');
-    expect(await repo.read()).toEqual(before);
-    await repo.close();
-  });
+      await expect(repo.restore(invalid, new Map())).rejects.toThrow(
+        'messages.anImageResourceIsMissingNoChangesWereSaved',
+      );
+      expect(await repo.read()).toEqual(before);
+      await repo.close();
+    },
+  );
 });

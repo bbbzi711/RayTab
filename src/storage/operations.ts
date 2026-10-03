@@ -1,5 +1,9 @@
+import { AppError } from '@/lib/errors';
 import {
   normalizeUrl,
+  defaultSiteIcon,
+  defaultSiteIconBackground,
+  siteSchema,
   type RayState,
   type Site,
   type SpaceData,
@@ -8,7 +12,7 @@ import {
 } from './model';
 import type { BookmarkCandidate } from '@/features/import/bookmarks';
 
-type SiteInput = Pick<Site, 'title' | 'url' | 'color' | 'iconId'>;
+export type SiteInput = Pick<Site, 'title' | 'url' | 'icon' | 'iconBackground'>;
 type Destination = { groupId: string; folderId: string | null };
 export type Command =
   | { type: 'switch-space'; spaceId: SpaceId }
@@ -41,7 +45,7 @@ export type Command =
   | ({ type: 'move-site'; spaceId: SpaceId; id: string; beforeId?: string } & Destination)
   | { type: 'move-folder'; spaceId: SpaceId; id: string; groupId: string; beforeId?: string }
   | { type: 'settings'; spaceId: SpaceId; patch: Partial<SpaceSettings> }
-  | { type: 'reset-private-setting'; key: keyof SpaceSettings }
+  | { type: 'reset-private-setting'; keys: (keyof SpaceSettings)[] }
   | { type: 'import-bookmarks'; spaceId: SpaceId; groupId: string; items: BookmarkCandidate[] };
 
 const byOrder = (a: { order: number; id: string }, b: { order: number; id: string }) =>
@@ -56,11 +60,11 @@ function reorder<T extends { id: string; order: number; updatedAt: number; chang
 ) {
   const ordered = [...items].sort(byOrder);
   const moving = ordered.find((item) => item.id === movingId);
-  if (!moving) throw new Error('要移动的项目不存在');
+  if (!moving) throw new AppError('messages.theItemToMoveDoesNotExist');
   if (beforeId === movingId) return;
   const rest = ordered.filter((item) => item.id !== movingId);
   const index = beforeId ? rest.findIndex((item) => item.id === beforeId) : -1;
-  if (beforeId && index < 0) throw new Error('排序目标不在目标容器中');
+  if (beforeId && index < 0) throw new AppError('messages.theSortTargetIsNotInTheDestination');
   rest.splice(index < 0 ? rest.length : index, 0, moving);
   rest.forEach((item, order) => {
     if (item.order !== order) Object.assign(item, { order, ...changed(item.updatedAt) });
@@ -68,15 +72,16 @@ function reorder<T extends { id: string; order: number; updatedAt: number; chang
 }
 function ensureExpected(item: { updatedAt: number } | undefined, expected?: number) {
   if (expected !== undefined && (!item || item.updatedAt !== expected))
-    throw new Error('这个项目已在另一个页面更改，请关闭编辑后重试');
+    throw new AppError('messages.thisItemChangedInAnotherPageCloseTheEditorAndTryAgain');
 }
 function destination(space: SpaceData, target: Destination) {
-  if (!space.groups.some((item) => item.id === target.groupId)) throw new Error('目标分组不存在');
+  if (!space.groups.some((item) => item.id === target.groupId))
+    throw new AppError('messages.theDestinationGroupDoesNotExist');
   if (
     target.folderId !== null &&
     !space.folders.some((item) => item.id === target.folderId && item.groupId === target.groupId)
   )
-    throw new Error('目标文件夹不存在');
+    throw new AppError('messages.theDestinationFolderDoesNotExist');
 }
 const at = (item: Site, target: Destination) =>
   item.groupId === target.groupId && item.folderId === target.folderId;
@@ -91,7 +96,7 @@ function containerItems(space: SpaceData, target: Destination) {
 }
 function checkBefore(space: SpaceData, target: Destination, beforeId?: string) {
   if (beforeId && !containerItems(space, target).some((item) => item.id === beforeId))
-    throw new Error('排序目标不在目标容器中');
+    throw new AppError('messages.theSortTargetIsNotInTheDestination');
 }
 
 export function applyCommand(state: RayState, command: Command) {
@@ -101,7 +106,7 @@ export function applyCommand(state: RayState, command: Command) {
   }
   if (command.type === 'switch-space') {
     if (command.spaceId === 'private' && state.privateSecurity.locked)
-      throw new Error('请先解锁私密空间');
+      throw new AppError('messages.unlockThePrivateSpaceFirst');
     state.local.activeSpace = command.spaceId;
     return;
   }
@@ -110,13 +115,13 @@ export function applyCommand(state: RayState, command: Command) {
     return;
   }
   if (command.type === 'reset-private-setting') {
-    if (state.privateSecurity.locked) throw new Error('请先解锁私密空间');
-    delete state.privateSettingOverrides[command.key];
-    if (command.key === 'searchEngines') delete state.privateSettingOverrides.searchEngine;
+    if (state.privateSecurity.locked) throw new AppError('messages.unlockThePrivateSpaceFirst');
+    for (const key of command.keys) delete state.privateSettingOverrides[key];
+    if (command.keys.includes('searchEngines')) delete state.privateSettingOverrides.searchEngine;
     return;
   }
   if (command.spaceId === 'private' && state.privateSecurity.locked)
-    throw new Error('请先解锁私密空间');
+    throw new AppError('messages.unlockThePrivateSpaceFirst');
   const space = state.spaces[command.spaceId];
   const tombstone = (entity: 'group' | 'folder' | 'site', id: string) => {
     const { updatedAt, changeId } = changed();
@@ -149,11 +154,11 @@ export function applyCommand(state: RayState, command: Command) {
     const item = list.find((entry) => entry.id === command.id);
     ensureExpected(item, command.expected);
     const name = command.name.trim();
-    if (!name) throw new Error('请输入名称');
+    if (!name) throw new AppError('messages.enterAName');
     if (command.type === 'save-folder') {
       destination(space, { groupId: command.groupId, folderId: null });
       if (item && 'groupId' in item && item.groupId !== command.groupId)
-        throw new Error('文件夹已移到其他分组，请重新打开');
+        throw new AppError('messages.thisFolderMovedToAnotherGroupReopenItToContinue');
     }
     if (item) Object.assign(item, { name, ...changed(item.updatedAt) });
     else {
@@ -177,8 +182,9 @@ export function applyCommand(state: RayState, command: Command) {
     return;
   }
   if (command.type === 'delete-group') {
-    if (space.groups.length === 1) throw new Error('至少保留一个分组');
-    if (command.id === command.destinationGroupId) throw new Error('请选择其他分组接收内容');
+    if (space.groups.length === 1) throw new AppError('messages.keepAtLeastOneGroup');
+    if (command.id === command.destinationGroupId)
+      throw new AppError('messages.chooseAnotherGroupToReceiveTheContents');
     destination(space, { groupId: command.id, folderId: null });
     destination(space, { groupId: command.destinationGroupId, folderId: null });
     for (const item of containerItems(space, { groupId: command.id, folderId: null }).sort(byOrder))
@@ -208,7 +214,7 @@ export function applyCommand(state: RayState, command: Command) {
   }
   if (command.type === 'delete-folder') {
     const folder = space.folders.find((item) => item.id === command.id);
-    if (!folder) throw new Error('文件夹不存在');
+    if (!folder) throw new AppError('messages.theFolderDoesNotExist');
     for (const site of space.sites.filter((item) => item.folderId === folder.id).sort(byOrder))
       applyCommand(state, {
         type: 'move-site',
@@ -228,14 +234,17 @@ export function applyCommand(state: RayState, command: Command) {
     destination(space, command);
     const item = space.sites.find((entry) => entry.id === command.id);
     ensureExpected(item, command.expected);
+    const title = command.site.title.trim();
+    if (!title) throw new AppError('messages.enterAName');
     const value = {
-      ...command.site,
-      title: command.site.title.trim(),
-      url: normalizeUrl(command.site.url),
+      ...siteSchema.pick({ title: true, url: true, icon: true, iconBackground: true }).parse({
+        ...command.site,
+        title,
+        url: normalizeUrl(command.site.url),
+      }),
       groupId: command.groupId,
       folderId: command.folderId,
     };
-    if (!value.title) throw new Error('请输入名称');
     if (item) {
       const moved = !at(item, command);
       Object.assign(item, value, changed(item.updatedAt));
@@ -253,7 +262,7 @@ export function applyCommand(state: RayState, command: Command) {
   if (command.type === 'delete-site' || command.type === 'delete-sites') {
     const ids = new Set(command.type === 'delete-site' ? [command.id] : command.ids);
     if ([...ids].some((id) => !space.sites.some((item) => item.id === id)))
-      throw new Error('网站不存在');
+      throw new AppError('messages.theSiteDoesNotExist');
     space.sites = space.sites.filter((item) => !ids.has(item.id));
     ids.forEach((id) => tombstone('site', id));
     return;
@@ -262,7 +271,7 @@ export function applyCommand(state: RayState, command: Command) {
     const ids = [...new Set(command.ids)];
     destination(space, command);
     if (ids.some((id) => !space.sites.some((item) => item.id === id)))
-      throw new Error('网站不存在');
+      throw new AppError('messages.theSiteDoesNotExist');
     for (const id of space.sites
       .filter((item) => ids.includes(item.id))
       .sort(byOrder)
@@ -279,7 +288,7 @@ export function applyCommand(state: RayState, command: Command) {
   if (command.type === 'move-site') {
     destination(space, command);
     const item = space.sites.find((entry) => entry.id === command.id);
-    if (!item) throw new Error('网站不存在');
+    if (!item) throw new AppError('messages.theSiteDoesNotExist');
     if (command.beforeId === command.id && at(item, command)) return;
     checkBefore(space, command, command.beforeId);
     Object.assign(item, {
@@ -292,7 +301,7 @@ export function applyCommand(state: RayState, command: Command) {
   }
   if (command.type === 'move-folder') {
     const item = space.folders.find((entry) => entry.id === command.id);
-    if (!item) throw new Error('文件夹不存在');
+    if (!item) throw new AppError('messages.theFolderDoesNotExist');
     destination(space, { groupId: command.groupId, folderId: null });
     if (command.beforeId === command.id && item.groupId === command.groupId) return;
     checkBefore(space, { groupId: command.groupId, folderId: null }, command.beforeId);
@@ -344,7 +353,12 @@ export function applyCommand(state: RayState, command: Command) {
       id: crypto.randomUUID(),
       groupId: command.groupId,
       folderId,
-      site: { title: candidate.title.slice(0, 80), url: candidate.url, color: '#4f7c68' },
+      site: {
+        title: candidate.title.slice(0, 80),
+        url: candidate.url,
+        icon: { ...defaultSiteIcon },
+        iconBackground: { ...defaultSiteIconBackground },
+      },
     });
   }
 }

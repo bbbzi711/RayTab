@@ -1,3 +1,4 @@
+import { AppError } from '@/lib/errors';
 import { z } from 'zod';
 
 const ITERATIONS = 310_000;
@@ -16,7 +17,7 @@ export const encryptedEnvelopeSchema = z.object({
 export type EncryptedEnvelope = z.infer<typeof encryptedEnvelopeSchema>;
 
 export async function encryptJson(value: unknown, password: string): Promise<EncryptedEnvelope> {
-  if (password.length < 6) throw new Error('密码至少需要 6 个字符');
+  if (password.length < 6) throw new AppError('messages.thePasswordMustContainAtLeast6Characters');
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt, ITERATIONS);
@@ -51,7 +52,7 @@ export async function decryptJson<T>(envelope: EncryptedEnvelope, password: stri
     );
     return JSON.parse(decoder.decode(plaintext)) as T;
   } catch {
-    throw new Error('密码错误或加密数据已损坏');
+    throw new AppError('messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged');
   }
 }
 

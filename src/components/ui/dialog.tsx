@@ -2,6 +2,7 @@ import * as React from 'react';
 import { cn } from 'cn';
 import { XIcon } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
+import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 
@@ -41,23 +42,37 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  closeLabel = 'Close',
+  closeLabel,
+  overlayClassName,
   variant = 'center',
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
   closeLabel?: string;
-  variant?: 'center' | 'workspace';
+  overlayClassName?: string;
+  variant?: 'center' | 'workspace' | 'settings';
 }) {
+  const { t } = useTranslation();
+  const label = closeLabel ?? t('messages.close');
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay className={variant === 'workspace' ? 'dialog-workspace-overlay' : undefined} />
+      <DialogOverlay
+        className={cn(
+          variant === 'settings'
+            ? 'dialog-settings-overlay'
+            : variant === 'workspace'
+              ? 'dialog-workspace-overlay'
+              : undefined,
+          overlayClassName,
+        )}
+      />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
           variant === 'center'
             ? 'ray-dialog fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 outline-none duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg'
             : 'ray-workspace fixed z-50 outline-none',
+          variant === 'settings' && 'ray-settings',
           className,
         )}
         {...props}
@@ -66,11 +81,11 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            aria-label={closeLabel}
+            aria-label={label}
             className="dialog-close-button absolute top-4 right-4 grid h-9 w-9 place-items-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
-            <span className="sr-only">{closeLabel}</span>
+            <span className="sr-only">{label}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -96,6 +111,7 @@ function DialogFooter({
 }: React.ComponentProps<'div'> & {
   showCloseButton?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       data-slot="dialog-footer"
@@ -105,7 +121,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{t('messages.close')}</Button>
         </DialogPrimitive.Close>
       )}
     </div>

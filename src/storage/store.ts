@@ -1,115 +1,225 @@
-import { useSyncExternalStore } from 'react';
+import { create } from 'zustand';
+import { serializeError, type StoredError } from '@/lib/errors';
 import { repository } from './repository';
 import { applyCommand, type Command } from './operations';
+import { wallpaperDisplay } from '@/features/appearance/wallpaper-source';
 import {
   createLockedPrivateSpace,
   effectiveSettings,
-  rayStateSchema,
   type RayState,
+  type SpaceId,
+  type SpaceSettings,
 } from './model';
 
-const QUICK_CACHE_KEY = 'raytab-quick-cache';
-const QUICK_META_KEY = 'raytab-quick-meta';
+const STARTUP_META_KEY = 'raytab-startup-meta';
+const readError = (reason: unknown): StoredError => {
+  const error = serializeError(reason);
+  return error.code === 'messages.anErrorOccurredTryAgain'
+    ? { ...error, code: 'errors.localRead' }
+    : error;
+};
 
-function saveQuickCache(state: RayState) {
+function saveStartupMeta(state: RayState) {
   if (typeof localStorage === 'undefined') return;
   try {
-    const safeState = structuredClone(state);
-    if (safeState.privateSecurity.protected) {
-      safeState.spaces.private = createLockedPrivateSpace();
-      safeState.privateSettingOverrides = {};
-      safeState.local.activeGroup.private = safeState.spaces.private.groups[0].id;
-      safeState.local.selectedFolder.private = {};
-      safeState.local.activeSpace = 'normal';
-      safeState.privateSecurity.locked = true;
+    const wallpaper = wallpaperDisplay(state.normalSettings);
+    const previous: unknown = JSON.parse(localStorage.getItem(STARTUP_META_KEY) || '{}');
+    if (typeof previous === 'object' && previous && 'wallpaper' in previous) {
+      const cached = previous.wallpaper;
+      if (
+        (wallpaper.resourceId || wallpaper.remoteUrl) &&
+        typeof cached === 'object' &&
+        cached &&
+        'color' in cached &&
+        typeof cached.color === 'string' &&
+        /^#[\da-f]{6}$/i.test(cached.color)
+      )
+        wallpaper.color = cached.color;
     }
-    localStorage.setItem(QUICK_CACHE_KEY, JSON.stringify(safeState));
-    const activeSpace = safeState.local.activeSpace;
-    const settings = effectiveSettings(safeState, activeSpace);
     localStorage.setItem(
-      QUICK_META_KEY,
+      STARTUP_META_KEY,
       JSON.stringify({
-        theme: settings.theme,
-        homeMode: safeState.local.homeMode,
+        theme: state.normalSettings.theme,
+        homeMode: state.local.homeMode,
+        wallpaper,
       }),
     );
   } catch {
-    /* ignore quota or serialization errors */
+    // First-paint metadata is optional; IndexedDB remains the saved data source.
   }
 }
 
-function loadQuickCache(): RayState | null {
-  if (typeof localStorage === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(QUICK_CACHE_KEY);
-    return raw ? rayStateSchema.parse(JSON.parse(raw)) : null;
-  } catch {
-    return null;
-  }
-}
-
-type Snapshot = { state: RayState | null; error: string | null };
-let snapshot: Snapshot = { state: loadQuickCache(), error: null };
-const listeners = new Set<() => void>();
-const channel =
-  typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('raytab-updates');
-function notify() {
-  listeners.forEach((listener) => listener());
-}
-export async function refresh() {
-  try {
-    const state = await repository.read();
-    if (!snapshot.state || state.revision >= snapshot.state.revision) {
-      snapshot = { state, error: null };
-      saveQuickCache(state);
-      notify();
-    }
-  } catch {
-    snapshot = { ...snapshot, error: '本地数据暂时无法读取。请重试；不要清除浏览器数据。' };
-    notify();
-  }
-}
-channel?.addEventListener('message', () => void refresh());
-window.addEventListener('focus', () => void refresh());
-void refresh();
-export function useRayTab() {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    () => snapshot,
-  );
-}
-export async function dispatch(command: Command, assets?: Map<string, Blob>) {
-  const state = await repository.update((draft) => applyCommand(draft, command), assets);
-  channel?.postMessage('updated');
-  if (!snapshot.state || state.revision >= snapshot.state.revision) {
-    snapshot = { state, error: null };
-    saveQuickCache(state);
-    notify();
-  }
-}
-
-async function runSecurity(action: () => Promise<RayState>) {
-  const state = await action();
-  channel?.postMessage('updated');
-  snapshot = { state, error: null };
-  saveQuickCache(state);
-  notify();
-}
-export const privateVault = {
-  protect: (password: string) => runSecurity(() => repository.protectPrivate(password)),
-  unlock: (password: string) => runSecurity(() => repository.unlockPrivate(password)),
-  lock: () => runSecurity(() => repository.lockPrivate()),
-  changePassword: async (current: string, next: string) => {
-    await repository.changePrivatePassword(current, next);
-    await refresh();
-  },
-  removePassword: (password: string) =>
-    runSecurity(() => repository.removePrivatePassword(password)),
+type RayTabStore = {
+  state: RayState | null;
+  error: StoredError | null;
+  resourceVersion: number;
+  settingsPreview: { spaceId: SpaceId; patch: Partial<SpaceSettings> } | null;
+  previewSettings: (spaceId: SpaceId, patch: Partial<SpaceSettings>) => void;
+  clearSettingsPreview: (spaceId?: SpaceId, savedPatch?: Partial<SpaceSettings>) => void;
+  refresh: () => Promise<void>;
+  dispatch: (command: Command, assets?: Map<string, Blob>) => Promise<void>;
+  protectPrivate: (password: string) => Promise<void>;
+  unlockPrivate: (password: string) => Promise<void>;
+  lockPrivate: () => Promise<void>;
+  changePrivatePassword: (current: string, next: string) => Promise<void>;
+  removePrivatePassword: (password: string) => Promise<void>;
 };
 
-export { repository };
+export const useRayTabStore = create<RayTabStore>((set, get) => {
+  let readRequest = 0;
+  let privateSessionVersion = 0;
+
+  const publish = (state: RayState, sessionVersion: number) => {
+    if (sessionVersion !== privateSessionVersion) return false;
+    const current = get().state;
+    if (current && state.revision < current.revision) return false;
+    readRequest++;
+    const resourcesChanged =
+      !current ||
+      state.revision !== current.revision ||
+      state.privateSecurity.protected !== current.privateSecurity.protected ||
+      state.privateSecurity.locked !== current.privateSecurity.locked;
+    set({
+      state,
+      error: null,
+      resourceVersion: get().resourceVersion + Number(resourcesChanged),
+      settingsPreview:
+        current?.local.activeSpace !== state.local.activeSpace ||
+        (state.privateSecurity.locked && !current?.privateSecurity.locked)
+          ? null
+          : get().settingsPreview,
+    });
+    saveStartupMeta(state);
+    return true;
+  };
+
+  const runPrivate = async (action: () => Promise<RayState>) => {
+    const sessionVersion = ++privateSessionVersion;
+    readRequest++;
+    const state = await action();
+    if (!publish(state, sessionVersion)) await get().refresh();
+  };
+
+  return {
+    state: null,
+    error: null,
+    resourceVersion: 0,
+    settingsPreview: null,
+    previewSettings: (spaceId, patch) => {
+      const current = get();
+      if (!current.state || (spaceId === 'private' && current.state.privateSecurity.locked)) return;
+      set({
+        settingsPreview: {
+          spaceId,
+          patch: {
+            ...(current.settingsPreview?.spaceId === spaceId ? current.settingsPreview.patch : {}),
+            ...patch,
+          },
+        },
+      });
+    },
+    clearSettingsPreview: (spaceId, savedPatch) => {
+      const preview = get().settingsPreview;
+      if (!preview || (spaceId && preview.spaceId !== spaceId)) return;
+      if (!savedPatch) {
+        set({ settingsPreview: null });
+        return;
+      }
+      const patch = { ...preview.patch };
+      for (const key of Object.keys(savedPatch) as (keyof SpaceSettings)[])
+        if (Object.is(patch[key], savedPatch[key])) delete patch[key];
+      set({ settingsPreview: Object.keys(patch).length ? { ...preview, patch } : null });
+    },
+    refresh: async () => {
+      const request = ++readRequest;
+      const sessionVersion = privateSessionVersion;
+      try {
+        const state = await repository.read();
+        if (request === readRequest) publish(state, sessionVersion);
+      } catch (reason) {
+        if (request === readRequest && sessionVersion === privateSessionVersion)
+          set({ error: readError(reason) });
+      }
+    },
+    dispatch: async (command, assets) => {
+      const sessionVersion = privateSessionVersion;
+      const state = await repository.update((draft) => applyCommand(draft, command), assets);
+      if (!publish(state, sessionVersion)) await get().refresh();
+    },
+    protectPrivate: (password) => runPrivate(() => repository.protectPrivate(password)),
+    unlockPrivate: (password) => runPrivate(() => repository.unlockPrivate(password)),
+    lockPrivate: () =>
+      runPrivate(() => {
+        const current = get().state;
+        set({ settingsPreview: null });
+        if (current?.privateSecurity.protected && !current.privateSecurity.locked) {
+          const privateSpace = createLockedPrivateSpace();
+          set({
+            state: {
+              ...current,
+              spaces: { ...current.spaces, private: privateSpace },
+              privateSettingOverrides: {},
+              privateSecurity: { protected: true, locked: true },
+              local: {
+                ...current.local,
+                activeSpace: 'normal',
+                activeGroup: { ...current.local.activeGroup, private: privateSpace.groups[0].id },
+                selectedFolder: { ...current.local.selectedFolder, private: {} },
+              },
+            },
+            resourceVersion: get().resourceVersion + 1,
+          });
+        }
+        return repository.lockPrivate();
+      }),
+    changePrivatePassword: (current, next) =>
+      runPrivate(async () => {
+        await repository.changePrivatePassword(current, next);
+        return repository.read();
+      }),
+    removePrivatePassword: (password) =>
+      runPrivate(() => repository.removePrivatePassword(password)),
+  };
+});
+
+export function selectEffectiveSettings(store: RayTabStore, spaceId?: SpaceId) {
+  if (!store.state) return null;
+  const selectedSpace = spaceId ?? store.state.local.activeSpace;
+  const settings = effectiveSettings(store.state, selectedSpace);
+  return store.settingsPreview?.spaceId === selectedSpace
+    ? { ...settings, ...store.settingsPreview.patch }
+    : settings;
+}
+
+export function startRayTabStore() {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.removeItem('raytab-quick-cache');
+      localStorage.removeItem('raytab-quick-meta');
+    } catch {
+      // Discarding an obsolete optional cache does not change saved data.
+    }
+  }
+  const channel =
+    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('raytab-updates');
+  const refresh = () => void useRayTabStore.getState().refresh();
+  const lock = () => {
+    if (!useRayTabStore.getState().state?.privateSecurity.protected) return;
+    void useRayTabStore
+      .getState()
+      .lockPrivate()
+      .catch((reason: unknown) => {
+        useRayTabStore.setState({ error: readError(reason) });
+      });
+  };
+  channel?.addEventListener('message', refresh);
+  window.addEventListener('focus', refresh);
+  window.addEventListener('pagehide', lock);
+  refresh();
+  return () => {
+    channel?.removeEventListener('message', refresh);
+    channel?.close();
+    window.removeEventListener('focus', refresh);
+    window.removeEventListener('pagehide', lock);
+  };
+}

@@ -1,4 +1,9 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useImperativeHandle, type Ref } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { errorMessage } from '@/lib/errors';
+import { NavigationMenuItems, NavigationMoreMenu, type NavigationAction } from './NavigationMenu';
+import { useShallow } from 'zustand/react/shallow';
 import { createPortal } from 'react-dom';
 import {
   DndContext,
@@ -16,7 +21,17 @@ import {
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import { Plus, FolderPlus, ListTree, CheckSquare, House, Layers, Settings2 } from 'lucide-react';
+import {
+  Plus,
+  ListTree,
+  CheckSquare,
+  House,
+  Layers,
+  MoreHorizontal,
+  Pencil,
+  FolderInput,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
@@ -26,24 +41,11 @@ import {
   DialogDescription,
   DialogHeader,
 } from '@/components/ui/dialog';
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-} from '@/components/ui/context-menu';
-import { dispatch } from '@/storage/store';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent } from '@/components/ui/context-menu';
+import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import type { Command } from '@/storage/operations';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import {
-  type RayState,
-  type Site,
-  type Folder,
-  type Group,
-  effectiveSettings,
-} from '@/storage/model';
-import { t } from '@/locales';
+import { type Site, type Folder, type Group } from '@/storage/model';
 import { resolveHomeTextColors } from '@/features/appearance/text-colors';
 import { cn } from '@/lib/utils';
 import { SiteCard, SiteCardView, FolderCard, FolderCardView } from './NavigationCards';
@@ -58,12 +60,12 @@ import {
   FolderModalDropTargets,
 } from './NavigationDrag';
 
+export type NavigationHandle = { addSite: () => void; addFolder: () => void; organize: () => void };
+
 export interface NavigationPageProps {
-  state: RayState;
   spaceId: 'normal' | 'private';
-  onError: (message: string) => void;
   groupsPortal?: HTMLElement | null;
-  onOpenSettings?: () => void;
+  ref?: Ref<NavigationHandle>;
 }
 
 const byOrder = (a: { order: number; id: string }, b: { order: number; id: string }) =>
@@ -71,16 +73,16 @@ const byOrder = (a: { order: number; id: string }, b: { order: number; id: strin
 
 type RootItem = { kind: 'folder'; folder: Folder } | { kind: 'site'; site: Site };
 
-export function NavigationPage({
-  state,
-  spaceId,
-  onError,
-  groupsPortal,
-  onOpenSettings,
-}: NavigationPageProps) {
-  const space = state.spaces[spaceId];
-  const settings = effectiveSettings(state, spaceId);
-  const tr = (text: string) => t(settings.language, text);
+export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPageProps) {
+  const space = useRayTabStore((store) => store.state?.spaces[spaceId])!;
+  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
+  const activeGroupId =
+    useRayTabStore((store) => store.state?.local.activeGroup[spaceId]) || space.groups[0]?.id;
+  const selectedFolderId = useRayTabStore(
+    (store) => store.state?.local.selectedFolder[spaceId]?.[activeGroupId] ?? null,
+  );
+  const dispatch = useRayTabStore((store) => store.dispatch);
+  const { t } = useTranslation();
   const [confirm, confirmDialog] = useConfirm();
 
   const run = useCallback(
@@ -89,15 +91,12 @@ export function NavigationPage({
         await dispatch(command);
         return true;
       } catch (err) {
-        onError(err instanceof Error ? err.message : String(err));
+        toast.error(errorMessage(err));
         return false;
       }
     },
-    [onError],
+    [dispatch],
   );
-
-  const activeGroupId = state.local.activeGroup[spaceId] || space.groups[0]?.id;
-  const selectedFolderId = state.local.selectedFolder[spaceId]?.[activeGroupId] ?? null;
 
   const orderedGroups = useMemo(() => [...space.groups].sort(byOrder), [space.groups]);
   const activeGroup = orderedGroups.find((g) => g.id === activeGroupId) || orderedGroups[0];
@@ -156,8 +155,20 @@ export function NavigationPage({
     ids?: string[];
   } | null>(null);
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      addSite: () => {
+        setEditingSite(undefined);
+        setEditorOpen(true);
+      },
+      addFolder: () => setNameTarget({ type: 'folder' }),
+      organize: () => setManageMode(true),
+    }),
+    [],
+  );
+
   const [activeDrag, setActiveDrag] = useState<NavigationDrag | null>(null);
-  const dragEndAt = useRef(0);
 
   const activeSite = useMemo(
     () =>
@@ -169,26 +180,6 @@ export function NavigationPage({
       activeDrag?.type === 'folder' ? space.folders.find((f) => f.id === activeDrag.id) : undefined,
     [activeDrag, space.folders],
   );
-
-  const isPointerIntercepted = useCallback((e?: React.MouseEvent) => {
-    if (Date.now() - dragEndAt.current < 150) {
-      if (!e || e.detail > 0) {
-        e?.preventDefault();
-        e?.stopPropagation();
-        return true;
-      }
-    }
-    return false;
-  }, []);
-
-  const handleContainerClickCapture = useCallback((e: React.MouseEvent) => {
-    if (Date.now() - dragEndAt.current < 150) {
-      if (e.detail > 0) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    }
-  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -219,7 +210,6 @@ export function NavigationPage({
 
   const handleDragEnd = useCallback(
     ({ active, over }: DragEndEvent) => {
-      dragEndAt.current = Date.now();
       setActiveDrag(null);
       if (!over) return;
 
@@ -244,7 +234,6 @@ export function NavigationPage({
   );
 
   const handleDragCancel = useCallback(() => {
-    dragEndAt.current = Date.now();
     setActiveDrag(null);
   }, []);
 
@@ -278,6 +267,7 @@ export function NavigationPage({
     '--site-card-size': `${settings.cardSize}px`,
     '--site-icon-size': `${settings.cardSize * settings.iconSizeRatio}px`,
     '--site-grid-gap': `${settings.iconSpacing}px`,
+    '--site-icon-radius': `${settings.iconRadius}%`,
     maxWidth: `${settings.cardSize * settings.maxCardsPerRow + settings.iconSpacing * (settings.maxCardsPerRow - 1) + 16}px`,
     margin: '0 auto',
   } as React.CSSProperties;
@@ -289,7 +279,7 @@ export function NavigationPage({
     const expected = isNew ? undefined : nameTarget.item!.updatedAt;
     if (nameTarget.type === 'group') {
       await dispatch({ type: 'save-group', spaceId, id, name, expected });
-      if (isNew) await dispatch({ type: 'select-group', spaceId, groupId: id });
+      if (isNew) await run({ type: 'select-group', spaceId, groupId: id });
     } else {
       await dispatch({ type: 'save-folder', spaceId, id, groupId: activeGroup.id, name, expected });
     }
@@ -315,78 +305,117 @@ export function NavigationPage({
     }
   };
 
-  const renderSiteContextMenu = (site: Site) => (
-    <>
-      <ContextMenuItem
-        onClick={() => {
-          setEditingSite(site);
-          setEditorOpen(true);
-        }}
-      >
-        {tr('编辑')}
-      </ContextMenuItem>
-      <ContextMenuItem
-        onClick={() => {
-          navigator.clipboard
-            .writeText(site.url)
-            .then(() => onError(tr('已复制网址到剪贴板')))
-            .catch((e: Error) => onError(e.message || tr('复制失败')));
-        }}
-      >
-        {tr('复制网址')}
-      </ContextMenuItem>
-      <ContextMenuItem onClick={() => setMoveTarget({ type: 'site', item: site })}>
-        {tr('移动')}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem
-        className="text-red-500"
-        onClick={async () => {
-          const ok = await confirm({
-            title: tr('确定删除网站？'),
+  const openEditor = (site?: Site) => {
+    setEditingSite(site);
+    setEditorOpen(true);
+  };
+  const siteActions = (site: Site): NavigationAction[] => [
+    { id: 'edit', label: t('messages.editSite'), icon: Pencil, run: () => openEditor(site) },
+    {
+      id: 'move',
+      label: t('messages.move'),
+      icon: FolderInput,
+      run: () => setMoveTarget({ type: 'site', item: site }),
+    },
+    {
+      id: 'delete',
+      icon: Trash2,
+      label: t('messages.delete'),
+      destructive: true,
+      separator: true,
+      run: async () => {
+        if (
+          await confirm({
+            title: t('messages.deleteThisSite'),
             description: site.title,
-            confirmText: tr('删除'),
-            cancelText: tr('取消'),
+            confirmText: t('messages.delete'),
+            cancelText: t('messages.cancel'),
             variant: 'destructive',
-          });
-          if (ok) {
-            run({ type: 'delete-site', spaceId, id: site.id });
-          }
-        }}
-      >
-        {tr('删除')}
-      </ContextMenuItem>
-    </>
-  );
-
-  const renderFolderContextMenu = (folder: Folder) => (
-    <>
-      <ContextMenuItem onClick={() => setNameTarget({ type: 'folder', item: folder })}>
-        {tr('重命名')}
-      </ContextMenuItem>
-      <ContextMenuItem onClick={() => setMoveTarget({ type: 'folder', item: folder })}>
-        {tr('移动')}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem
-        className="text-red-500"
-        onClick={async () => {
-          const ok = await confirm({
-            title: tr('确定解散文件夹？'),
-            description: tr('文件夹内的网站将被移出到当前分组，不会被删除。'),
-            confirmText: tr('解散'),
-            cancelText: tr('取消'),
+          })
+        ) {
+          if (await run({ type: 'delete-site', spaceId, id: site.id }))
+            toast.success(t('messages.deleted'));
+        }
+      },
+    },
+  ];
+  const folderActions = (folder: Folder): NavigationAction[] => [
+    {
+      id: 'rename',
+      label: t('messages.rename'),
+      run: () => setNameTarget({ type: 'folder', item: folder }),
+    },
+    {
+      id: 'move',
+      label: t('messages.move'),
+      run: () => setMoveTarget({ type: 'folder', item: folder }),
+    },
+    {
+      id: 'organize',
+      label: t('navigation.organizeContents'),
+      run: async () => {
+        if (
+          await run({
+            type: 'select-folder',
+            spaceId,
+            groupId: folder.groupId,
+            folderId: folder.id,
+          })
+        )
+          setManageMode(true);
+      },
+    },
+    {
+      id: 'dissolve',
+      label: t('messages.dissolveFolder'),
+      separator: true,
+      destructive: true,
+      run: async () => {
+        if (
+          await confirm({
+            title: t('messages.dissolveThisFolder'),
+            description: t('messages.sitesInThisFolderWillMoveToTheCurrentGroupAndRemain'),
+            confirmText: t('messages.dissolveFolder'),
+            cancelText: t('messages.cancel'),
             variant: 'destructive',
-          });
-          if (ok) {
-            run({ type: 'delete-folder', spaceId, id: folder.id });
-          }
-        }}
-      >
-        {tr('解散')}
-      </ContextMenuItem>
-    </>
-  );
+          })
+        ) {
+          if (await run({ type: 'delete-folder', spaceId, id: folder.id }))
+            toast.success(t('messages.deleted'));
+        }
+      },
+    },
+  ];
+  const groupActions = (group: Group, index: number): NavigationAction[] => [
+    { id: 'new', label: t('navigation.newGroup'), run: () => setNameTarget({ type: 'group' }) },
+    {
+      id: 'rename',
+      label: t('messages.rename'),
+      run: () => setNameTarget({ type: 'group', item: group }),
+    },
+    {
+      id: 'earlier',
+      label: t('messages.moveEarlier'),
+      disabled: index === 0,
+      run: () =>
+        run({ type: 'move-group', spaceId, id: group.id, beforeId: orderedGroups[index - 1]?.id }),
+    },
+    {
+      id: 'later',
+      label: t('messages.moveLater'),
+      disabled: index === orderedGroups.length - 1,
+      run: () =>
+        run({ type: 'move-group', spaceId, id: group.id, beforeId: orderedGroups[index + 2]?.id }),
+    },
+    {
+      id: 'delete',
+      label: t('messages.delete'),
+      separator: true,
+      destructive: true,
+      disabled: orderedGroups.length <= 1,
+      run: () => setMoveTarget({ type: 'group', item: group }),
+    },
+  ];
 
   const renderToolbar = (currentSites: Site[]) => {
     const allSelected = currentSites.length > 0 && currentSites.every((s) => selectedIds.has(s.id));
@@ -415,37 +444,39 @@ export function NavigationPage({
           type="button"
           variant="ghost"
           className="rounded-xl cursor-pointer"
-          aria-label={allSelected ? tr('取消全选') : tr('全选当前')}
-          title={allSelected ? tr('取消全选') : tr('全选当前')}
+          aria-label={
+            allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')
+          }
+          title={allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')}
           onClick={handleToggleAll}
         >
           <CheckSquare className="mr-2" size={16} />
-          {allSelected ? tr('取消全选') : tr('全选当前')}
+          {allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')}
         </Button>
         <Button
           type="button"
           variant="ghost"
           disabled={selectedIds.size === 0}
           className="rounded-xl cursor-pointer"
-          aria-label={tr('移动所选')}
-          title={tr('移动所选')}
+          aria-label={t('messages.moveSelected')}
+          title={t('messages.moveSelected')}
           onClick={() => setMoveTarget({ type: 'sites', ids: Array.from(selectedIds) })}
         >
-          {tr('移动所选')}
+          {t('messages.moveSelected')}
         </Button>
         <Button
           type="button"
           variant="ghost"
           className="text-red-500 rounded-xl cursor-pointer hover:bg-red-500/10"
           disabled={selectedIds.size === 0}
-          aria-label={tr('删除所选')}
-          title={tr('删除所选')}
+          aria-label={t('messages.deleteSelected')}
+          title={t('messages.deleteSelected')}
           onClick={async () => {
             const ok = await confirm({
-              title: tr('确定删除所选网站？'),
-              description: `${tr('已选择')} ${selectedIds.size} ${tr('个网站')}`,
-              confirmText: tr('删除'),
-              cancelText: tr('取消'),
+              title: t('messages.deleteSelectedSites'),
+              description: t('navigation.selectedSites', { count: selectedIds.size }),
+              confirmText: t('messages.delete'),
+              cancelText: t('messages.cancel'),
               variant: 'destructive',
             });
             if (ok) {
@@ -455,11 +486,11 @@ export function NavigationPage({
             }
           }}
         >
-          {tr('删除所选')}
+          {t('messages.deleteSelected')}
         </Button>
         {selectedIds.size > 0 && (
           <span className="text-xs text-muted-foreground px-2">
-            {tr('已选择')} {selectedIds.size}
+            {t('navigation.selectedSites', { count: selectedIds.size })}
           </span>
         )}
         <div className="flex-1 min-w-[8px]" />
@@ -467,14 +498,14 @@ export function NavigationPage({
           type="button"
           variant="default"
           className="rounded-xl cursor-pointer px-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-          aria-label={tr('完成')}
-          title={tr('完成')}
+          aria-label={t('messages.done')}
+          title={t('messages.done')}
           onClick={() => {
             setManageMode(false);
             setSelectedIds(new Set());
           }}
         >
-          {tr('完成')}
+          {t('messages.done')}
         </Button>
       </div>
     );
@@ -492,7 +523,6 @@ export function NavigationPage({
       <div
         className="w-full flex flex-col items-center flex-1 min-h-0"
         style={{ color: 'var(--home-tabs-color)' }}
-        onClickCapture={handleContainerClickCapture}
       >
         {groupsPortal &&
           createPortal(
@@ -500,7 +530,7 @@ export function NavigationPage({
               {orderedGroups.map((group, index) => {
                 const GroupIcon = index === 0 ? House : Layers;
                 return (
-                  <DroppableGroupTab key={group.id} group={group} className="w-full">
+                  <DroppableGroupTab key={group.id} group={group} className="w-full relative group">
                     <Tooltip content={group.name} side="right">
                       <ContextMenu>
                         <ContextMenuTrigger asChild>
@@ -528,55 +558,26 @@ export function NavigationPage({
                           </button>
                         </ContextMenuTrigger>
                         <ContextMenuContent>
-                          <ContextMenuItem
-                            onClick={() => setNameTarget({ type: 'group', item: group })}
-                          >
-                            {tr('重命名')}
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            disabled={index === 0}
-                            onClick={() =>
-                              run({
-                                type: 'move-group',
-                                spaceId,
-                                id: group.id,
-                                beforeId: orderedGroups[index - 1].id,
-                              })
-                            }
-                          >
-                            {tr('前移')}
-                          </ContextMenuItem>
-                          <ContextMenuItem
-                            disabled={index === orderedGroups.length - 1}
-                            onClick={() =>
-                              run({
-                                type: 'move-group',
-                                spaceId,
-                                id: group.id,
-                                beforeId: orderedGroups[index + 2]?.id,
-                              })
-                            }
-                          >
-                            {tr('后移')}
-                          </ContextMenuItem>
-                          <ContextMenuSeparator />
-                          <ContextMenuItem
-                            className="text-red-500"
-                            disabled={orderedGroups.length <= 1}
-                            onClick={() => setMoveTarget({ type: 'group', item: group })}
-                          >
-                            {tr('删除')}
-                          </ContextMenuItem>
+                          <NavigationMenuItems actions={groupActions(group, index)} />
                         </ContextMenuContent>
                       </ContextMenu>
                     </Tooltip>
+                    <NavigationMoreMenu actions={groupActions(group, index)}>
+                      <button
+                        type="button"
+                        className="group-more-trigger"
+                        aria-label={`${t('messages.moreActions')}: ${group.name}`}
+                      >
+                        <MoreHorizontal size={13} />
+                      </button>
+                    </NavigationMoreMenu>
                   </DroppableGroupTab>
                 );
               })}
-              <Tooltip content={tr('添加分组')} side="right">
+              <Tooltip content={t('messages.addGroup')} side="right">
                 <button
                   type="button"
-                  aria-label={tr('添加分组')}
+                  aria-label={t('messages.addGroup')}
                   className="flex flex-col items-center justify-center w-full min-h-[54px] gap-[5px] rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all duration-150 cursor-pointer"
                   onClick={() => setNameTarget({ type: 'group' })}
                 >
@@ -595,113 +596,68 @@ export function NavigationPage({
               .map((i) => (i as { kind: 'site'; site: Site }).site),
           )}
 
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <div className="w-full min-h-[40vh]">
-              <DroppableRootGrid
-                groupId={activeGroup.id}
-                style={gridStyle}
-                className="site-grid w-full mb-12 min-h-[200px]"
-              >
-                <SortableContext items={rootSortableIds} strategy={rectSortingStrategy}>
-                  {rootItems.map((item) =>
-                    item.kind === 'folder' ? (
-                      <FolderCard
-                        key={item.folder.id}
-                        folder={item.folder}
-                        previewSites={space.sites
-                          .filter((s) => s.folderId === item.folder.id)
-                          .sort(byOrder)}
-                        showCardBackground={settings.showCardBackground}
-                        cardOpacity={settings.cardOpacity}
-                        showTitle={settings.showSiteTitle}
-                        manageMode={false}
-                        disabledDrag={manageMode}
-                        selected={false}
-                        onClick={(e) => {
-                          if (isPointerIntercepted(e)) return;
-                          run({
-                            type: 'select-folder',
-                            spaceId,
-                            groupId: activeGroup.id,
-                            folderId: item.folder.id,
-                          });
-                        }}
-                        contextMenu={renderFolderContextMenu(item.folder)}
-                      />
-                    ) : (
-                      <SiteCard
-                        key={item.site.id}
-                        site={item.site}
-                        editLabel={tr('编辑网站')}
-                        openInNewTab={settings.openInNewTab}
-                        showCardBackground={settings.showCardBackground}
-                        cardOpacity={settings.cardOpacity}
-                        showTitle={settings.showSiteTitle}
-                        manageMode={manageMode}
-                        disabledDrag={manageMode}
-                        selected={selectedIds.has(item.site.id)}
-                        onToggleSelection={() => toggleSelection(item.site.id)}
-                        onEdit={() => {
-                          setEditingSite(item.site);
-                          setEditorOpen(true);
-                        }}
-                        onClick={(e) => {
-                          if (isPointerIntercepted(e)) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }
-                        }}
-                        contextMenu={renderSiteContextMenu(item.site)}
-                      />
-                    ),
-                  )}
-                  {!manageMode && (
-                    <button
-                      type="button"
-                      className="add-site-card cursor-pointer"
-                      aria-label={tr('添加网站')}
-                      title={tr('添加网站')}
-                      onClick={() => {
-                        setEditingSite(undefined);
-                        setEditorOpen(true);
-                      }}
-                    >
-                      <span className="add-site-icon">
-                        <Plus size={22} />
-                      </span>
-                      <span className="text-xs font-medium leading-tight">{tr('添加网站')}</span>
-                    </button>
-                  )}
-                </SortableContext>
-              </DroppableRootGrid>
-            </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem
-              onClick={() => {
-                setEditingSite(undefined);
-                setEditorOpen(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {tr('添加网站')}
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => setNameTarget({ type: 'folder' })}>
-              <FolderPlus className="mr-2 h-4 w-4" />
-              {tr('新建文件夹')}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => setManageMode(true)}>
-              <ListTree className="mr-2 h-4 w-4" />
-              {tr('整理')}
-            </ContextMenuItem>
-            <ContextMenuItem onClick={() => onOpenSettings?.()}>
-              <Settings2 className="mr-2 h-4 w-4" />
-              {tr('设置')}
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+        <div className="w-full min-h-[40vh]">
+          <DroppableRootGrid
+            groupId={activeGroup.id}
+            style={gridStyle}
+            className="site-grid w-full mb-12 min-h-[200px]"
+          >
+            <SortableContext items={rootSortableIds} strategy={rectSortingStrategy}>
+              {rootItems.map((item) =>
+                item.kind === 'folder' ? (
+                  <FolderCard
+                    key={item.folder.id}
+                    folder={item.folder}
+                    previewSites={space.sites
+                      .filter((s) => s.folderId === item.folder.id)
+                      .sort(byOrder)}
+                    showTitle={settings.showSiteTitle}
+                    manageMode={false}
+                    disabledDrag={manageMode}
+                    selected={false}
+                    onClick={() => {
+                      run({
+                        type: 'select-folder',
+                        spaceId,
+                        groupId: activeGroup.id,
+                        folderId: item.folder.id,
+                      });
+                    }}
+                    menuActions={folderActions(item.folder)}
+                  />
+                ) : (
+                  <SiteCard
+                    key={item.site.id}
+                    site={item.site}
+                    openInNewTab={settings.openInNewTab}
+                    showTitle={settings.showSiteTitle}
+                    manageMode={manageMode}
+                    disabledDrag={manageMode}
+                    selected={selectedIds.has(item.site.id)}
+                    onToggleSelection={() => toggleSelection(item.site.id)}
+                    menuActions={siteActions(item.site)}
+                  />
+                ),
+              )}
+              {!manageMode && (
+                <button
+                  type="button"
+                  className="add-site-card cursor-pointer"
+                  aria-label={t('messages.addSite')}
+                  title={t('messages.addSite')}
+                  onClick={() => {
+                    openEditor();
+                  }}
+                >
+                  <span className="add-site-icon">
+                    <Plus size={22} />
+                  </span>
+                  <span className="text-xs font-medium leading-tight">{t('messages.addSite')}</span>
+                </button>
+              )}
+            </SortableContext>
+          </DroppableRootGrid>
+        </div>
 
         <Dialog
           open={Boolean(selectedFolderId)}
@@ -718,7 +674,7 @@ export function NavigationPage({
         >
           <DialogContent
             variant="center"
-            closeLabel={tr('关闭')}
+            closeLabel={t('messages.close')}
             className="folder-dialog w-full sm:max-w-none max-h-[min(80vh,800px)] overflow-y-auto flex flex-col gap-4 p-6"
             style={
               {
@@ -738,7 +694,7 @@ export function NavigationPage({
                     {selectedFolder?.name}
                   </DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                    {folderSites.length} {tr('个网站')}
+                    {t('navigation.siteCount', { count: folderSites.length })}
                   </DialogDescription>
                 </div>
                 {!manageMode && (
@@ -750,18 +706,14 @@ export function NavigationPage({
                     onClick={() => setManageMode(true)}
                   >
                     <ListTree size={15} />
-                    {tr('整理')}
+                    {t('messages.organize')}
                   </Button>
                 )}
               </div>
             </DialogHeader>
 
             {activeDrag && (
-              <FolderModalDropTargets
-                activeGroupId={activeGroup.id}
-                groups={orderedGroups}
-                tr={tr}
-              />
+              <FolderModalDropTargets activeGroupId={activeGroup.id} groups={orderedGroups} />
             )}
 
             {manageMode && renderToolbar(folderSites)}
@@ -772,43 +724,31 @@ export function NavigationPage({
                   <SiteCard
                     key={site.id}
                     site={site}
-                    editLabel={tr('编辑网站')}
                     openInNewTab={settings.openInNewTab}
-                    showCardBackground={settings.showCardBackground}
-                    cardOpacity={settings.cardOpacity}
                     showTitle={settings.showSiteTitle}
                     manageMode={manageMode}
                     disabledDrag={manageMode}
                     selected={selectedIds.has(site.id)}
                     onToggleSelection={() => toggleSelection(site.id)}
-                    onEdit={() => {
-                      setEditingSite(site);
-                      setEditorOpen(true);
-                    }}
-                    onClick={(e) => {
-                      if (isPointerIntercepted(e)) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }
-                    }}
-                    contextMenu={renderSiteContextMenu(site)}
+                    menuActions={siteActions(site)}
                   />
                 ))}
                 {!manageMode && (
                   <button
                     type="button"
                     className="add-site-card cursor-pointer"
-                    aria-label={tr('添加网站')}
-                    title={tr('添加网站')}
+                    aria-label={t('messages.addSite')}
+                    title={t('messages.addSite')}
                     onClick={() => {
-                      setEditingSite(undefined);
-                      setEditorOpen(true);
+                      openEditor();
                     }}
                   >
                     <span className="add-site-icon">
                       <Plus size={22} />
                     </span>
-                    <span className="text-xs font-medium leading-tight">{tr('添加网站')}</span>
+                    <span className="text-xs font-medium leading-tight">
+                      {t('messages.addSite')}
+                    </span>
                   </button>
                 )}
               </SortableContext>
@@ -821,26 +761,24 @@ export function NavigationPage({
             title={
               nameTarget.type === 'group'
                 ? nameTarget.item
-                  ? tr('重命名分组')
-                  : tr('新建分组')
+                  ? t('messages.renameGroup')
+                  : t('messages.newGroup')
                 : nameTarget.item
-                  ? tr('重命名文件夹')
-                  : tr('新建文件夹')
+                  ? t('messages.renameFolder')
+                  : t('messages.newFolder')
             }
             initialName={nameTarget.item?.name}
             onSave={handleNameSave}
             onClose={() => setNameTarget(null)}
-            onError={onError}
-            tr={tr}
           />
         )}
 
         {moveTarget && (
           <MoveDialog
-            title={moveTarget.type === 'group' ? tr('删除分组') : tr('移动')}
+            title={moveTarget.type === 'group' ? t('messages.deleteGroup') : t('messages.move')}
             description={
               moveTarget.type === 'group'
-                ? tr('请选择将分组内的网站和文件夹移动到哪个分组：')
+                ? t('messages.chooseAGroupToReceiveAllSitesAndFolders')
                 : undefined
             }
             groups={space.groups}
@@ -848,11 +786,12 @@ export function NavigationPage({
             initialGroupId={activeGroupId}
             excludeGroupId={moveTarget.type === 'group' ? moveTarget.item!.id : undefined}
             allowFolders={moveTarget.type !== 'group' && moveTarget.type !== 'folder'}
-            confirmLabel={moveTarget.type === 'group' ? tr('删除并移动') : undefined}
+            destructive={moveTarget.type === 'group'}
+            confirmLabel={
+              moveTarget.type === 'group' ? t('messages.deleteAndMoveContents') : undefined
+            }
             onMove={handleMoveSave}
             onClose={() => setMoveTarget(null)}
-            onError={onError}
-            tr={tr}
           />
         )}
 
@@ -864,8 +803,6 @@ export function NavigationPage({
             groupId={activeGroupId}
             folderId={selectedFolderId}
             onClose={() => setEditorOpen(false)}
-            onError={onError}
-            tr={tr}
           />
         )}
 
@@ -884,15 +821,13 @@ export function NavigationPage({
                       : resolveHomeTextColors(settings).cards,
                     '--site-card-size': `${settings.cardSize}px`,
                     '--site-icon-size': `${settings.cardSize * settings.iconSizeRatio}px`,
+                    '--site-icon-radius': `${settings.iconRadius}%`,
                   } as React.CSSProperties
                 }
               >
                 <SiteCardView
                   site={activeSite}
-                  editLabel={tr('编辑网站')}
                   openInNewTab={settings.openInNewTab}
-                  showCardBackground={settings.showCardBackground}
-                  cardOpacity={settings.cardOpacity}
                   showTitle={settings.showSiteTitle}
                   manageMode={false}
                   dragOverlay
@@ -910,6 +845,7 @@ export function NavigationPage({
                       : resolveHomeTextColors(settings).cards,
                     '--site-card-size': `${settings.cardSize}px`,
                     '--site-icon-size': `${settings.cardSize * settings.iconSizeRatio}px`,
+                    '--site-icon-radius': `${settings.iconRadius}%`,
                   } as React.CSSProperties
                 }
               >
@@ -918,8 +854,6 @@ export function NavigationPage({
                   previewSites={space.sites
                     .filter((s) => s.folderId === activeFolder.id)
                     .sort(byOrder)}
-                  showCardBackground={settings.showCardBackground}
-                  cardOpacity={settings.cardOpacity}
                   showTitle={settings.showSiteTitle}
                   manageMode={false}
                   dragOverlay

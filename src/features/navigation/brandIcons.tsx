@@ -3,25 +3,129 @@ import {
   siBaidu,
   siBilibili,
   siDuckduckgo,
+  siDeepseek,
+  siZhihu,
   siGithub,
   siSinaweibo,
   siYoutube,
+  siNotion,
+  siReddit,
+  siStackoverflow,
+  siWikipedia,
+  siX,
+  siTaobao,
+  siJuejin,
+  siTiktok,
+  siXiaohongshu,
   type SimpleIcon,
 } from 'simple-icons';
 import { IconFrame } from '@/components/ui/icon-frame';
+import { normalizeUrl } from '@/storage/model';
+import geminiIcon from './assets/gemini.svg';
+import { findCatalogIcon } from './brand-catalog';
 
-const brandMatchers: Array<{ matches: string[]; icon: SimpleIcon }> = [
-  { matches: ['github'], icon: siGithub },
-  { matches: ['youtube'], icon: siYoutube },
-  { matches: ['bilibili', '哔哩', 'b站'], icon: siBilibili },
-  { matches: ['weibo', '微博'], icon: siSinaweibo },
-  { matches: ['baidu', '百度'], icon: siBaidu },
-  { matches: ['duckduckgo'], icon: siDuckduckgo },
+const brands: Array<{
+  domains: string[];
+  icon: SimpleIcon;
+  background: string;
+  foreground: string;
+  monochrome?: boolean;
+}> = [
+  {
+    domains: ['notion.so', 'notion.com'],
+    icon: siNotion,
+    background: '#ffffff',
+    foreground: '#191919',
+    monochrome: true,
+  },
+  { domains: ['reddit.com'], icon: siReddit, background: '#ff4500', foreground: '#ffffff' },
+  {
+    domains: ['stackoverflow.com'],
+    icon: siStackoverflow,
+    background: '#f48024',
+    foreground: '#ffffff',
+  },
+  {
+    domains: ['wikipedia.org'],
+    icon: siWikipedia,
+    background: '#ffffff',
+    foreground: '#191919',
+    monochrome: true,
+  },
+  {
+    domains: ['x.com', 'twitter.com'],
+    icon: siX,
+    background: '#14171a',
+    foreground: '#ffffff',
+    monochrome: true,
+  },
+  { domains: ['taobao.com'], icon: siTaobao, background: '#ff5000', foreground: '#ffffff' },
+  { domains: ['juejin.cn'], icon: siJuejin, background: '#1e80ff', foreground: '#ffffff' },
+  {
+    domains: ['tiktok.com', 'douyin.com'],
+    icon: siTiktok,
+    background: '#161823',
+    foreground: '#ffffff',
+  },
+  {
+    domains: ['xiaohongshu.com'],
+    icon: siXiaohongshu,
+    background: '#ff2442',
+    foreground: '#ffffff',
+  },
+  {
+    domains: ['github.com'],
+    icon: siGithub,
+    background: '#ffffff',
+    foreground: '#24292f',
+    monochrome: true,
+  },
+  {
+    domains: ['youtube.com', 'youtu.be'],
+    icon: siYoutube,
+    background: '#ffffff',
+    foreground: '#ff0033',
+  },
+  {
+    domains: ['bilibili.com', 'b23.tv'],
+    icon: siBilibili,
+    background: '#ffffff',
+    foreground: '#fb7299',
+  },
+  { domains: ['weibo.com'], icon: siSinaweibo, background: '#e6162d', foreground: '#ffffff' },
+  { domains: ['baidu.com'], icon: siBaidu, background: '#2932e1', foreground: '#ffffff' },
+  { domains: ['duckduckgo.com'], icon: siDuckduckgo, background: '#de5833', foreground: '#ffffff' },
+  { domains: ['zhihu.com'], icon: siZhihu, background: '#1772f6', foreground: '#ffffff' },
+  { domains: ['deepseek.com'], icon: siDeepseek, background: '#ffffff', foreground: '#4d6bfe' },
 ];
 
-function SimpleBrandIcon({ icon, className }: { icon: SimpleIcon; className: string }) {
+function siteHost(url: string) {
+  try {
+    return new URL(normalizeUrl(url)).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+function isDomain(host: string, domain: string) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
+function SimpleBrandIcon({
+  icon,
+  className,
+  color,
+}: {
+  icon: SimpleIcon;
+  className: string;
+  color?: string;
+}) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill={`#${icon.hex}`} aria-hidden="true">
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill={color ?? `#${icon.hex}`}
+      aria-hidden="true"
+    >
       <path d={icon.path} />
     </svg>
   );
@@ -113,46 +217,117 @@ function BingIcon({ className }: { className: string }) {
 }
 
 export function getSearchEngineIcon(id: string, name: string): ReactNode {
-  const key = `${id} ${name}`.toLowerCase();
-  if (key.includes('google'))
+  const key = id.toLowerCase();
+  if (key === 'google')
     return (
       <IconFrame size="search">
-        <GoogleIcon className="brand-icon-glyph brand-icon-glyph--google" />
+        <GoogleIcon className="brand-icon-glyph" />
       </IconFrame>
     );
-  if (key.includes('bing') || key.includes('必应'))
+  if (key === 'bing')
     return (
       <IconFrame size="search">
         <BingIcon className="brand-icon-glyph brand-icon-glyph--bing" />
       </IconFrame>
     );
-  const match = brandMatchers.find(({ matches }) => matches.some((value) => key.includes(value)));
-  if (match)
-    return (
-      <IconFrame size="search">
-        <SimpleBrandIcon icon={match.icon} className="brand-icon-glyph" />
-      </IconFrame>
-    );
+  const icon = key === 'baidu' ? siBaidu : key === 'duckduckgo' ? siDuckduckgo : undefined;
   return (
     <IconFrame size="search">
-      <span className="search-engine-fallback">{name.slice(0, 1).toUpperCase()}</span>
+      {icon ? (
+        <SimpleBrandIcon icon={icon} className="brand-icon-glyph" />
+      ) : (
+        <span className="search-engine-fallback">{name.slice(0, 1).toUpperCase()}</span>
+      )}
     </IconFrame>
   );
 }
 
-export function getBrandIcon(url: string, title: string): ReactNode | null {
-  const key = (() => {
-    try {
-      return `${new URL(url).hostname} ${title}`.toLowerCase();
-    } catch {
-      return title.toLowerCase();
-    }
-  })();
+type BrandAppearance = {
+  background: string;
+  foreground: string;
+  graphic: ReactNode;
+  contrastColor?: string;
+  darkGraphic?: ReactNode;
+  tile?: boolean;
+};
 
-  if (key.includes('google'))
-    return <GoogleIcon className="brand-icon-glyph brand-icon-glyph--google" />;
-  if (key.includes('bing') || key.includes('必应'))
-    return <BingIcon className="brand-icon-glyph brand-icon-glyph--bing" />;
-  const match = brandMatchers.find(({ matches }) => matches.some((value) => key.includes(value)));
-  return match ? <SimpleBrandIcon icon={match.icon} className="brand-icon-glyph" /> : null;
+export function getBrandAppearance(url: string): BrandAppearance | null {
+  const host = siteHost(url);
+  if (!host) return null;
+  const catalog = findCatalogIcon(normalizeUrl(url));
+  if (catalog?.tile)
+    return {
+      background: '#ffffff',
+      foreground: '#202124',
+      tile: true,
+      graphic: (
+        <img
+          src={catalog.light}
+          className={
+            catalog.cover ? 'brand-icon-glyph brand-icon-glyph--cover' : 'brand-icon-glyph'
+          }
+          alt=""
+          draggable={false}
+        />
+      ),
+    };
+  if (host === 'gemini.google.com')
+    return {
+      background: '#ffffff',
+      foreground: '#4285f4',
+      graphic: <img src={geminiIcon} className="brand-icon-glyph" alt="" draggable={false} />,
+    };
+  if (
+    ['google.com', 'google.com.hk', 'google.co.uk'].some(
+      (domain) => host === domain || host === `www.${domain}`,
+    )
+  )
+    return {
+      background: '#ffffff',
+      foreground: '#4285f4',
+      graphic: <GoogleIcon className="brand-icon-glyph" />,
+    };
+  if (isDomain(host, 'bing.com'))
+    return {
+      background: '#e4f5fa',
+      foreground: '#048fce',
+      graphic: <BingIcon className="brand-icon-glyph brand-icon-glyph--bing" />,
+    };
+  const brand = brands.find(({ domains }) =>
+    domains.some((domain) =>
+      domain === 'baidu.com' ? host === domain || host === `www.${domain}` : isDomain(host, domain),
+    ),
+  );
+  if (
+    catalog &&
+    (!brand ||
+      catalog.pathname !== '/' ||
+      brand.icon === siTiktok ||
+      !brand.domains.some((domain) => host === domain || host === `www.${domain}`))
+  )
+    return {
+      background: brand?.background ?? '#ffffff',
+      foreground: brand?.foreground ?? '#202124',
+      graphic: <img src={catalog.light} className="brand-icon-glyph" alt="" draggable={false} />,
+      darkGraphic: <img src={catalog.dark} className="brand-icon-glyph" alt="" draggable={false} />,
+    };
+  return brand
+    ? {
+        background: brand.background,
+        foreground: brand.foreground,
+        contrastColor:
+          !brand.monochrome && brand.foreground === '#ffffff'
+            ? `#${brand.icon.hex.toLowerCase()}`
+            : undefined,
+        graphic: (
+          <SimpleBrandIcon
+            icon={brand.icon}
+            className="brand-icon-glyph"
+            color={
+              brand.monochrome || brand.foreground === '#ffffff' ? 'currentColor' : brand.foreground
+            }
+          />
+        ),
+      }
+    : null;
 }

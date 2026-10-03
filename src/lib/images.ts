@@ -1,3 +1,4 @@
+import { AppError } from '@/lib/errors';
 const ALLOWED_TYPES = [
   'image/png',
   'image/jpeg',
@@ -11,9 +12,33 @@ const ALLOWED_TYPES = [
 type Drawable = {
   width: number;
   height: number;
-  draw: (ctx: CanvasRenderingContext2D, width: number, height: number) => void;
+  draw: (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    area?: ImageCropArea,
+  ) => void;
   cleanup: () => void;
 };
+
+export type ImageCropArea = { x: number; y: number; width: number; height: number };
+
+export function validateImageFile(file: Blob) {
+  const isAllowed = ALLOWED_TYPES.includes(file.type) || file.type.startsWith('image/');
+  if (!isAllowed) throw new AppError('messages.chooseAValidImageFilePngJpegWebpIcoOrSvg');
+  if (file.size > 10 * 1024 * 1024) throw new AppError('messages.imagesCannotExceed10Mb');
+}
+
+function drawImage(
+  context: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  width: number,
+  height: number,
+  area?: ImageCropArea,
+) {
+  if (area) context.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, width, height);
+  else context.drawImage(image, 0, 0, width, height);
+}
 
 async function loadDrawable(file: Blob): Promise<Drawable> {
   try {
@@ -21,7 +46,7 @@ async function loadDrawable(file: Blob): Promise<Drawable> {
     return {
       width: bitmap.width,
       height: bitmap.height,
-      draw: (ctx, w, h) => ctx.drawImage(bitmap, 0, 0, w, h),
+      draw: (ctx, w, h, area) => drawImage(ctx, bitmap, w, h, area),
       cleanup: () => bitmap.close(),
     };
   } catch {
@@ -34,16 +59,13 @@ async function loadDrawable(file: Blob): Promise<Drawable> {
         resolve({
           width,
           height,
-          draw: (ctx, w, h) => {
-            ctx.drawImage(img, 0, 0, w, h);
-            URL.revokeObjectURL(url);
-          },
+          draw: (ctx, w, h, area) => drawImage(ctx, img, w, h, area),
           cleanup: () => URL.revokeObjectURL(url),
         });
       };
       img.onerror = () => {
         URL.revokeObjectURL(url);
-        reject(new Error('这张图片无法读取'));
+        reject(new AppError('messages.thisImageCannotBeRead'));
       };
       img.src = url;
     });
@@ -51,29 +73,64 @@ async function loadDrawable(file: Blob): Promise<Drawable> {
 }
 
 export async function prepareImage(file: Blob, kind: 'icon' | 'wallpaper') {
-  const isAllowed = ALLOWED_TYPES.includes(file.type) || file.type.startsWith('image/');
-  if (!isAllowed) throw new Error('请选择有效的图片文件（PNG、JPEG、WebP、ICO 或 SVG）');
-  if (file.size > 10 * 1024 * 1024) throw new Error('图片不能超过 10 MB');
+  return {
+    id: crypto.randomUUID(),
+    blob: await renderImage(file, kind === 'icon' ? 256 : 2560),
+  };
+}
+
+export async function imageDimensions(file: Blob) {
+  validateImageFile(file);
+  const drawable = await loadDrawable(file);
+  try {
+    return { width: drawable.width, height: drawable.height };
+  } finally {
+    drawable.cleanup();
+  }
+}
+
+/** Cropping is explicit: preserve all pixels, including white and transparency, inside the area. */
+export function cropImage(file: Blob, area: ImageCropArea) {
+  return renderImage(file, 256, area);
+}
+
+async function renderImage(file: Blob, limit: number, area?: ImageCropArea) {
+  validateImageFile(file);
   const drawable = await loadDrawable(file);
   try {
     if (drawable.width * drawable.height > 40_000_000)
-      throw new Error('图片尺寸过大，请使用 4000 万像素以内的图片');
-    const limit = kind === 'icon' ? 160 : 2560;
-    const scale = Math.min(1, limit / Math.max(drawable.width, drawable.height));
+      throw new AppError('messages.useAnImageSmallerThan40Megapixels');
+    if (
+      area &&
+      (!Object.values(area).every(Number.isFinite) ||
+        area.x < 0 ||
+        area.y < 0 ||
+        area.width <= 0 ||
+        area.height <= 0 ||
+        area.x + area.width > drawable.width + 1 ||
+        area.y + area.height > drawable.height + 1)
+    )
+      throw new AppError('navigation.cropRequired');
+    const width = area?.width ?? drawable.width;
+    const height = area?.height ?? drawable.height;
+    const scale =
+      file.type === 'image/svg+xml' && !area
+        ? limit / Math.max(width, height)
+        : Math.min(1, limit / Math.max(width, height));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(drawable.width * scale));
-    canvas.height = Math.max(1, Math.round(drawable.height * scale));
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
     const context = canvas.getContext('2d');
-    if (!context) throw new Error('浏览器无法处理图片');
-    drawable.draw(context, canvas.width, canvas.height);
-    const blob = await new Promise<Blob>((resolve, reject) =>
+    if (!context) throw new AppError('messages.theBrowserCannotProcessThisImage');
+    drawable.draw(context, canvas.width, canvas.height, area);
+    return await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(
-        (value) => (value ? resolve(value) : reject(new Error('图片处理失败'))),
+        (value) =>
+          value ? resolve(value) : reject(new AppError('messages.imageProcessingFailed')),
         'image/webp',
         0.88,
       ),
     );
-    return { id: crypto.randomUUID(), blob };
   } finally {
     drawable.cleanup();
   }

@@ -3,28 +3,21 @@ import { resolveHomeTextColors } from '../src/features/appearance/text-colors';
 import { defaultSettings } from '../src/storage/model';
 
 describe('home text colors', () => {
-  it('supports white, dark and per-element custom colors', () => {
-    expect(resolveHomeTextColors({ ...defaultSettings, textColorMode: 'light' }).clock).toBe(
-      '#ffffff',
-    );
-    expect(resolveHomeTextColors({ ...defaultSettings, textColorMode: 'dark' }).clock).toBe(
-      '#0f172a',
-    );
-    const custom = {
-      ...defaultSettings.textColors,
-      clock: '#123456',
-      cards: '#abcdef',
-    };
-    expect(
-      resolveHomeTextColors({ ...defaultSettings, textColorMode: 'custom', textColors: custom }),
-    ).toEqual(custom);
+  it('uses high contrast light text on image backgrounds', () => {
+    expect(resolveHomeTextColors(defaultSettings)).toEqual({
+      clock: '#ffffff',
+      date: '#ffffff',
+      greeting: '#ffffff',
+      search: '#ffffff',
+      tabs: '#ffffff',
+      cards: '#ffffff',
+    });
   });
 
   it('chooses dark text for bright colors and white text for dark gradients', () => {
     expect(
       resolveHomeTextColors({
         ...defaultSettings,
-        textColorMode: 'auto',
         background: 'color',
         solidColor: '#ffffff',
       }).clock,
@@ -32,7 +25,6 @@ describe('home text colors', () => {
     expect(
       resolveHomeTextColors({
         ...defaultSettings,
-        textColorMode: 'auto',
         background: 'gradient',
         gradient: 'linear-gradient(#102020, #203030)',
       }).clock,
@@ -42,7 +34,6 @@ describe('home text colors', () => {
     expect(
       resolveHomeTextColors({
         ...defaultSettings,
-        textColorMode: 'auto',
         background: 'color',
         solidColor: '#ffffff',
         overlay: 0.8,

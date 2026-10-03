@@ -1,12 +1,18 @@
 import { spaceDataSchema, type SpaceData } from '@/storage/model';
+import { z } from 'zod';
 
-export type SyncConflict = {
-  entity: 'group' | 'folder' | 'site';
-  id: string;
-  field: string;
-  local: unknown;
-  remote: unknown;
-};
+export const syncConflictSchema = z.object({
+  key: z.string().min(1),
+  entity: z.enum(['group', 'folder', 'site']),
+  id: z.string().min(1),
+  field: z.string().min(1),
+  local: z.unknown(),
+  remote: z.unknown(),
+});
+export type SyncConflict = z.infer<typeof syncConflictSchema>;
+export function createSyncConflict(conflict: Omit<SyncConflict, 'key'>): SyncConflict {
+  return { key: JSON.stringify([conflict.entity, conflict.id, conflict.field]), ...conflict };
+}
 
 export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, remote: SpaceData) {
   const conflicts: SyncConflict[] = [];
@@ -72,7 +78,7 @@ function mergeRecords<T extends { id: string }>(
     if (!ancestor) {
       if (same(left, right)) result.push(left);
       else {
-        conflicts.push({ entity, id, field: '*', local: left, remote: right });
+        conflicts.push(createSyncConflict({ entity, id, field: '*', local: left, remote: right }));
         result.push(left);
       }
       continue;
@@ -120,7 +126,9 @@ function mergeRecords<T extends { id: string }>(
       else if (same(remoteValue, baseValue) || same(localValue, remoteValue)) selected = localValue;
       else {
         selected = localValue;
-        conflicts.push({ entity, id, field: key, local: localValue, remote: remoteValue });
+        conflicts.push(
+          createSyncConflict({ entity, id, field: key, local: localValue, remote: remoteValue }),
+        );
       }
       if (key === 'location') Object.assign(merged, selected);
       else merged[key] = selected;

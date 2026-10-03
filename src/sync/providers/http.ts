@@ -1,18 +1,43 @@
 import { SyncProviderError } from './types';
+import { z } from 'zod';
+
+export const gitFileResponseSchema = z.object({
+  type: z.string(),
+  content: z.string(),
+  sha: z.string().min(1),
+});
+export const gitWriteResponseSchema = z.object({ content: z.object({ sha: z.string().min(1) }) });
+
+export async function parseResponseJson<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new SyncProviderError('errors.sync.invalidRemoteResponse', 'invalid');
+  }
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) throw new SyncProviderError('errors.sync.invalidRemoteResponse', 'invalid');
+  return parsed.data;
+}
 
 export async function request(url: string, init: RequestInit) {
   let response: Response;
   try {
     response = await fetch(url, init);
   } catch {
-    throw new SyncProviderError('网络连接失败，请检查地址和网络', 'network');
+    throw new SyncProviderError('messages.theConnectionFailedCheckTheAddressAndNetwork', 'network');
   }
   if (response.status === 401 || response.status === 403)
-    throw new SyncProviderError('认证失败，请检查账号或令牌权限', 'auth');
-  if (response.status === 404) throw new SyncProviderError('远端文件不存在', 'not-found');
+    throw new SyncProviderError(
+      'messages.authenticationFailedCheckTheAccountOrTokenPermissions',
+      'auth',
+    );
+  if (response.status === 404)
+    throw new SyncProviderError('messages.theRemoteFileDoesNotExist', 'not-found');
   if (response.status === 409 || response.status === 412)
-    throw new SyncProviderError('远端内容已被其他设备更新', 'conflict');
-  if (!response.ok) throw new SyncProviderError(`远端服务返回 ${response.status}`, 'network');
+    throw new SyncProviderError('messages.theRemoteContentWasUpdatedByAnotherDevice', 'conflict');
+  if (!response.ok)
+    throw new SyncProviderError('errors.remoteStatus', 'network', { status: response.status });
   return response;
 }
 export function encodeBase64(value: string) {

@@ -1,9 +1,21 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBackup } from '../src/features/backup/backup';
 import { createInitialState } from '../src/storage/model';
 import { repository } from '../src/storage/repository';
 import { applyCommand } from '../src/storage/operations';
-import { loadSyncStatus, saveSyncConfig, synchronize } from '../src/sync/core/engine';
+import {
+  clearSyncConfig,
+  loadSyncConfig,
+  loadSyncStatus,
+  resolveSyncConflict,
+  saveSyncConfig,
+  SyncBusyError,
+  synchronize,
+  synchronizeAutomatically,
+} from '../src/sync/core/engine';
+import { createTestLockManager } from './helpers/locks';
+import { createSyncConflict } from '../src/sync/core/merge';
+import { AppError } from '../src/lib/errors';
 
 function storageArea(values: Record<string, unknown>) {
   return {
@@ -19,6 +31,21 @@ function storageArea(values: Record<string, unknown>) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+}
+const placeholderConflict = createSyncConflict({
+  entity: 'site',
+  id: 'placeholder',
+  field: 'title',
+  local: 'Local',
+  remote: 'Remote',
+});
+
 describe('sync engine', () => {
   let local: Record<string, unknown>;
   let session: Record<string, unknown>;
@@ -26,6 +53,7 @@ describe('sync engine', () => {
   beforeEach(async () => {
     local = {};
     session = {};
+    vi.stubGlobal('navigator', { locks: createTestLockManager() });
     vi.stubGlobal('browser', {
       storage: { local: storageArea(local), session: storageArea(session) },
     });
@@ -40,6 +68,191 @@ describe('sync engine', () => {
       includePrivate: false,
       automatic: true,
     });
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(['auto', 'push', 'pull'] as const)(
+    'excludes background sync, configuration changes and conflict choices during manual %s',
+    async (mode) => {
+      const remote = await createBackup(createInitialState(), new Map(), 'normal');
+      const started = deferred<void>();
+      const release = deferred<void>();
+      const fetchMock = vi.fn(async (_url: string, init: RequestInit = {}) => {
+        if (init.method !== 'PUT') {
+          started.resolve();
+          await release.promise;
+        }
+        return new Response(JSON.stringify(remote), { status: 200, headers: { etag: 'v1' } });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      const config = (await loadSyncConfig())!;
+      const status = { schemaVersion: 1, conflicts: [], lastSuccess: 'previous-success' };
+      local['raytab-sync-status'] = status;
+      const running = synchronize(mode);
+      await started.promise;
+      try {
+        await expect(synchronizeAutomatically()).rejects.toBeInstanceOf(SyncBusyError);
+        await expect(
+          saveSyncConfig({ ...config, privatePassword: 'changed' }),
+        ).rejects.toBeInstanceOf(SyncBusyError);
+        await expect(clearSyncConfig()).rejects.toBeInstanceOf(SyncBusyError);
+        await expect(resolveSyncConflict(placeholderConflict, 'local')).rejects.toBeInstanceOf(
+          SyncBusyError,
+        );
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        await expect(loadSyncConfig()).resolves.toEqual(config);
+        expect(local['raytab-sync-status']).toEqual(status);
+        expect(local['raytab-sync-baseline']).toBeUndefined();
+      } finally {
+        release.resolve();
+        await running;
+      }
+    },
+  );
+
+  it('excludes manual sync while an automatic sync is running', async () => {
+    const started = deferred<void>();
+    const release = deferred<void>();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit = {}) => {
+        if (init.method !== 'PUT') {
+          started.resolve();
+          await release.promise;
+          return new Response('', { status: 404 });
+        }
+        return new Response('', { status: 200, headers: { etag: 'v1' } });
+      }),
+    );
+    const running = synchronizeAutomatically();
+    await started.promise;
+    try {
+      await expect(synchronize('push')).rejects.toBeInstanceOf(SyncBusyError);
+    } finally {
+      release.resolve();
+      await running;
+    }
+    await expect(loadSyncStatus()).resolves.toMatchObject({ conflicts: [], retryCount: 0 });
+  });
+
+  it('holds the configuration lock until both connection and session password are saved', async () => {
+    const config = (await loadSyncConfig())!;
+    const started = deferred<void>();
+    const release = deferred<void>();
+    vi.spyOn(browser.storage.session, 'set').mockImplementationOnce(async (entries) => {
+      started.resolve();
+      await release.promise;
+      Object.assign(session, entries);
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const saving = saveSyncConfig({ ...config, automatic: false, privatePassword: 'new-password' });
+    await started.promise;
+    try {
+      await expect(synchronizeAutomatically()).rejects.toBeInstanceOf(SyncBusyError);
+      await expect(resolveSyncConflict(placeholderConflict, 'remote')).rejects.toBeInstanceOf(
+        SyncBusyError,
+      );
+      await expect(clearSyncConfig()).rejects.toBeInstanceOf(SyncBusyError);
+    } finally {
+      release.resolve();
+      await saving;
+    }
+    await expect(loadSyncConfig()).resolves.toMatchObject({
+      automatic: false,
+      privatePassword: 'new-password',
+    });
+    await expect(synchronizeAutomatically()).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(local['raytab-sync-config']).not.toHaveProperty('privatePassword');
+  });
+
+  it('excludes synchronization and configuration changes until a remote conflict choice is saved', async () => {
+    const state = await repository.read();
+    local['raytab-sync-status'] = {
+      conflicts: [
+        {
+          entity: 'site',
+          id: state.spaces.normal.sites[0].id,
+          field: 'title',
+          local: 'Local',
+          remote: 'Remote',
+        },
+      ],
+    };
+    const started = deferred<void>();
+    const release = deferred<void>();
+    const restore = repository.restore.bind(repository);
+    vi.spyOn(repository, 'restore').mockImplementationOnce(async (...args) => {
+      started.resolve();
+      await release.promise;
+      return restore(...args);
+    });
+    const expected = (await loadSyncStatus()).conflicts[0];
+    const resolving = resolveSyncConflict(expected, 'remote');
+    await started.promise;
+    try {
+      await expect(synchronize()).rejects.toBeInstanceOf(SyncBusyError);
+      await expect(saveSyncConfig((await loadSyncConfig())!)).rejects.toBeInstanceOf(SyncBusyError);
+      await expect(resolveSyncConflict(expected, 'local')).rejects.toBeInstanceOf(SyncBusyError);
+      expect((await loadSyncStatus()).conflicts).toHaveLength(1);
+    } finally {
+      release.resolve();
+      await resolving;
+    }
+    expect((await repository.read()).spaces.normal.sites[0].title).toBe('Remote');
+    expect((await loadSyncStatus()).conflicts).toHaveLength(0);
+    await clearSyncConfig();
+    await expect(loadSyncConfig()).resolves.toBeUndefined();
+  });
+
+  it('checks automatic retry eligibility without performing a remote request', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    local['raytab-sync-status'] = { conflicts: [], nextRetryAt: '2999-01-01T00:00:00Z' };
+    await expect(synchronizeAutomatically()).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails explicitly without Web Locks and does not mutate saved data', async () => {
+    const config = (await loadSyncConfig())!;
+    vi.stubGlobal('navigator', {});
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(synchronize()).rejects.toThrow(
+      'messages.thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable',
+    );
+    await expect(saveSyncConfig({ ...config, automatic: false })).rejects.toThrow(
+      'messages.thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable',
+    );
+    await expect(clearSyncConfig()).rejects.toThrow(
+      'messages.thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable',
+    );
+    await expect(resolveSyncConflict(placeholderConflict, 'local')).rejects.toThrow(
+      'messages.thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable',
+    );
+    await expect(loadSyncConfig()).resolves.toEqual(config);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(local['raytab-sync-status']).toBeUndefined();
+  });
+
+  it('releases the lock after an invalid conflict choice without removing conflicts', async () => {
+    const conflicts = [
+      { entity: 'group', id: 'private-space', field: '*', local: 'Local', remote: 'Remote' },
+    ];
+    local['raytab-sync-status'] = { conflicts };
+    const expected = (await loadSyncStatus()).conflicts[0];
+    await expect(resolveSyncConflict(expected, 'remote')).rejects.toThrow(
+      'messages.resolvePrivateSpaceVersionsWithLocalToCloudOrCloudToLocal',
+    );
+    expect((await loadSyncStatus()).conflicts).toEqual([expected]);
+    await expect(resolveSyncConflict(expected, 'local')).rejects.toThrow(
+      'messages.resolvePrivateSpaceVersionsWithLocalToCloudOrCloudToLocal',
+    );
+    expect((await loadSyncStatus()).conflicts).toEqual([expected]);
+    await clearSyncConfig();
+    expect((await loadSyncStatus()).conflicts).toHaveLength(0);
   });
 
   it('creates a missing remote file and records a successful baseline', async () => {
@@ -122,7 +335,9 @@ describe('sync engine', () => {
           return new Response(JSON.stringify(remote), { status: 200, headers: { etag: 'v1' } });
         }),
       );
-      await expect(synchronize(mode)).rejects.toThrow('本地数据发生变化');
+      await expect(synchronize(mode)).rejects.toThrow(
+        /(messages\.localDataChangedDuringSyncTryAgain|messages\.localDataChangedDuringThisOperationTryAgain)/,
+      );
       expect((await repository.read()).spaces.normal.sites[0].title).toBe('New local edit');
       expect(local['raytab-sync-baseline']).toBeUndefined();
     },
@@ -140,7 +355,9 @@ describe('sync engine', () => {
         return new Response(JSON.stringify(remote), { status: 200, headers: { etag: 'v1' } });
       }),
     );
-    await expect(synchronize('auto')).rejects.toThrow('本地数据发生变化');
+    await expect(synchronize('auto')).rejects.toThrow(
+      /(messages\.localDataChangedDuringSyncTryAgain|messages\.localDataChangedDuringThisOperationTryAgain)/,
+    );
     expect((await repository.read()).spaces.normal.sites[0].title).toBe('Edited during upload');
     expect(local['raytab-sync-baseline']).toBeUndefined();
   });
@@ -148,13 +365,88 @@ describe('sync engine', () => {
   it('records retry state after a network failure without advancing the baseline', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
-    await expect(synchronize('auto')).rejects.toThrow('网络连接失败');
+    await expect(synchronize('auto')).rejects.toThrow(
+      'messages.theConnectionFailedCheckTheAddressAndNetwork',
+    );
 
     await expect(loadSyncStatus()).resolves.toMatchObject({ retryCount: 1 });
     expect((await loadSyncStatus()).nextRetryAt).toBeTruthy();
     expect(local['raytab-sync-baseline']).toBeUndefined();
-    expect(local['raytab-sync-lease']).toBeUndefined();
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('', { status: 404 }))
+        .mockResolvedValueOnce(new Response('', { status: 200, headers: { etag: 'recovered' } })),
+    );
+    await synchronize();
+    await expect(loadSyncStatus()).resolves.toMatchObject({ retryCount: 0 });
+    expect(local['raytab-sync-baseline']).toMatchObject({ version: 'recovered' });
   });
+
+  it.each([
+    new Error('password=password private=fixture-private-token'),
+    new Error('errors.password.password'),
+    'password=password',
+  ])('persists unknown failures without their diagnostic text: %s', async (failure) => {
+    vi.spyOn(repository, 'snapshot').mockRejectedValueOnce(failure);
+    await expect(synchronize()).rejects.toBe(failure);
+    expect((await loadSyncStatus()).lastError).toEqual({
+      code: 'messages.anErrorOccurredTryAgain',
+    });
+    expect(JSON.stringify(local['raytab-sync-status'])).not.toContain('password');
+    expect(local['raytab-sync-baseline']).toBeUndefined();
+  });
+
+  it('retains semantic failure parameters while redacting configured secrets', async () => {
+    await saveSyncConfig({
+      ...(await loadSyncConfig())!,
+      privatePassword: 'fixture-private-token',
+    });
+    vi.spyOn(repository, 'snapshot').mockRejectedValueOnce(
+      new AppError('errors.backup.missingResource', {
+        id: 'image-password-fixture-private-token',
+        count: 2,
+      }),
+    );
+    await expect(synchronize()).rejects.toThrow('errors.backup.missingResource');
+    expect((await loadSyncStatus()).lastError).toEqual({
+      code: 'errors.backup.missingResource',
+      values: { id: 'image-[redacted]-[redacted]', count: 2 },
+    });
+    expect(JSON.stringify(local['raytab-sync-status'])).not.toContain('fixture-private-token');
+  });
+
+  it.each(['github', 'gitee'] as const)(
+    'records an invalid %s response without copying its token-bearing body',
+    async (type) => {
+      const connection = {
+        type,
+        owner: 'ray',
+        repo: 'tab',
+        path: 'data.json',
+        token: 'response-sensitive-token',
+      };
+      await saveSyncConfig({ ...(await loadSyncConfig())!, connection });
+      const before = await repository.read();
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(new Response(`${connection.token} is invalid JSON`, { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      await expect(synchronize()).rejects.toMatchObject({
+        code: 'invalid',
+        translationKey: 'errors.sync.invalidRemoteResponse',
+      });
+      expect((await loadSyncStatus()).lastError).toEqual({
+        code: 'errors.sync.invalidRemoteResponse',
+        values: {},
+      });
+      expect(JSON.stringify(local['raytab-sync-status'])).not.toContain(connection.token);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(local['raytab-sync-baseline']).toBeUndefined();
+      expect(await repository.read()).toEqual(before);
+    },
+  );
 
   it('merges independent offline edits and retains same-field conflicts', async () => {
     let remoteContent = '';
@@ -283,7 +575,8 @@ describe('sync engine', () => {
         site: {
           title: 'Private sync site',
           url: 'https://private-sync.example',
-          color: '#123456',
+          icon: { source: 'auto' },
+          iconBackground: { mode: 'color', color: '#123456' },
         },
       }),
     );
@@ -300,7 +593,15 @@ describe('sync engine', () => {
       automatic: true,
     });
     vi.stubGlobal('fetch', vi.fn());
-    await expect(synchronize('auto')).rejects.toThrow('需要填写同步加密密码');
+    await expect(synchronize('auto')).rejects.toThrow(
+      'messages.enterASyncEncryptionPasswordBeforeSyncingTheProtectedPrivateSpace',
+    );
+    await expect(loadSyncStatus()).resolves.toMatchObject({
+      lastError: {
+        code: 'messages.enterASyncEncryptionPasswordBeforeSyncingTheProtectedPrivateSpace',
+      },
+      retryCount: 1,
+    });
 
     let remoteContent = '';
     let version = 0;

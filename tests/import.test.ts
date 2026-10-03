@@ -35,10 +35,12 @@ describe('bookmark import', () => {
   });
 
   it('reports empty and unsupported bookmark files clearly', () => {
-    expect(() => parseBookmarkHtml('<!doctype html><p>empty</p>')).toThrow('没有找到可导入的书签');
+    expect(() => parseBookmarkHtml('<!doctype html><p>empty</p>')).toThrow(
+      'messages.noImportableBookmarksWereFound',
+    );
     expect(() =>
       parseBookmarkHtml('<DL><DT><A HREF="chrome://settings">Settings</A></DL>'),
-    ).toThrow('没有找到可导入的 http 或 https 书签');
+    ).toThrow('messages.noImportableHttpOrHttpsBookmarksWereFound');
   });
 
   it('requests bookmark permission only when browser import is used', async () => {
@@ -47,7 +49,9 @@ describe('bookmark import', () => {
       permissions: { request: vi.fn().mockResolvedValue(false) },
       bookmarks: { getTree },
     });
-    await expect(readBrowserBookmarks()).rejects.toThrow('未授予读取浏览器书签的权限');
+    await expect(readBrowserBookmarks()).rejects.toThrow(
+      'messages.browserBookmarkAccessWasNotGranted',
+    );
     expect(getTree).not.toHaveBeenCalled();
   });
 

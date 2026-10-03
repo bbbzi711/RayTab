@@ -1,3 +1,4 @@
+import { AppError } from '@/lib/errors';
 import { z } from 'zod';
 import { decryptJson, encryptJson, encryptedEnvelopeSchema } from '@/security/crypto';
 import {
@@ -6,20 +7,51 @@ import {
   spaceDataSchema,
   spaceIdSchema,
   spaceSettingsSchema,
+  spaceResourceIds,
   type RayState,
   type SpaceData,
   type SpaceId,
 } from '@/storage/model';
+import { upgradeSettings, upgradeV4Space } from '@/storage/upgrade-local';
 
 const resourceSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
   data: z.string(),
 });
-const spacePayloadSchema = z.object({
-  data: spaceDataSchema,
-  settings: spaceSettingsSchema,
+const spacePayloadSchema = z
+  .object({
+    data: spaceDataSchema,
+    settings: spaceSettingsSchema,
+    resources: z.array(resourceSchema),
+  })
+  .superRefine((payload, ctx) => {
+    const ids = new Set(payload.resources.map((item) => item.id));
+    for (const id of spaceResourceIds(payload.data, payload.settings))
+      if (!ids.has(id))
+        ctx.addIssue({
+          code: 'custom',
+          message: 'messages.anImageResourceIsMissingNoChangesWereSaved',
+        });
+  });
+const legacyPayloadSchema = z.object({
+  data: z.unknown(),
+  settings: z.unknown(),
   resources: z.array(resourceSchema),
+});
+const legacyBackupSchema = z.object({
+  format: z.literal('raytab-backup'),
+  version: z.literal(2),
+  createdAt: z.string().datetime(),
+  spaces: z.object({
+    normal: legacyPayloadSchema.optional(),
+    private: z
+      .discriminatedUnion('protected', [
+        z.object({ protected: z.literal(false), payload: legacyPayloadSchema }),
+        z.object({ protected: z.literal(true), envelope: encryptedEnvelopeSchema }),
+      ])
+      .optional(),
+  }),
 });
 const privatePayloadSchema = z.discriminatedUnion('protected', [
   z.object({ protected: z.literal(false), payload: spacePayloadSchema }),
@@ -27,7 +59,7 @@ const privatePayloadSchema = z.discriminatedUnion('protected', [
 ]);
 export const backupSchema = z.object({
   format: z.literal('raytab-backup'),
-  version: z.literal(2),
+  version: z.literal(3),
   createdAt: z.string().datetime(),
   spaces: z.object({
     normal: spacePayloadSchema.optional(),
@@ -43,12 +75,12 @@ export async function createBackup(
   privatePassword?: string,
 ): Promise<BackupDocument> {
   if (range !== 'normal' && state.privateSecurity.protected) {
-    if (state.privateSecurity.locked) throw new Error('请先解锁私密空间');
-    if (!privatePassword) throw new Error('请填写备份加密密码');
+    if (state.privateSecurity.locked) throw new AppError('messages.unlockThePrivateSpaceFirst');
+    if (!privatePassword) throw new AppError('messages.enterTheBackupEncryptionPassword');
   }
   const document: BackupDocument = {
     format: 'raytab-backup',
-    version: 2,
+    version: 3,
     createdAt: new Date().toISOString(),
     spaces: {},
   };
@@ -57,7 +89,10 @@ export async function createBackup(
   if (range === 'all' || range === 'private') {
     const payload = await payloadFor(state, resources, 'private');
     document.spaces.private = privatePassword
-      ? { protected: true, envelope: await encryptJson(payload, privatePassword) }
+      ? {
+          protected: true,
+          envelope: await encryptJson({ schemaVersion: 5, ...payload }, privatePassword),
+        }
       : { protected: false, payload };
   }
   return backupSchema.parse(document);
@@ -68,10 +103,24 @@ export async function parseBackup(input: string | unknown) {
   try {
     value = typeof input === 'string' ? JSON.parse(input) : input;
   } catch {
-    throw new Error('备份文件不是有效的 JSON');
+    throw new AppError('messages.theBackupFileIsNotValidJson');
+  }
+  if (typeof value === 'object' && value !== null && 'version' in value && value.version === 2) {
+    const legacy = legacyBackupSchema.safeParse(value);
+    if (!legacy.success)
+      throw new AppError('messages.theBackupFormatIsInvalidOrItsVersionIsUnsupported');
+    const spaces: BackupDocument['spaces'] = {};
+    if (legacy.data.spaces.normal) spaces.normal = upgradeBackupPayload(legacy.data.spaces.normal);
+    const privateSpace = legacy.data.spaces.private;
+    if (privateSpace)
+      spaces.private = privateSpace.protected
+        ? privateSpace
+        : { protected: false, payload: upgradeBackupPayload(privateSpace.payload) };
+    return backupSchema.parse({ ...legacy.data, version: 3, spaces });
   }
   const parsed = backupSchema.safeParse(value);
-  if (!parsed.success) throw new Error('备份格式无效或版本不受支持');
+  if (!parsed.success)
+    throw new AppError('messages.theBackupFormatIsInvalidOrItsVersionIsUnsupported');
   return parsed.data;
 }
 
@@ -86,7 +135,7 @@ export async function restoreBackup(
     current.privateSecurity.protected &&
     current.privateSecurity.locked
   )
-    throw new Error('请先解锁私密空间');
+    throw new AppError('messages.unlockThePrivateSpaceFirst');
   const next = rayStateSchema.parse(structuredClone(current));
   const resources = new Map<string, Blob>();
   if (document.spaces.normal) {
@@ -95,20 +144,15 @@ export async function restoreBackup(
         ? document.spaces.normal.data
         : mergeSpace(next.spaces.normal, document.spaces.normal.data);
     next.normalSettings = document.spaces.normal.settings;
-    await decodeResources(document.spaces.normal.resources, resources);
+    decodeResources(document.spaces.normal.resources, resources);
   }
   if (document.spaces.private) {
-    const payload = document.spaces.private.protected
-      ? await decryptJson<z.infer<typeof spacePayloadSchema>>(
-          document.spaces.private.envelope,
-          privatePassword ?? '',
-        )
-      : document.spaces.private.payload;
-    const valid = spacePayloadSchema.parse(payload);
+    const valid = await privateBackupPayload(document, privatePassword);
+    if (!valid) throw new AppError('messages.theBackupFormatIsInvalidOrItsVersionIsUnsupported');
     next.spaces.private =
       mode === 'replace' ? valid.data : mergeSpace(next.spaces.private, valid.data);
     next.privateSettingOverrides = diffSettings(next.normalSettings, valid.settings);
-    await decodeResources(valid.resources, resources);
+    decodeResources(valid.resources, resources);
   }
   for (const spaceId of spaceIdSchema.options) {
     if (!next.spaces[spaceId].groups.some((item) => item.id === next.local.activeGroup[spaceId]))
@@ -137,15 +181,12 @@ export function backupSummary(document: BackupDocument) {
 
 async function payloadFor(state: RayState, resources: Map<string, Blob>, spaceId: SpaceId) {
   const space = state.spaces[spaceId];
-  const ids = new Set(
-    space.sites.map((item) => item.iconId).filter((id): id is string => Boolean(id)),
-  );
   const settings = effectiveSettings(state, spaceId);
-  if (settings.wallpaperId) ids.add(settings.wallpaperId);
+  const ids = spaceResourceIds(space, settings);
   const encoded = [];
   for (const id of ids) {
     const blob = resources.get(id);
-    if (!blob) throw new Error(`备份需要的资源 ${id} 不存在`);
+    if (!blob) throw new AppError('errors.backup.missingResource', { id });
     encoded.push({
       id,
       type: blob.type || 'application/octet-stream',
@@ -153,6 +194,32 @@ async function payloadFor(state: RayState, resources: Map<string, Blob>, spaceId
     });
   }
   return spacePayloadSchema.parse({ data: space, settings, resources: encoded });
+}
+
+function upgradeBackupPayload(value: unknown) {
+  const old = legacyPayloadSchema.parse(value);
+  return spacePayloadSchema.parse({
+    data: upgradeV4Space(old.data),
+    settings: upgradeSettings(old.settings, true),
+    resources: old.resources,
+  });
+}
+
+export async function privateBackupPayload(document: BackupDocument, password?: string) {
+  const privateSpace = document.spaces.private;
+  if (!privateSpace) return undefined;
+  if (!privateSpace.protected) return privateSpace.payload;
+  const plaintext = await decryptJson<unknown>(privateSpace.envelope, password ?? '');
+  // v2 encrypted payloads were unversioned. Preserve opaque ciphertext during
+  // normal-only sync, and convert this known format only after authentication.
+  if (typeof plaintext === 'object' && plaintext !== null && 'schemaVersion' in plaintext) {
+    const current = z
+      .object({ schemaVersion: z.literal(5) })
+      .passthrough()
+      .parse(plaintext);
+    return spacePayloadSchema.parse(current);
+  }
+  return upgradeBackupPayload(plaintext);
 }
 
 function mergeSpace(local: SpaceData, incoming: SpaceData): SpaceData {
@@ -184,13 +251,18 @@ function diffSettings(
 ) {
   return Object.fromEntries(
     Object.entries(privateSettings).filter(
-      ([key, value]) => normal[key as keyof typeof normal] !== value,
+      ([key, value]) =>
+        JSON.stringify(normal[key as keyof typeof normal]) !== JSON.stringify(value),
     ),
   );
 }
-async function decodeResources(input: z.infer<typeof resourceSchema>[], output: Map<string, Blob>) {
+export function decodeResources(
+  input: z.infer<typeof resourceSchema>[],
+  output = new Map<string, Blob>(),
+) {
   for (const item of input)
     output.set(item.id, new Blob([fromBase64(item.data)], { type: item.type }));
+  return output;
 }
 async function blobToBase64(blob: Blob) {
   const bytes = new Uint8Array(await blob.arrayBuffer());

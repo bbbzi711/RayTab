@@ -1,0 +1,68 @@
+{
+  "errors": {
+    "localRead": "Local data could not be read. Retry without clearing browser data.",
+    "model": {
+      "groupRequired": "A space must contain at least one group",
+      "duplicateGroupId": "Duplicate group ID",
+      "duplicateFolderId": "Duplicate folder ID",
+      "duplicateSiteId": "Duplicate site ID",
+      "duplicateNavigationId": "A site and a folder share the same ID",
+      "missingFolderGroup": "A folder references a missing group",
+      "missingSiteGroup": "A site references a missing group",
+      "missingSiteFolder": "A site references a missing folder",
+      "missingActiveGroup": "The current group does not exist",
+      "duplicateSearchEngineId": "Duplicate search engine ID",
+      "missingSearchEngine": "The current search engine does not exist"
+    },
+    "backup": {
+      "missingResource": "Required backup resource {{id}} is missing"
+    },
+    "sync": {
+      "privateConflictRequiresChoice": "Both private spaces changed, so sync stopped. Confirm whether to overwrite the cloud or restore from it.",
+      "conflictChanged": "This conflict changed. Refresh and try again.",
+      "invalidRemoteResponse": "The sync service returned an invalid response. Check the service and try again.",
+      "invalidConflict": "This conflict could not be recognized. Existing data was not changed."
+    },
+    "remoteStatus": "The remote service returned {{status}}",
+    "missingBackupResource": "Required backup resource {{id}} is missing",
+    "invalidInput": "The input is invalid. Check it and try again."
+  },
+  "onboarding": {
+    "welcome": "Welcome to RayTab",
+    "title": "Build your starting point around the sites you use",
+    "description": "Add the places you visit every day. Layout, appearance, and sync can all be adjusted later in Settings.",
+    "action": "Open my home",
+    "quickTitle": "Get there quickly",
+    "quickDescription": "Keep sites, groups, folders, and search within easy reach.",
+    "organizeTitle": "Arrange it your way",
+    "organizeDescription": "Organize with groups and folders, then drag sites into place.",
+    "privacyTitle": "Keep control of your data",
+    "privacyDescription": "Data stays local by default. Private space and sync are optional."
+  },
+  "clock": {
+    "label": "Clock",
+    "night": "It is late. Get some rest.",
+    "morning": "Good morning.",
+    "noon": "Have a good afternoon.",
+    "afternoon": "Keep going.",
+    "evening": "Good evening."
+  },
+  "errorBoundary": {
+    "title": "This page could not be displayed",
+    "description": "Reload the page. If the problem persists, keep the diagnostic details below.",
+    "reload": "Reload"
+  },
+  "popup": {
+    "tabReadFailed": "Could not read the current tab. Enter the URL manually.",
+    "saveFailed": "The site was not saved. Check it and try again.",
+    "saving": "Saving…"
+  },
+  "counts": {
+    "sites_one": "{{count}} site",
+    "sites_other": "{{count}} sites",
+    "folders_one": "{{count}} folder",
+    "folders_other": "{{count}} folders",
+    "selected_one": "{{count}} item selected",
+    "selected_other": "{{count}} items selected"
+  }
+}
