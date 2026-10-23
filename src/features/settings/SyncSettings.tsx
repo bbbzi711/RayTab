@@ -18,6 +18,7 @@ import {
   type SyncStatus,
 } from '@/sync/core/engine';
 import type { SyncConnection } from '@/sync/providers';
+import { resolveWebDavFileUrl } from '@/sync/providers/webdav';
 import type { SyncConflict } from '@/sync/core/merge';
 import { useRayTabStore } from '@/storage/store';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
@@ -63,15 +64,11 @@ export const createSyncDraftSchema = (privateLocked: boolean) =>
     })
     .superRefine((draft, ctx) => {
       if (draft.type === 'webdav') {
-        let valid = false;
         try {
-          const url = new URL(draft.url);
-          valid = ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password;
+          resolveWebDavFileUrl(draft.url);
         } catch {
-          valid = false;
-        }
-        if (!valid)
           ctx.addIssue({ code: 'custom', path: ['url'], message: 'settings.syncInvalidUrl' });
+        }
       } else {
         for (const key of ['token', 'owner', 'repo', 'path'] as const)
           if (!draft[key])
@@ -297,7 +294,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
     () =>
       provider === 'webdav'
         ? ([
-            ['url', 'fileAddress', 'url'],
+            ['url', 'serverAddress', 'url'],
             ['username', 'username', 'text'],
             ['password', 'password', 'password'],
           ] as const)
@@ -497,9 +494,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                             ? 'current-password'
                             : undefined
                       }
-                      placeholder={
-                        name === 'url' ? 'https://dav.example.com/raytab.json' : undefined
-                      }
+                      placeholder={name === 'url' ? 'https://dav.jianguoyun.com/dav/' : undefined}
                       aria-invalid={Boolean(errors[name])}
                     />
                   </label>
@@ -507,6 +502,12 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 </div>
               ))}
             </div>
+            {provider === 'webdav' && (
+              <div className="settings-help">
+                <p>{t('settings.webdavServerHelp')}</p>
+                <p>{t('settings.webdavNutstoreHelp')}</p>
+              </div>
+            )}
             <div className="sync-connection-options">
               <Controller
                 control={form.control}

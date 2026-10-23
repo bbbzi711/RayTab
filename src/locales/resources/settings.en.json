@@ -133,10 +133,10 @@
   "removeProtectionTitle": "Remove private space protection?",
   "removeProtectionHelp": "Private content will be stored unencrypted on this device. Confirm that you trust this device.",
   "removeProtection": "Remove password protection",
-  "syncInvalidUrl": "Enter an HTTP or HTTPS WebDAV file URL without embedded credentials.",
+  "syncInvalidUrl": "Enter an HTTP or HTTPS WebDAV server URL without embedded credentials. For Nutstore, paste https://dav.jianguoyun.com/dav/.",
   "required": "This field is required.",
   "provider": "Provider",
-  "fileAddress": "File URL",
+  "serverAddress": "Server URL",
   "username": "Username",
   "token": "Access token",
   "owner": "Owner",
@@ -270,5 +270,7 @@
     "configure": "Set up sync",
     "loadFailed": "Could not load sync settings",
     "retryLoad": "Retry loading"
-  }
+  },
+  "webdavServerHelp": "Paste the WebDAV server URL from your cloud provider. RayTab automatically uses raytab.json in that directory. You can also enter the full URL of an existing backup file.",
+  "webdavNutstoreHelp": "Nutstore server URL: https://dav.jianguoyun.com/dav/. Copy the account and generated app password from third-party app management."
 }

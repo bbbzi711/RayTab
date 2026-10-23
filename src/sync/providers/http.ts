@@ -29,8 +29,9 @@ export async function request(url: string, init: RequestInit) {
   }
   if (response.status === 401 || response.status === 403)
     throw new SyncProviderError(
-      'messages.authenticationFailedCheckTheAccountOrTokenPermissions',
+      response.status === 401 ? 'errors.sync.unauthorized' : 'errors.sync.forbidden',
       'auth',
+      { status: response.status, method: (init.method ?? 'GET').toUpperCase() },
     );
   if (response.status === 404)
     throw new SyncProviderError('messages.theRemoteFileDoesNotExist', 'not-found');

@@ -237,24 +237,24 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
 test('设置表单在栏目间保留草稿，关闭时确认放弃', async ({ newTab }) => {
   const settings = await openSettings(newTab, '同步');
   await expect(settings.getByText('尚未设置同步', { exact: true })).toBeVisible();
-  await expect(settings.getByLabel('文件地址', { exact: true })).not.toBeVisible();
+  await expect(settings.getByLabel('服务器地址', { exact: true })).not.toBeVisible();
   await settings.getByRole('button', { name: '配置同步', exact: true }).click();
   await settings
-    .getByLabel('文件地址', { exact: true })
+    .getByLabel('服务器地址', { exact: true })
     .fill('https://dav.example.test/draft.json');
   await settings.getByRole('button', { name: '收起配置', exact: true }).click();
-  await expect(settings.getByLabel('文件地址', { exact: true })).not.toBeVisible();
+  await expect(settings.getByLabel('服务器地址', { exact: true })).not.toBeVisible();
   await settings.getByRole('button', { name: '配置同步', exact: true }).click();
   await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
   await settings.getByRole('button', { name: '同步', exact: true }).click();
-  await expect(settings.getByLabel('文件地址', { exact: true })).toHaveValue(
+  await expect(settings.getByLabel('服务器地址', { exact: true })).toHaveValue(
     'https://dav.example.test/draft.json',
   );
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   const confirmation = newTab.getByRole('alertdialog');
   await confirmation.getByRole('button', { name: '继续编辑', exact: true }).click();
   await expect(settings).toBeVisible();
-  await expect(settings.getByLabel('文件地址', { exact: true })).toHaveValue(
+  await expect(settings.getByLabel('服务器地址', { exact: true })).toHaveValue(
     'https://dav.example.test/draft.json',
   );
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
@@ -620,10 +620,10 @@ test('原生互斥拒绝配置变更，释放后真实后台可以继续同步',
   try {
     const settings = await openSettings(newTab, '同步');
     await settings.getByRole('button', { name: '配置同步', exact: true }).click();
-    await settings.getByLabel('文件地址', { exact: true }).fill(url);
+    await settings.getByLabel('服务器地址', { exact: true }).fill(url);
     await settings.getByRole('button', { name: '保存连接', exact: true }).click();
     await expect(settings.getByText('已配置 WebDAV', { exact: true })).toBeVisible();
-    await expect(settings.getByLabel('文件地址', { exact: true })).not.toBeVisible();
+    await expect(settings.getByLabel('服务器地址', { exact: true })).not.toBeVisible();
     await expect(settings.getByRole('button', { name: '双向同步', exact: true })).toBeEnabled();
     const contender = await context.newPage();
     await contender.goto(`chrome-extension://${extensionId}/newtab.html`);

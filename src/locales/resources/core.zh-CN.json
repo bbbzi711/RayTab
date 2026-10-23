@@ -21,7 +21,10 @@
       "privateConflictRequiresChoice": "两侧私密空间都已修改，同步已停止。请确认后选择本机覆盖云端或云端恢复本机。",
       "conflictChanged": "冲突已变化，请刷新后重试",
       "invalidRemoteResponse": "同步服务返回的数据格式无效，请检查服务响应后重试。",
-      "invalidConflict": "无法识别当前冲突数据，原数据未改变"
+      "invalidConflict": "无法识别当前冲突数据，原数据未改变",
+      "unauthorized": "认证被拒绝（HTTP {{status}}，{{method}}）。请核对账号、密码或令牌；WebDAV 服务可能要求单独的应用密码。",
+      "forbidden": "服务器禁止此操作（HTTP {{status}}，{{method}}）。请检查目标文件或文件夹权限、应用授权及服务限制。",
+      "webdavUrlRequired": "WebDAV 服务器地址无效。请编辑连接并粘贴云盘提供的 http 或 https 地址；坚果云请使用 https://dav.jianguoyun.com/dav/。"
     },
     "remoteStatus": "远端服务返回 {{status}}",
     "missingBackupResource": "备份需要的资源 {{id}} 不存在",
