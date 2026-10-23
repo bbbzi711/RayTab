@@ -37,11 +37,13 @@ test('首页与 Popup 保存会刷新其他已打开的新标签页', async ({ n
   await addSite(newTab, '跨页首页网站', 'https://page.example.test');
   await expect(other.getByRole('link', { name: '跨页首页网站', exact: true })).toBeVisible();
 
+  await context.route('https://popup.example.test/**', (route) => route.abort());
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
   await popup.getByLabel('名称', { exact: true }).fill('跨页 Popup 网站');
   await popup.getByLabel('网址', { exact: true }).fill('https://popup.example.test');
   await popup.getByRole('button', { name: '添加网站', exact: true }).click();
+  await popup.getByRole('button', { name: '以文字占位图标添加', exact: true }).click();
   await expect(
     popup.locator('.popup-success').getByText('已添加网站', { exact: true }),
   ).toBeVisible();

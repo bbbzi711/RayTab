@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRepository } from '../src/storage/database';
+import { createRepository, type RepositoryCommit } from '../src/storage/database';
 import { type RayState } from '../src/storage/model';
 import { applyStartupMeta } from '../src/entrypoints/newtab/startup';
 import { wallpaperDisplay } from '../src/features/appearance/wallpaper-source';
@@ -228,6 +228,111 @@ describe('Zustand saved state', () => {
     emitter.postMessage('updated');
     expect(repositoryMock.read).toHaveBeenCalledTimes(previousReads);
   });
+});
+
+describe('resource invalidation', () => {
+  it('retains unchanged resources through ordinary saves and focus reads, and invalidates only written IDs', async () => {
+    const store = storeModule.useRayTabStore;
+    await store.getState().refresh();
+    await store
+      .getState()
+      .dispatch(
+        { type: 'settings', spaceId: 'normal', patch: { wallpaperId: 'normal-image' } },
+        new Map([['normal-image', new Blob(['before'])]]),
+      );
+    await store
+      .getState()
+      .dispatch(
+        { type: 'settings', spaceId: 'private', patch: { wallpaperId: 'private-image' } },
+        new Map([['private-image', new Blob(['private'])]]),
+      );
+    const version = (id: string) => storeModule.selectResourceVersion(store.getState(), id);
+    const normal = version('normal-image');
+    const privateImage = version('private-image');
+    await store.getState().dispatch({
+      type: 'settings',
+      spaceId: 'normal',
+      patch: { showClock: false },
+    });
+    await store.getState().refresh();
+    expect(version('normal-image')).toBe(normal);
+    expect(version('private-image')).toBe(privateImage);
+    await store
+      .getState()
+      .dispatch(
+        { type: 'settings', spaceId: 'normal', patch: { overlay: 0.2 } },
+        new Map([['normal-image', new Blob(['after'])]]),
+      );
+    expect(version('normal-image')).not.toBe(normal);
+    expect(version('private-image')).toBe(privateImage);
+    expect(await (await actual.resource('normal-image'))?.text()).toBe('after');
+  });
+
+  it('receives cross-page resource metadata, refreshes same-ID restores, and ignores duplicate commit notifications', async () => {
+    const store = storeModule.useRayTabStore;
+    stop = storeModule.startRayTabStore();
+    await vi.waitFor(() => expect(store.getState().state).not.toBeNull());
+    let commit: RepositoryCommit | undefined;
+    other = createRepository(databaseName, (next) => {
+      commit = next;
+      emitter.postMessage(next ?? 'updated');
+    });
+    await other.update(
+      (draft) => {
+        draft.normalSettings.wallpaperId = 'shared-image';
+      },
+      new Map([['shared-image', new Blob(['first bytes'])]]),
+    );
+    await vi.waitFor(() =>
+      expect(store.getState().state!.normalSettings.wallpaperId).toBe('shared-image'),
+    );
+    const version = () => storeModule.selectResourceVersion(store.getState(), 'shared-image');
+    const first = version();
+    const epoch = store.getState().resourceVersion;
+    await other.update((draft) => {
+      draft.normalSettings.showDate = false;
+    });
+    await vi.waitFor(() => expect(store.getState().state!.normalSettings.showDate).toBe(false));
+    expect(version()).toBe(first);
+    await other.restore(
+      await other.read(),
+      new Map([['shared-image', new Blob(['restored bytes'])]]),
+    );
+    await vi.waitFor(() => expect(version()).not.toBe(first));
+    expect(store.getState().resourceVersion).toBe(epoch);
+    expect(await (await actual.resource('shared-image'))?.text()).toBe('restored bytes');
+    const restored = version();
+    const reads = repositoryMock.read.mock.calls.length;
+    emitter.postMessage(commit);
+    await vi.waitFor(() => expect(repositoryMock.read.mock.calls.length).toBeGreaterThan(reads));
+    await store.getState().refresh();
+    expect(version()).toBe(restored);
+  });
+
+  it.each(['missing metadata', 'skipped revision'] as const)(
+    'conservatively invalidates resources after a cross-page change with %s',
+    async (mode) => {
+      const store = storeModule.useRayTabStore;
+      await store.getState().refresh();
+      const epoch = store.getState().resourceVersion;
+      let commit: RepositoryCommit | undefined;
+      other = createRepository(databaseName, (next) => {
+        commit = next;
+      });
+      await other.update((draft) => {
+        draft.normalSettings.showClock = false;
+      });
+      if (mode === 'skipped revision')
+        await other.update((draft) => {
+          draft.normalSettings.showDate = false;
+        });
+      await store.getState().refresh(mode === 'missing metadata' ? undefined : commit);
+      expect(store.getState().resourceVersion).toBeGreaterThan(epoch);
+      const invalidated = store.getState().resourceVersion;
+      await store.getState().refresh();
+      expect(store.getState().resourceVersion).toBe(invalidated);
+    },
+  );
 });
 
 describe('private session invalidation', () => {

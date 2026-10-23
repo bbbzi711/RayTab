@@ -269,8 +269,12 @@
     "edit": "Edit connection",
     "configure": "Set up sync",
     "loadFailed": "Could not load sync settings",
-    "retryLoad": "Retry loading"
+    "retryLoad": "Retry loading",
+    "automaticPaused": "Scheduled sync is paused. Unlock password-protected private spaces to sync manually, or change the connection settings."
   },
+  "loading": "Loading settings…",
+  "protectedPrivateAutomaticSync": "Password-protected private spaces must be unlocked and synced manually. Turn off Include private space to use scheduled sync.",
+  "syncRecovered": "The original group was deleted. {{sites}} sites and {{folders}} folders were preserved in “{{group}}”. Review their locations.",
   "webdavServerHelp": "Paste the WebDAV server URL from your cloud provider. RayTab automatically uses raytab.json in that directory. You can also enter the full URL of an existing backup file.",
   "webdavNutstoreHelp": "Nutstore server URL: https://dav.jianguoyun.com/dav/. Copy the account and generated app password from third-party app management."
 }

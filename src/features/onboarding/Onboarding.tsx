@@ -1,5 +1,8 @@
+import { useRef, useState } from 'react';
 import { ArrowRight, Compass, Layers3, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { errorMessage } from '@/lib/errors';
 
 const items = [
   { icon: Compass, title: 'onboarding.quickTitle', description: 'onboarding.quickDescription' },
@@ -11,16 +14,35 @@ const items = [
   { icon: Shield, title: 'onboarding.privacyTitle', description: 'onboarding.privacyDescription' },
 ];
 
-export function Onboarding({ onFinish }: { onFinish: () => void }) {
+export function Onboarding({ onFinish }: { onFinish: () => Promise<void> }) {
   const { t } = useTranslation();
+  const title = useRef<HTMLHeadingElement>(null);
+  const [saving, setSaving] = useState(false);
+  const [failure, setFailure] = useState<string>();
+  const finish = async () => {
+    if (saving) return;
+    setSaving(true);
+    setFailure(undefined);
+    try {
+      await onFinish();
+    } catch (reason) {
+      setFailure(errorMessage(reason));
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
-    <div className="onboarding-backdrop">
-      <section
+    <Dialog open>
+      <DialogContent
         className="onboarding-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="onboarding-title"
-        aria-describedby="onboarding-description"
+        overlayClassName="onboarding-backdrop"
+        showCloseButton={false}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          title.current?.focus({ preventScroll: true });
+        }}
       >
         <div className="onboarding-brand" aria-hidden="true">
           <span>R</span>
@@ -28,8 +50,14 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
         </div>
         <header className="onboarding-copy">
           <p>{t('onboarding.welcome')}</p>
-          <h1 id="onboarding-title">{t('onboarding.title')}</h1>
-          <span id="onboarding-description">{t('onboarding.description')}</span>
+          <DialogTitle asChild>
+            <h1 ref={title} tabIndex={-1} className="outline-none">
+              {t('onboarding.title')}
+            </h1>
+          </DialogTitle>
+          <DialogDescription asChild>
+            <span>{t('onboarding.description')}</span>
+          </DialogDescription>
         </header>
         <div className="onboarding-guide">
           {items.map(({ icon: Icon, title, description }) => (
@@ -44,11 +72,21 @@ export function Onboarding({ onFinish }: { onFinish: () => void }) {
             </article>
           ))}
         </div>
-        <button type="button" className="onboarding-start" onClick={onFinish} autoFocus>
-          {t('onboarding.action')}
+        <button
+          type="button"
+          className="onboarding-start"
+          disabled={saving}
+          onClick={() => void finish()}
+        >
+          {t(saving ? 'onboarding.saving' : 'onboarding.action')}
           <ArrowRight size={17} />
         </button>
-      </section>
-    </div>
+        {failure && (
+          <p className="onboarding-error" role="alert">
+            {failure}
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

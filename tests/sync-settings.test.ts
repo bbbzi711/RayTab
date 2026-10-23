@@ -78,4 +78,25 @@ describe('sync connection private-space protection', () => {
         }),
       ]);
   });
+
+  it('requires manual sync for a protected private space while retaining normal-space scheduling', () => {
+    const schema = createSyncDraftSchema(false, true);
+    const scheduledPrivate = schema.safeParse(draft);
+    expect(scheduledPrivate.success).toBe(false);
+    if (!scheduledPrivate.success)
+      expect(scheduledPrivate.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['automatic'],
+          message: 'settings.protectedPrivateAutomaticSync',
+        }),
+      );
+    expect(schema.parse({ ...draft, automatic: false })).toMatchObject({
+      includePrivate: true,
+      automatic: false,
+    });
+    expect(schema.parse({ ...draft, includePrivate: false })).toMatchObject({
+      includePrivate: false,
+      automatic: true,
+    });
+  });
 });

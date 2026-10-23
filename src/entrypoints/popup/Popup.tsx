@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type BaseSyntheticEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,14 +10,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { SiteIcon } from '@/features/navigation/SiteIcon';
+import { destinationSchema } from '@/features/navigation/navigation-form-schemas';
 import {
   defaultSiteIcon,
   defaultSiteIconBackground,
   normalizeUrl,
   siteSchema,
+  type Site,
 } from '@/storage/model';
 import { startRayTabStore, useRayTabStore } from '@/storage/store';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
+import { prepareImage } from '@/lib/images';
 import i18n from '@/locales';
 
 const schema = z.object({
@@ -36,6 +39,12 @@ const schema = z.object({
   location: z.string().min(1),
 });
 type Fields = z.infer<typeof schema>;
+type IconDraft = {
+  url: string;
+  icon: Site['icon'];
+  background: Site['iconBackground'];
+  resource?: { id: string; blob: Blob };
+};
 
 export default function Popup() {
   const { t } = useTranslation();
@@ -48,6 +57,12 @@ export default function Popup() {
   useEffect(startRayTabStore, []);
   const [saved, setSaved] = useState(false);
   const [page, setPage] = useState({ title: '', url: '' });
+  const [fetchingIcon, setFetchingIcon] = useState(false);
+  const [iconFailure, setIconFailure] = useState<{ url: string; detail?: string }>();
+  const active = useRef(true);
+  const submitting = useRef(false);
+  const siteId = useRef<string | undefined>(undefined);
+  const iconDraft = useRef<IconDraft | undefined>(undefined);
   const form = useForm<Fields>({
     resolver: zodResolver(schema),
     defaultValues: { title: '', url: '', location: '' },
@@ -56,12 +71,30 @@ export default function Popup() {
   // Subscribe to dirty fields so asynchronous tab/default loading preserves edits.
   void dirtyFields;
   useEffect(() => {
+    active.current = true;
+    const deactivate = () => {
+      active.current = false;
+    };
+    window.addEventListener('pagehide', deactivate);
+    return () => {
+      deactivate();
+      window.removeEventListener('pagehide', deactivate);
+    };
+  }, []);
+  useEffect(() => {
     if (!browser.tabs?.query) return;
     let active = true;
     void browser.tabs
       .query({ active: true, currentWindow: true })
       .then(([tab]) => {
-        if (active) setPage({ title: tab?.title ?? '', url: tab?.url ?? '' });
+        if (active)
+          setPage({
+            title: (tab?.title ?? '')
+              .trim()
+              .slice(0, 80)
+              .replace(/[\uD800-\uDBFF]$/, ''),
+            url: tab?.url ?? '',
+          });
       })
       .catch(() => {
         if (active) toast.error(t('popup.tabReadFailed'));
@@ -99,27 +132,82 @@ export default function Popup() {
       toast.error(errorMessage(reason));
     }
   };
-  const submit = form.handleSubmit(async (data) => {
+  const save = async (data: Fields, withoutIcon = false) => {
+    const requestedUrl = form.getValues('url');
+    const isCurrent = () => active.current && form.getValues('url') === requestedUrl;
     try {
-      const location: { groupId: string; folderId: string | null } = JSON.parse(data.location);
-      await dispatch({
-        type: 'save-site',
-        spaceId: 'normal',
-        id: crypto.randomUUID(),
-        ...location,
-        site: {
-          title: data.title,
-          url: data.url,
-          icon: defaultSiteIcon,
-          iconBackground: defaultSiteIconBackground,
+      form.clearErrors('root');
+      const location = destinationSchema.parse(JSON.parse(data.location));
+      let draft = iconDraft.current;
+      if (withoutIcon) {
+        draft = { url: data.url, icon: defaultSiteIcon, background: defaultSiteIconBackground };
+      } else if (draft?.url !== data.url) {
+        setIconFailure(undefined);
+        setFetchingIcon(true);
+        try {
+          const { resolveWebsiteIcon } = await import('@/features/navigation/site-metadata');
+          if (!isCurrent()) return;
+          const metadata = await resolveWebsiteIcon(data.url, { allowPublicService: true });
+          if (!isCurrent()) return;
+          if (!metadata.localBrand && !metadata.icon) {
+            setIconFailure({ url: requestedUrl });
+            return;
+          }
+          const resource = metadata.icon ? await prepareImage(metadata.icon, 'icon') : undefined;
+          if (!isCurrent()) return;
+          draft = {
+            url: data.url,
+            icon: resource ? { source: 'auto', resourceId: resource.id } : defaultSiteIcon,
+            background:
+              resource && metadata.background
+                ? { mode: 'color', color: metadata.background }
+                : defaultSiteIconBackground,
+            resource,
+          };
+          iconDraft.current = draft;
+        } catch (reason) {
+          if (isCurrent()) setIconFailure({ url: requestedUrl, detail: errorMessage(reason) });
+          return;
+        } finally {
+          if (active.current) setFetchingIcon(false);
+        }
+      }
+      if (!isCurrent() || !draft) return;
+      siteId.current ??= crypto.randomUUID();
+      await dispatch(
+        {
+          type: 'save-site',
+          spaceId: 'normal',
+          id: siteId.current,
+          ...location,
+          site: {
+            title: data.title,
+            url: data.url,
+            icon: draft.icon,
+            iconBackground: draft.background,
+          },
         },
-      });
-      setSaved(true);
-      toast.success(t('messages.siteAdded'));
+        draft.resource ? new Map([[draft.resource.id, draft.resource.blob]]) : undefined,
+      );
+      if (active.current) {
+        setSaved(true);
+        toast.success(t('messages.siteAdded'));
+      }
     } catch (reason) {
-      form.setError('root', { message: errorMessage(reason) });
+      if (active.current) form.setError('root', { message: errorMessage(reason) });
     }
-  });
+  };
+  const submit = async (event?: BaseSyntheticEvent, withoutIcon = false) => {
+    event?.preventDefault();
+    if (submitting.current || saved || !active.current) return;
+    submitting.current = true;
+    try {
+      await form.handleSubmit((data) => save(data, withoutIcon))(event);
+    } finally {
+      submitting.current = false;
+    }
+  };
+  const currentIconFailure = iconFailure?.url === url ? iconFailure : undefined;
   const fieldError = (message?: string) =>
     message ? (
       <p className="text-xs text-destructive" role="alert">
@@ -156,6 +244,9 @@ export default function Popup() {
                   type="button"
                   variant="outline"
                   onClick={() => {
+                    siteId.current = undefined;
+                    iconDraft.current = undefined;
+                    setIconFailure(undefined);
                     form.reset({
                       title: '',
                       url: '',
@@ -245,6 +336,22 @@ export default function Popup() {
                     {errors.root.message}
                   </p>
                 )}
+                {currentIconFailure && (
+                  <div className="flex flex-col items-start gap-2">
+                    <p role="alert" className="text-xs text-destructive">
+                      {t('popup.iconFetchFailed')}
+                      {currentIconFailure.detail && ` ${currentIconFailure.detail}`}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isSubmitting}
+                      onClick={() => void submit(undefined, true)}
+                    >
+                      {t('popup.addWithoutIcon')}
+                    </Button>
+                  </div>
+                )}
                 <div className="popup-footer-actions">
                   <Button
                     type="button"
@@ -257,7 +364,11 @@ export default function Popup() {
                   </Button>
                   <Button type="submit" disabled={isSubmitting}>
                     <Plus size={15} />
-                    {isSubmitting ? t('popup.saving') : t('messages.addSite')}
+                    {fetchingIcon
+                      ? t('popup.fetchingIcon')
+                      : isSubmitting
+                        ? t('popup.saving')
+                        : t('messages.addSite')}
                   </Button>
                 </div>
               </form>

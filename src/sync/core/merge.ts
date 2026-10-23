@@ -1,4 +1,5 @@
-import { spaceDataSchema, type SpaceData } from '@/storage/model';
+import { folderSchema, siteSchema, type SpaceData } from '@/storage/model';
+import { reconcileMergedContainers, type MergeLocation } from '@/storage/merge-containers';
 import { z } from 'zod';
 
 export const syncConflictSchema = z.object({
@@ -31,23 +32,65 @@ export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, re
     local.folders,
     remote.folders,
     conflicts,
-  ).filter(
-    (item) =>
-      !deletedKeys.has(`folder:${item.id}`) && groups.some((group) => group.id === item.groupId),
-  );
-  const sites = mergeRecords('site', base?.sites ?? [], local.sites, remote.sites, conflicts)
-    .map((site) => {
-      const folder = folders.find((item) => item.id === site.folderId);
-      return { ...site, groupId: folder?.groupId ?? site.groupId, folderId: folder?.id ?? null };
-    })
-    .filter((item) => {
-      return (
-        !deletedKeys.has(`site:${item.id}`) && groups.some((group) => group.id === item.groupId)
-      );
-    });
-  return {
-    data: spaceDataSchema.parse({ groups, folders, sites, tombstones: deleted }),
+  ).filter((item) => !deletedKeys.has(`folder:${item.id}`));
+  const sites = mergeRecords(
+    'site',
+    base?.sites ?? [],
+    local.sites,
+    remote.sites,
     conflicts,
+  ).filter((item) => !deletedKeys.has(`site:${item.id}`));
+  return reconcileMergeConflicts({ groups, folders, sites, tombstones: deleted }, conflicts);
+}
+
+export function reconcileMergeConflicts(data: SpaceData, conflicts: SyncConflict[]) {
+  const deletedKeys = new Set(data.tombstones.map((item) => `${item.entity}:${item.id}`));
+  const existing = {
+    group: new Map(data.groups.map((item) => [item.id, item])),
+    folder: new Map(data.folders.map((item) => [item.id, item])),
+    site: new Map(data.sites.map((item) => [item.id, item])),
+  };
+  const retainedConflicts = conflicts
+    .filter(
+      (conflict) =>
+        conflict.id === 'settings' ||
+        conflict.id === 'private-space' ||
+        (!deletedKeys.has(`${conflict.entity}:${conflict.id}`) &&
+          existing[conflict.entity].has(conflict.id)),
+    )
+    .map((conflict) => ({ ...conflict }));
+  const locationConflicts = retainedConflicts.filter(
+    (conflict) =>
+      (conflict.entity === 'site' || conflict.entity === 'folder') &&
+      (conflict.field === 'location' || conflict.field === '*'),
+  );
+  const locationOf = (conflict: SyncConflict, value: unknown): MergeLocation =>
+    conflict.entity === 'site'
+      ? siteSchema.pick({ groupId: true, folderId: true, order: true }).parse(value)
+      : folderSchema.pick({ groupId: true, order: true }).parse(value);
+  const reconciled = reconcileMergedContainers(
+    data,
+    locationConflicts.map((conflict) => locationOf(conflict, conflict.remote)),
+  );
+  locationConflicts.forEach((conflict, index) => {
+    const update = (value: unknown, location: MergeLocation) =>
+      conflict.field === '*'
+        ? {
+            ...(conflict.entity === 'site' ? siteSchema.parse(value) : folderSchema.parse(value)),
+            ...location,
+          }
+        : location;
+    const current =
+      conflict.entity === 'site'
+        ? reconciled.data.sites.find((item) => item.id === conflict.id)
+        : reconciled.data.folders.find((item) => item.id === conflict.id);
+    conflict.local = update(current, locationOf(conflict, current));
+    conflict.remote = update(conflict.remote, reconciled.locations[index]);
+  });
+  return {
+    data: reconciled.data,
+    conflicts: retainedConflicts.filter((conflict) => !same(conflict.local, conflict.remote)),
+    recovery: reconciled.recovery,
   };
 }
 

@@ -46,7 +46,7 @@ const emptyDraft = {
   includePrivate: false,
   privatePassword: '',
 };
-export const createSyncDraftSchema = (privateLocked: boolean) =>
+export const createSyncDraftSchema = (privateLocked: boolean, privateProtected = false) =>
   z
     .object({
       type: z.enum(['webdav', 'github', 'gitee']),
@@ -63,6 +63,12 @@ export const createSyncDraftSchema = (privateLocked: boolean) =>
       privatePassword: z.string(),
     })
     .superRefine((draft, ctx) => {
+      if (draft.automatic && draft.includePrivate && privateProtected)
+        ctx.addIssue({
+          code: 'custom',
+          path: ['automatic'],
+          message: 'settings.protectedPrivateAutomaticSync',
+        });
       if (draft.type === 'webdav') {
         try {
           resolveWebDavFileUrl(draft.url);
@@ -123,6 +129,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   const { t, i18n } = useTranslation();
   const refresh = useRayTabStore((store) => store.refresh);
   const locked = useRayTabStore((store) => store.state?.privateSecurity.locked);
+  const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const available =
     typeof browser !== 'undefined' &&
     Boolean(browser.storage?.local && browser.permissions?.request);
@@ -130,6 +137,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   const [connectionInfo, setConnectionInfo] = useState<{
     provider: SyncDraft['type'];
     automatic: boolean;
+    includePrivate: boolean;
   } | null>(null);
   const connected = connectionInfo !== null;
   const [editing, setEditing] = useState(false);
@@ -137,7 +145,15 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [status, setStatus] = useState<SyncStatus>({ schemaVersion: 1, conflicts: [] });
-  const syncDraftSchema = useMemo(() => createSyncDraftSchema(Boolean(locked)), [locked]);
+  const recoveryGroupName = useRayTabStore(
+    (store) =>
+      store.state?.spaces.normal.groups.find((group) => group.id === status.recovery?.groupId)
+        ?.name,
+  );
+  const syncDraftSchema = useMemo(
+    () => createSyncDraftSchema(Boolean(locked), Boolean(protectedPrivate)),
+    [locked, protectedPrivate],
+  );
   const form = useForm<SyncDraft>({
     resolver: zodResolver(syncDraftSchema),
     defaultValues: emptyDraft,
@@ -174,7 +190,13 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       }
       if (!mounted || version !== loadVersion) return;
       setConnectionInfo(
-        config ? { provider: config.connection.type, automatic: config.automatic } : null,
+        config
+          ? {
+              provider: config.connection.type,
+              automatic: config.automatic,
+              includePrivate: config.includePrivate,
+            }
+          : null,
       );
       setStatus(nextStatus);
       const values = draftFromConfig(config);
@@ -340,7 +362,10 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                   ? 'settings.syncUnavailable'
                   : connected
                     ? connectionInfo.automatic
-                      ? 'settings.syncOverview.automatic'
+                      ? status.automaticPaused ||
+                        (connectionInfo.includePrivate && protectedPrivate)
+                        ? 'settings.syncOverview.automaticPaused'
+                        : 'settings.syncOverview.automatic'
                       : 'settings.syncOverview.manual'
                     : 'settings.syncHelp',
               )}
@@ -354,6 +379,15 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                   date: new Date(status.lastSuccess).toLocaleString(i18n.language),
                 })
               : t('settings.syncOverview.noSuccess')}
+          </p>
+        )}
+        {status.recovery && (
+          <p role="status" className="settings-help">
+            {t('settings.syncRecovered', {
+              sites: status.recovery.sites,
+              folders: status.recovery.folders,
+              group: recoveryGroupName ?? 'Recovered',
+            })}
           </p>
         )}
         <div className="settings-form-actions sync-overview-actions">
@@ -449,7 +483,11 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                     ? ''
                     : draft.privatePassword,
                 });
-                setConnectionInfo({ provider: draft.type, automatic: draft.automatic });
+                setConnectionInfo({
+                  provider: draft.type,
+                  automatic: draft.automatic,
+                  includePrivate: draft.includePrivate,
+                });
                 setEditing(false);
                 toast.success(t('settings.connectionSaved'));
               } catch (reason) {
@@ -533,6 +571,10 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                   />
                 )}
               />
+              <FormError error={errors.automatic} />
+              {includePrivate && protectedPrivate && (
+                <p className="settings-help">{t('settings.protectedPrivateAutomaticSync')}</p>
+              )}
               {locked && <p className="settings-help">{t('settings.unlockPrivateForSync')}</p>}
               {includePrivate && (
                 <div>

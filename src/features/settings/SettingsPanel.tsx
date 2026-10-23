@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Cloud, Database, Grid2X2, Palette, SlidersHorizontal, Clock3 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
@@ -16,8 +16,6 @@ import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import { errorMessage } from '@/lib/errors';
 import { gradientPresets, nextFeaturedPhoto } from '@/features/appearance/wallpapers';
 import { effectiveSettings, type SpaceId, type SpaceSettings } from '@/storage/model';
-import { DataSettings } from './DataSettings';
-import { SyncSettings } from './SyncSettings';
 import {
   LocalWallpaperForm,
   PasswordForm,
@@ -34,6 +32,13 @@ import {
 } from './SettingsControls';
 import type { SettingsTarget } from './settings-target';
 import './settings.css';
+
+const DataSettings = lazy(() =>
+  import('./DataSettings').then((module) => ({ default: module.DataSettings })),
+);
+const SyncSettings = lazy(() =>
+  import('./SyncSettings').then((module) => ({ default: module.SyncSettings })),
+);
 
 const tabs = [
   ['general', SlidersHorizontal],
@@ -559,12 +564,16 @@ export default function SettingsPanel({
               )}
               {visited.has('sync') && (
                 <div className="settings-panel-content" hidden={activeTab !== 'sync'}>
-                  <SyncSettings report={report} />
+                  <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
+                    <SyncSettings report={report} />
+                  </Suspense>
                 </div>
               )}
               {visited.has('data') && (
                 <div className="settings-panel-content" hidden={activeTab !== 'data'}>
-                  <DataSettings spaceId={spaceId} report={report} />
+                  <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
+                    <DataSettings spaceId={spaceId} report={report} />
+                  </Suspense>
                 </div>
               )}
               {Object.values(drafts).some((draft) => draft.dirty) && (

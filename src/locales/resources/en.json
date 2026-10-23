@@ -128,6 +128,7 @@
     "anErrorOccurredTryAgain": "An error occurred. Try again.",
     "chooseAValidImageFilePngJpegWebpIcoOrSvg": "Choose a valid image file (PNG, JPEG, WebP, ICO or SVG)",
     "enterTheBackupEncryptionPassword": "Enter the backup encryption password",
-    "thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable": "This browser does not support Web Locks. Safe sync is unavailable."
+    "thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable": "This browser does not support Web Locks. Safe sync is unavailable.",
+    "protectedPrivateAutomaticSyncUnavailable": "Password-protected private spaces must be unlocked and synced manually. Turn off Include private space to use scheduled sync."
   }
 }

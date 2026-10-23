@@ -593,6 +593,19 @@ function BackupRestore({ report }: { report: DraftReporter }) {
           if (!isCurrent()) return;
           form.reset(defaults);
           toast.success(t('settings.backupRestored'));
+          for (const spaceId of ['normal', 'private'] as const) {
+            const recovery = result.recoveries[spaceId];
+            if (!recovery) continue;
+            toast.info(
+              t('settings.syncRecovered', {
+                sites: recovery.sites,
+                folders: recovery.folders,
+                group:
+                  result.state.spaces[spaceId].groups.find((group) => group.id === recovery.groupId)
+                    ?.name ?? 'Recovered',
+              }),
+            );
+          }
         } catch (reason) {
           if (isCurrent()) form.setError('root', { message: errorMessage(reason) });
         }

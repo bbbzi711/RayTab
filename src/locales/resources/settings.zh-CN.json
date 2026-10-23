@@ -265,8 +265,12 @@
     "edit": "编辑连接",
     "configure": "配置同步",
     "loadFailed": "未能读取同步配置",
-    "retryLoad": "重新读取"
+    "retryLoad": "重新读取",
+    "automaticPaused": "定时同步已暂停：受密码保护的私密空间需要解锁后手动同步，请修改连接配置。"
   },
+  "loading": "正在加载设置…",
+  "protectedPrivateAutomaticSync": "受密码保护的私密空间需要解锁后手动同步。关闭“包含私密空间”即可使用定时同步。",
+  "syncRecovered": "原分组已删除，{{sites}} 个网站和 {{folders}} 个文件夹已保留到“{{group}}”分组，请检查位置。",
   "webdavServerHelp": "直接粘贴云盘提供的 WebDAV 服务器地址，RayTab 会在该目录下自动使用 raytab.json，无需填写文件名。也可填写已有备份文件的完整地址。",
   "webdavNutstoreHelp": "坚果云服务器地址：https://dav.jianguoyun.com/dav/；账号和应用密码请从“第三方应用管理”复制。"
 }

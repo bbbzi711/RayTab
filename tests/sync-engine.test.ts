@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBackup } from '../src/features/backup/backup';
 import { createInitialState } from '../src/storage/model';
 import { repository } from '../src/storage/repository';
+import { createRepository } from '../src/storage/database';
 import { applyCommand } from '../src/storage/operations';
 import {
   clearSyncConfig,
@@ -217,6 +218,7 @@ describe('sync engine', () => {
 
   it('fails explicitly without Web Locks and does not mutate saved data', async () => {
     const config = (await loadSyncConfig())!;
+    const status = structuredClone(local['raytab-sync-status']);
     vi.stubGlobal('navigator', {});
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -234,7 +236,7 @@ describe('sync engine', () => {
     );
     await expect(loadSyncConfig()).resolves.toEqual(config);
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(local['raytab-sync-status']).toBeUndefined();
+    expect(local['raytab-sync-status']).toEqual(status);
   });
 
   it('releases the lock after an invalid conflict choice without removing conflicts', async () => {
@@ -269,6 +271,146 @@ describe('sync engine', () => {
     expect(fetchMock.mock.calls[1][1].headers['If-None-Match']).toBe('*');
     expect(local['raytab-sync-baseline']).toMatchObject({ version: 'v1' });
     await expect(loadSyncStatus()).resolves.toMatchObject({ conflicts: [], retryCount: 0 });
+  });
+
+  it('merges a new destination without treating records absent there as deletions from the old target', async () => {
+    let content = '';
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit = {}) => {
+      if (init.method === 'PUT') {
+        content = String(init.body);
+        return new Response('', { status: 200, headers: { etag: 'v1' } });
+      }
+      return content
+        ? new Response(content, { status: 200, headers: { etag: 'v1' } })
+        : new Response('', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await synchronize();
+    const before = await repository.read();
+    const localOnlyId = before.spaces.normal.sites[0].id;
+    const nextRemote = createInitialState();
+    nextRemote.spaces.normal.sites = nextRemote.spaces.normal.sites.filter(
+      (site) => site.id !== localOnlyId,
+    );
+    content = JSON.stringify(await createBackup(nextRemote, new Map(), 'normal'));
+    const config = (await loadSyncConfig())!;
+    await saveSyncConfig({
+      ...config,
+      connection: {
+        type: 'webdav',
+        url: 'https://new-dav.test/other.json',
+        username: 'user',
+        password: 'password',
+      },
+    });
+    await synchronize();
+    expect((await repository.read()).spaces.normal.sites).toContainEqual(
+      expect.objectContaining({ id: localOnlyId }),
+    );
+    expect(JSON.parse(content).spaces.normal.data.sites).toContainEqual(
+      expect.objectContaining({ id: localOnlyId }),
+    );
+    expect((await loadSyncStatus()).conflicts).toEqual([]);
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('https://new-dav.test/other.json');
+  });
+
+  it('preserves concurrent additions to a deleted group through sync and keeps the recovery notice', async () => {
+    await repository.update((state) =>
+      applyCommand(state, {
+        type: 'save-group',
+        spaceId: 'normal',
+        id: 'destination',
+        name: 'Destination',
+      }),
+    );
+    const original = await repository.read();
+    const deletedGroupId = original.spaces.normal.groups[0].id;
+    let content = '';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init: RequestInit = {}) => {
+        if (init.method === 'PUT') {
+          content = String(init.body);
+          return new Response('', { status: 200, headers: { etag: 'v1' } });
+        }
+        return content
+          ? new Response(content, { status: 200, headers: { etag: 'v1' } })
+          : new Response('', { status: 404 });
+      }),
+    );
+    await synchronize();
+    await repository.update((state) =>
+      applyCommand(state, {
+        type: 'delete-group',
+        spaceId: 'normal',
+        id: deletedGroupId,
+        destinationGroupId: 'destination',
+      }),
+    );
+    applyCommand(original, {
+      type: 'save-site',
+      spaceId: 'normal',
+      id: 'remote-addition',
+      groupId: deletedGroupId,
+      folderId: null,
+      site: {
+        title: 'Remote addition',
+        url: 'https://remote.example',
+        icon: { source: 'auto' },
+        iconBackground: { mode: 'auto' },
+      },
+    });
+    content = JSON.stringify(await createBackup(original, new Map(), 'normal'));
+    await synchronize();
+    const state = await repository.read();
+    const recovery = (await loadSyncStatus()).recovery;
+    expect(recovery).toMatchObject({ sites: 1, folders: 0 });
+    expect(state.spaces.normal.sites).toHaveLength(original.spaces.normal.sites.length);
+    expect(state.spaces.normal.sites).toContainEqual(
+      expect.objectContaining({ id: 'remote-addition', groupId: recovery!.groupId }),
+    );
+    expect(JSON.parse(content).spaces.normal.data.sites).toContainEqual(
+      expect.objectContaining({ id: 'remote-addition' }),
+    );
+    await synchronize();
+    expect((await loadSyncStatus()).recovery).toEqual(recovery);
+    expect((await repository.read()).spaces.normal).toEqual(state.spaces.normal);
+  });
+
+  it('rejects scheduled protected-private sync and pauses an existing configuration without repeated failures', async () => {
+    const config = (await loadSyncConfig())!;
+    await saveSyncConfig({ ...config, includePrivate: true, privatePassword: 'sync-password' });
+    await repository.protectPrivate('vault-password');
+    const page = createRepository();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await page.unlockPrivate('vault-password');
+      expect((await page.read()).privateSecurity.locked).toBe(false);
+      await expect(
+        saveSyncConfig({ ...config, includePrivate: true, privatePassword: 'sync-password' }),
+      ).rejects.toThrow('messages.protectedPrivateAutomaticSyncUnavailable');
+      await expect(synchronizeAutomatically()).resolves.toBeUndefined();
+      await expect(loadSyncStatus()).resolves.toEqual({
+        schemaVersion: 1,
+        conflicts: [],
+        automaticPaused: 'protected-private',
+      });
+      const writes = vi.spyOn(browser.storage.local, 'set');
+      await synchronizeAutomatically();
+      expect(writes).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+      await saveSyncConfig({
+        ...config,
+        automatic: false,
+        includePrivate: true,
+        privatePassword: 'sync-password',
+      });
+      expect((await loadSyncStatus()).automaticPaused).toBeUndefined();
+    } finally {
+      await page.removePrivatePassword('vault-password');
+      await page.close();
+    }
   });
 
   it('pulls a remote snapshot into the local repository', async () => {
@@ -383,6 +525,50 @@ describe('sync engine', () => {
     await expect(loadSyncStatus()).resolves.toMatchObject({ retryCount: 0 });
     expect(local['raytab-sync-baseline']).toMatchObject({ version: 'recovered' });
   });
+
+  it('reports an existing invalid connection without sending requests or changing saved data', async () => {
+    const config = (await loadSyncConfig())!;
+    if (config.connection.type !== 'webdav') throw new Error('Expected WebDAV fixture');
+    local['raytab-sync-config'] = {
+      ...config,
+      connection: { ...config.connection, url: 'https://dav.jianguoyun.com/tab' },
+    };
+    const before = await repository.read();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(synchronize()).rejects.toMatchObject({
+      code: 'invalid',
+      translationKey: 'errors.sync.webdavUrlRequired',
+    });
+    expect((await loadSyncStatus()).lastError).toEqual({
+      code: 'errors.sync.webdavUrlRequired',
+      values: {},
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(local['raytab-sync-baseline']).toBeUndefined();
+    expect(await repository.read()).toEqual(before);
+  });
+
+  it.each([401, 403])(
+    'persists HTTP %s and the failed request stage without advancing saved data',
+    async (status) => {
+      const before = await repository.read();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(new Response('private-server-diagnostic', { status })),
+      );
+      await expect(synchronize()).rejects.toMatchObject({ code: 'auth' });
+      expect((await loadSyncStatus()).lastError).toEqual({
+        code: status === 401 ? 'errors.sync.unauthorized' : 'errors.sync.forbidden',
+        values: { status, method: 'GET' },
+      });
+      expect(local['raytab-sync-baseline']).toBeUndefined();
+      expect(await repository.read()).toEqual(before);
+      expect(JSON.stringify(local['raytab-sync-status'])).not.toContain(
+        'private-server-diagnostic',
+      );
+    },
+  );
 
   it.each([
     new Error('password=password private=fixture-private-token'),
@@ -590,7 +776,7 @@ describe('sync engine', () => {
         password: 'password',
       },
       includePrivate: true,
-      automatic: true,
+      automatic: false,
     });
     vi.stubGlobal('fetch', vi.fn());
     await expect(synchronize('auto')).rejects.toThrow(
@@ -627,7 +813,7 @@ describe('sync engine', () => {
       },
       includePrivate: true,
       privatePassword: 'sync-encryption-password',
-      automatic: true,
+      automatic: false,
     });
     await synchronize('auto');
     expect(remoteContent).not.toContain('private-sync.example');

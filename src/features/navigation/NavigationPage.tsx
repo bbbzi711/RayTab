@@ -243,11 +243,18 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (!selectedFolderId && !editorOpen && !nameTarget && !moveTarget && manageMode) {
-          setManageMode(false);
-          setSelectedIds(new Set());
-        }
+      if (
+        e.key !== 'Escape' ||
+        e.defaultPrevented ||
+        e.isComposing ||
+        document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]',
+        )
+      )
+        return;
+      if (!selectedFolderId && !editorOpen && !nameTarget && !moveTarget && manageMode) {
+        setManageMode(false);
+        setSelectedIds(new Set());
       }
     };
     window.addEventListener('keydown', onKeyDown);

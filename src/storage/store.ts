@@ -1,7 +1,9 @@
 import { create } from 'zustand';
+import { z } from 'zod';
 import { serializeError, type StoredError } from '@/lib/errors';
 import { repository } from './repository';
 import { applyCommand, type Command } from './operations';
+import type { RepositoryCommit } from './database';
 import { wallpaperDisplay } from '@/features/appearance/wallpaper-source';
 import {
   createLockedPrivateSpace,
@@ -12,6 +14,10 @@ import {
 } from './model';
 
 const STARTUP_META_KEY = 'raytab-startup-meta';
+const commitSchema = z.object({
+  revision: z.number().int().nonnegative(),
+  resourceIds: z.array(z.string().min(1).max(100)).max(40_000),
+});
 const readError = (reason: unknown): StoredError => {
   const error = serializeError(reason);
   return error.code === 'messages.anErrorOccurredTryAgain'
@@ -53,10 +59,11 @@ type RayTabStore = {
   state: RayState | null;
   error: StoredError | null;
   resourceVersion: number;
+  resourceVersions: Map<string, number>;
   settingsPreview: { spaceId: SpaceId; patch: Partial<SpaceSettings> } | null;
   previewSettings: (spaceId: SpaceId, patch: Partial<SpaceSettings>) => void;
   clearSettingsPreview: (spaceId?: SpaceId, savedPatch?: Partial<SpaceSettings>) => void;
-  refresh: () => Promise<void>;
+  refresh: (commit?: RepositoryCommit) => Promise<void>;
   dispatch: (command: Command, assets?: Map<string, Blob>) => Promise<void>;
   protectPrivate: (password: string) => Promise<void>;
   unlockPrivate: (password: string) => Promise<void>;
@@ -69,20 +76,38 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
   let readRequest = 0;
   let privateSessionVersion = 0;
 
-  const publish = (state: RayState, sessionVersion: number) => {
+  const publish = (state: RayState, sessionVersion: number, commit?: RepositoryCommit) => {
     if (sessionVersion !== privateSessionVersion) return false;
     const current = get().state;
     if (current && state.revision < current.revision) return false;
     readRequest++;
-    const resourcesChanged =
-      !current ||
-      state.revision !== current.revision ||
-      state.privateSecurity.protected !== current.privateSecurity.protected ||
-      state.privateSecurity.locked !== current.privateSecurity.locked;
+    const sessionChanged =
+      current &&
+      (state.privateSecurity.protected !== current.privateSecurity.protected ||
+        state.privateSecurity.locked !== current.privateSecurity.locked);
+    const knownCommit = Boolean(
+      current && commit?.revision === state.revision && state.revision <= current.revision + 1,
+    );
+    const invalidateAll = Boolean(
+      sessionChanged || (current && state.revision !== current.revision && !knownCommit),
+    );
+    let versions = invalidateAll ? new Map<string, number>() : get().resourceVersions;
+    if (
+      !invalidateAll &&
+      knownCommit &&
+      commit &&
+      current &&
+      state.revision > current.revision &&
+      commit.resourceIds.length
+    ) {
+      versions = new Map(versions);
+      for (const id of new Set(commit.resourceIds)) versions.set(id, (versions.get(id) ?? 0) + 1);
+    }
     set({
       state,
       error: null,
-      resourceVersion: get().resourceVersion + Number(resourcesChanged),
+      resourceVersion: get().resourceVersion + Number(invalidateAll),
+      resourceVersions: versions,
       settingsPreview:
         current?.local.activeSpace !== state.local.activeSpace ||
         (state.privateSecurity.locked && !current?.privateSecurity.locked)
@@ -104,6 +129,7 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
     state: null,
     error: null,
     resourceVersion: 0,
+    resourceVersions: new Map<string, number>(),
     settingsPreview: null,
     previewSettings: (spaceId, patch) => {
       const current = get();
@@ -130,12 +156,12 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
         if (Object.is(patch[key], savedPatch[key])) delete patch[key];
       set({ settingsPreview: Object.keys(patch).length ? { ...preview, patch } : null });
     },
-    refresh: async () => {
+    refresh: async (commit) => {
       const request = ++readRequest;
       const sessionVersion = privateSessionVersion;
       try {
         const state = await repository.read();
-        if (request === readRequest) publish(state, sessionVersion);
+        if (request === readRequest) publish(state, sessionVersion, commit);
       } catch (reason) {
         if (request === readRequest && sessionVersion === privateSessionVersion)
           set({ error: readError(reason) });
@@ -144,7 +170,13 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
     dispatch: async (command, assets) => {
       const sessionVersion = privateSessionVersion;
       const state = await repository.update((draft) => applyCommand(draft, command), assets);
-      if (!publish(state, sessionVersion)) await get().refresh();
+      if (
+        !publish(state, sessionVersion, {
+          revision: state.revision,
+          resourceIds: [...(assets?.keys() ?? [])],
+        })
+      )
+        await get().refresh();
     },
     protectPrivate: (password) => runPrivate(() => repository.protectPrivate(password)),
     unlockPrivate: (password) => runPrivate(() => repository.unlockPrivate(password)),
@@ -168,6 +200,7 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
               },
             },
             resourceVersion: get().resourceVersion + 1,
+            resourceVersions: new Map<string, number>(),
           });
         }
         return repository.lockPrivate();
@@ -191,6 +224,10 @@ export function selectEffectiveSettings(store: RayTabStore, spaceId?: SpaceId) {
     : settings;
 }
 
+export function selectResourceVersion(store: RayTabStore, id?: string) {
+  return id ? `${store.resourceVersion}:${store.resourceVersions.get(id) ?? 0}` : '';
+}
+
 export function startRayTabStore() {
   if (typeof localStorage !== 'undefined') {
     try {
@@ -203,6 +240,10 @@ export function startRayTabStore() {
   const channel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('raytab-updates');
   const refresh = () => void useRayTabStore.getState().refresh();
+  const updated = (event: MessageEvent<unknown>) => {
+    const commit = commitSchema.safeParse(event.data);
+    void useRayTabStore.getState().refresh(commit.success ? commit.data : undefined);
+  };
   const lock = () => {
     if (!useRayTabStore.getState().state?.privateSecurity.protected) return;
     void useRayTabStore
@@ -212,12 +253,12 @@ export function startRayTabStore() {
         useRayTabStore.setState({ error: readError(reason) });
       });
   };
-  channel?.addEventListener('message', refresh);
+  channel?.addEventListener('message', updated);
   window.addEventListener('focus', refresh);
   window.addEventListener('pagehide', lock);
   refresh();
   return () => {
-    channel?.removeEventListener('message', refresh);
+    channel?.removeEventListener('message', updated);
     channel?.close();
     window.removeEventListener('focus', refresh);
     window.removeEventListener('pagehide', lock);

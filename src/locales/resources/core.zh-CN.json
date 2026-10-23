@@ -22,6 +22,7 @@
       "conflictChanged": "冲突已变化，请刷新后重试",
       "invalidRemoteResponse": "同步服务返回的数据格式无效，请检查服务响应后重试。",
       "invalidConflict": "无法识别当前冲突数据，原数据未改变",
+      "connectionSaveRollbackFailed": "同步配置保存失败，且未能恢复原会话密码。请重新保存连接配置后再同步。",
       "unauthorized": "认证被拒绝（HTTP {{status}}，{{method}}）。请核对账号、密码或令牌；WebDAV 服务可能要求单独的应用密码。",
       "forbidden": "服务器禁止此操作（HTTP {{status}}，{{method}}）。请检查目标文件或文件夹权限、应用授权及服务限制。",
       "webdavUrlRequired": "WebDAV 服务器地址无效。请编辑连接并粘贴云盘提供的 http 或 https 地址；坚果云请使用 https://dav.jianguoyun.com/dav/。"
@@ -40,7 +41,8 @@
     "organizeTitle": "按你的方式整理",
     "organizeDescription": "用分组和文件夹梳理内容，拖动网站完成排序。",
     "privacyTitle": "数据由你掌控",
-    "privacyDescription": "数据默认保存在本机，私密空间和同步均按需启用。"
+    "privacyDescription": "数据默认保存在本机，私密空间和同步均按需启用。",
+    "saving": "保存中…"
   },
   "clock": {
     "label": "时钟",
@@ -58,7 +60,10 @@
   "popup": {
     "tabReadFailed": "无法读取当前标签页，请手动填写网址。",
     "saveFailed": "网站未保存，请检查后重试。",
-    "saving": "保存中…"
+    "saving": "保存中…",
+    "iconFetchFailed": "未能获取网站图标。你可以重试，或以文字占位图标添加。",
+    "addWithoutIcon": "以文字占位图标添加",
+    "fetchingIcon": "正在获取图标…"
   },
   "counts": {
     "sites": "{{count}} 个网站",

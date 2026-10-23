@@ -9,10 +9,12 @@
 body {
   margin: 0;
   width: 350px;
+  max-width: 100%;
   min-height: 420px;
   background-color: var(--dialog-surface, #ffffff);
   color: var(--dialog-text, #0f172a);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .popup-shell {

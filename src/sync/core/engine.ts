@@ -21,8 +21,17 @@ import {
 } from '@/storage/model';
 import { upgradeSettings, upgradeV4Site } from '@/storage/upgrade-local';
 import { applyCommand } from '@/storage/operations';
-import { mergeSpaceData, createSyncConflict, syncConflictSchema, type SyncConflict } from './merge';
+import type { ContainerRecovery } from '@/storage/merge-containers';
+import {
+  mergeSpaceData,
+  reconcileMergeConflicts,
+  createSyncConflict,
+  syncConflictSchema,
+  type SyncConflict,
+} from './merge';
 import { createProvider, type SyncConnection } from '../providers';
+import { resolveWebDavFileUrl } from '../providers/webdav';
+import { SyncProviderError } from '../providers/types';
 
 export type SyncConfig = {
   connection: SyncConnection;
@@ -32,6 +41,8 @@ export type SyncConfig = {
 };
 export type SyncStatus = {
   schemaVersion: 1;
+  automaticPaused?: 'protected-private';
+  recovery?: ContainerRecovery;
   lastSuccess?: string;
   lastError?: StoredError | string;
   conflicts: SyncConflict[];
@@ -50,6 +61,15 @@ const storedErrorSchema = z.object({
 });
 const legacyConflictSchema = syncConflictSchema.omit({ key: true });
 const statusFields = {
+  automaticPaused: z.literal('protected-private').optional(),
+  recovery: z
+    .object({
+      groupId: z.string().min(1),
+      sites: z.number().int().nonnegative(),
+      folders: z.number().int().nonnegative(),
+      createdGroup: z.boolean(),
+    })
+    .optional(),
   lastSuccess: z.string().optional(),
   lastError: z.union([storedErrorSchema, z.string()]).optional(),
   retryCount: z.number().int().nonnegative().optional(),
@@ -70,11 +90,73 @@ export class SyncBusyError extends AppError {
 
 export async function saveSyncConfig(config: SyncConfig) {
   return withSyncLock(async () => {
+    if (
+      config.automatic &&
+      config.includePrivate &&
+      (await repository.read()).privateSecurity.protected
+    )
+      throw new AppError('messages.protectedPrivateAutomaticSyncUnavailable');
+    const previous = await loadSyncConfig();
+    const nextTarget = syncTarget(config.connection);
+    let previousTarget: string | undefined;
+    try {
+      if (previous) previousTarget = syncTarget(previous.connection);
+    } catch (reason) {
+      // An invalid saved address must remain replaceable with a valid connection.
+      if (!(reason instanceof SyncProviderError && reason.code === 'invalid')) throw reason;
+    }
+    const changedTarget = previousTarget !== nextTarget;
+    const status = changedTarget ? undefined : await loadSyncStatus();
+    const baseline = changedTarget
+      ? (await browser.storage.local.get(BASELINE_KEY))[BASELINE_KEY]
+      : undefined;
     const { privatePassword, ...persisted } = config;
-    await browser.storage.local.set({ [CONFIG_KEY]: persisted });
     if (privatePassword) await browser.storage.session.set({ [SECRET_KEY]: privatePassword });
     else await browser.storage.session.remove(SECRET_KEY);
+    try {
+      const { automaticPaused: _, ...activeStatus } = status ?? { schemaVersion: 1, conflicts: [] };
+      await browser.storage.local.set({
+        [CONFIG_KEY]: persisted,
+        ...(changedTarget
+          ? {
+              ...(baseline === undefined ? {} : { [BASELINE_KEY]: null }),
+              [STATUS_KEY]: { schemaVersion: 1, conflicts: [] } satisfies SyncStatus,
+            }
+          : status?.automaticPaused
+            ? { [STATUS_KEY]: activeStatus }
+            : {}),
+      });
+    } catch (reason) {
+      try {
+        if (previous?.privatePassword)
+          await browser.storage.session.set({ [SECRET_KEY]: previous.privatePassword });
+        else await browser.storage.session.remove(SECRET_KEY);
+      } catch (rollbackReason) {
+        throw new AggregateError(
+          [reason, rollbackReason],
+          'errors.sync.connectionSaveRollbackFailed',
+        );
+      }
+      throw reason;
+    }
   });
+}
+
+function syncTarget(connection: SyncConnection) {
+  if (connection.type === 'webdav') {
+    return JSON.stringify([
+      connection.type,
+      resolveWebDavFileUrl(connection.url),
+      connection.username,
+    ]);
+  }
+  return JSON.stringify([
+    connection.type,
+    connection.owner,
+    connection.repo,
+    connection.path,
+    connection.branch ?? '',
+  ]);
 }
 export async function loadSyncConfig() {
   const config = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] as
@@ -159,7 +241,7 @@ function upgradeSyncStatus(value: unknown): SyncStatus {
 
 async function loadBaseline() {
   const raw = (await browser.storage.local.get(BASELINE_KEY))[BASELINE_KEY];
-  if (raw === undefined) return undefined;
+  if (raw == null) return undefined;
   const baseline = z.object({ document: z.unknown(), version: z.string().nullable() }).parse(raw);
   return { ...baseline, document: await parseBackup(baseline.document) };
 }
@@ -226,6 +308,17 @@ export async function synchronizeAutomatically() {
     const config = await loadSyncConfig();
     if (!config?.automatic) return;
     const status = await loadSyncStatus();
+    if (config.includePrivate && (await repository.read()).privateSecurity.protected) {
+      if (status.automaticPaused !== 'protected-private')
+        await browser.storage.local.set({
+          [STATUS_KEY]: { ...status, automaticPaused: 'protected-private' } satisfies SyncStatus,
+        });
+      return;
+    }
+    if (status.automaticPaused) {
+      const { automaticPaused: _, ...activeStatus } = status;
+      await browser.storage.local.set({ [STATUS_KEY]: activeStatus });
+    }
     if (status.nextRetryAt && Date.parse(status.nextRetryAt) > Date.now()) return;
     await upgradeSyncMetadata();
     return synchronizeUnlocked('auto');
@@ -284,12 +377,11 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
       return { document: remote, conflicts: [] };
     }
     const baseline = (await loadBaseline())?.document;
-    const { document, conflicts: incomingConflicts } = await mergeDocuments(
-      baseline,
-      local,
-      remote,
-      config.privatePassword,
-    );
+    const {
+      document,
+      conflicts: incomingConflicts,
+      recovery: mergedRecovery,
+    } = await mergeDocuments(baseline, local, remote, config.privatePassword);
     const previousStatus = await loadSyncStatus();
     const previousConflicts = previousStatus.conflicts;
     const privateConflict = incomingConflicts.find((conflict) => conflict.id === 'private-space');
@@ -306,11 +398,18 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
       });
       throw new AppError('errors.sync.privateConflictRequiresChoice');
     }
-    const conflicts = [
+    let conflicts = [
       ...new Map(
         [...previousConflicts, ...incomingConflicts].map((conflict) => [conflict.key, conflict]),
       ).values(),
     ];
+    let recovery = mergedRecovery;
+    if (document.spaces.normal) {
+      const reconciled = reconcileMergeConflicts(document.spaces.normal.data, conflicts);
+      document.spaces.normal.data = reconciled.data;
+      conflicts = reconciled.conflicts;
+      recovery ??= reconciled.recovery;
+    }
     retainConflictResources(document, conflicts, baseline);
     const restored = await restoreBackup(
       snapshot.state,
@@ -324,8 +423,8 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
       expectedRevision: snapshot.state.revision,
       range,
     });
-    await saveSuccess(document, version, conflicts);
-    return { document, conflicts };
+    await saveSuccess(document, version, conflicts, recovery);
+    return { document, conflicts, recovery };
   } catch (error) {
     const previous = await loadSyncStatus();
     const retryCount = Math.min((previous.retryCount ?? 0) + 1, 8);
@@ -492,6 +591,7 @@ async function mergeDocuments(
 ) {
   const document = structuredClone(local);
   const conflicts: SyncConflict[] = [];
+  let recovery: ContainerRecovery | undefined;
   if (local.spaces.normal && remote.spaces.normal) {
     const normal = structuredClone(local.spaces.normal);
     const merged = mergeSpaceData(
@@ -500,6 +600,7 @@ async function mergeDocuments(
       remote.spaces.normal.data,
     );
     normal.data = merged.data;
+    recovery = merged.recovery;
     normal.resources = mergeResources(
       local.spaces.normal.resources,
       remote.spaces.normal.resources,
@@ -550,7 +651,7 @@ async function mergeDocuments(
       );
   }
   document.createdAt = new Date().toISOString();
-  return { document: backupSchema.parse(document), conflicts };
+  return { document: backupSchema.parse(document), conflicts, recovery };
 }
 function mergeResources<T extends { id: string }>(local: T[], remote: T[]) {
   return [...new Map([...remote, ...local].map((item) => [item.id, item])).values()];
@@ -559,13 +660,21 @@ async function saveSuccess(
   document: BackupDocument,
   version: string | null,
   conflicts: SyncConflict[] = [],
+  recovery?: ContainerRecovery,
 ) {
+  const previousRecovery = (await loadSyncStatus()).recovery;
+  const retainedRecovery =
+    recovery ??
+    (document.spaces.normal?.data.groups.some((group) => group.id === previousRecovery?.groupId)
+      ? previousRecovery
+      : undefined);
   await browser.storage.local.set({
     [BASELINE_KEY]: { document, version },
     [STATUS_KEY]: {
       schemaVersion: 1,
       lastSuccess: new Date().toISOString(),
       conflicts,
+      ...(retainedRecovery ? { recovery: retainedRecovery } : {}),
       retryCount: 0,
     } satisfies SyncStatus,
   });

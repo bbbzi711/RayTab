@@ -599,7 +599,9 @@ select:focus-visible {
   place-items: center;
   border-radius: 9999px;
   color: rgba(255, 255, 255, 0.7);
-  transition: all 150ms ease;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease;
 }
 .notice button:hover {
   background: rgba(255, 255, 255, 0.15);
@@ -621,12 +623,16 @@ select:focus-visible {
   border: 1px solid var(--toast-border) !important;
   background: var(--toast-surface) !important;
   color: var(--toast-text) !important;
+  min-width: 0 !important;
+  overflow-wrap: anywhere !important;
 }
+
 [data-sonner-toast][data-type='success'] {
   background: var(--toast-success-surface) !important;
   color: var(--toast-success-text) !important;
   border-color: var(--toast-success-border) !important;
 }
+
 [data-sonner-toast][data-type='error'] {
   background: var(--toast-error-surface) !important;
   color: var(--toast-error-text) !important;
@@ -641,23 +647,59 @@ select:focus-visible {
   justify-content: center;
   gap: 16px;
 }
+
 [data-slot='dialog-content'] {
   color: var(--foreground);
 }
+
+[data-slot='dialog-title'],
+[data-slot='dialog-description'] {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 [data-slot='dialog-description'] {
   color: var(--dialog-muted);
 }
+
 [data-slot='dialog-content'].ray-dialog {
   left: calc(50% + var(--dialog-center-offset));
   max-height: calc(100dvh - 32px);
   translate: -50% -50%;
-  overflow: hidden auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--dialog-border);
   border-radius: 24px;
   padding: 28px 30px;
   background: var(--dialog-surface);
   box-shadow: var(--dialog-shadow);
   color: var(--dialog-text);
+}
+
+.ray-dialog > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 480px) {
+  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog) {
+    padding: 22px 20px;
+    border-radius: 18px;
+  }
+}
+
+@media (max-width: 380px) {
+  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog) {
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+}
+
+@media (max-height: 480px) {
+  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog) {
+    max-height: calc(100dvh - 20px);
+    padding-block: 16px;
+  }
 }
 /* Workspace dialogs share their entrance and theme tokens. */
 .dialog-workspace-overlay {
@@ -774,7 +816,12 @@ select:focus-visible {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--motion-fast) var(--ease-standard);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
 
 .manage-toolbar-action:active {

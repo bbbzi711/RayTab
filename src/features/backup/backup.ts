@@ -13,6 +13,7 @@ import {
   type SpaceId,
 } from '@/storage/model';
 import { upgradeSettings, upgradeV4Space } from '@/storage/upgrade-local';
+import { reconcileMergedContainers, type ContainerRecovery } from '@/storage/merge-containers';
 
 const resourceSchema = z.object({
   id: z.string().min(1),
@@ -138,19 +139,26 @@ export async function restoreBackup(
     throw new AppError('messages.unlockThePrivateSpaceFirst');
   const next = rayStateSchema.parse(structuredClone(current));
   const resources = new Map<string, Blob>();
+  const recoveries: Partial<Record<SpaceId, ContainerRecovery>> = {};
   if (document.spaces.normal) {
-    next.spaces.normal =
-      mode === 'replace'
-        ? document.spaces.normal.data
-        : mergeSpace(next.spaces.normal, document.spaces.normal.data);
+    if (mode === 'replace') next.spaces.normal = document.spaces.normal.data;
+    else {
+      const merged = mergeSpace(next.spaces.normal, document.spaces.normal.data);
+      next.spaces.normal = merged.data;
+      if (merged.recovery) recoveries.normal = merged.recovery;
+    }
     next.normalSettings = document.spaces.normal.settings;
     decodeResources(document.spaces.normal.resources, resources);
   }
   if (document.spaces.private) {
     const valid = await privateBackupPayload(document, privatePassword);
     if (!valid) throw new AppError('messages.theBackupFormatIsInvalidOrItsVersionIsUnsupported');
-    next.spaces.private =
-      mode === 'replace' ? valid.data : mergeSpace(next.spaces.private, valid.data);
+    if (mode === 'replace') next.spaces.private = valid.data;
+    else {
+      const merged = mergeSpace(next.spaces.private, valid.data);
+      next.spaces.private = merged.data;
+      if (merged.recovery) recoveries.private = merged.recovery;
+    }
     next.privateSettingOverrides = diffSettings(next.normalSettings, valid.settings);
     decodeResources(valid.resources, resources);
   }
@@ -158,7 +166,7 @@ export async function restoreBackup(
     if (!next.spaces[spaceId].groups.some((item) => item.id === next.local.activeGroup[spaceId]))
       next.local.activeGroup[spaceId] = next.spaces[spaceId].groups[0].id;
   }
-  return { state: rayStateSchema.parse(next), resources };
+  return { state: rayStateSchema.parse(next), resources, recoveries };
 }
 
 export function backupSummary(document: BackupDocument) {
@@ -222,7 +230,7 @@ export async function privateBackupPayload(document: BackupDocument, password?: 
   return upgradeBackupPayload(plaintext);
 }
 
-function mergeSpace(local: SpaceData, incoming: SpaceData): SpaceData {
+function mergeSpace(local: SpaceData, incoming: SpaceData) {
   const merge = <T extends { id: string; updatedAt: number }>(a: T[], b: T[]) => {
     const records = new Map(a.map((item) => [item.id, item]));
     for (const item of b)
@@ -235,7 +243,7 @@ function mergeSpace(local: SpaceData, incoming: SpaceData): SpaceData {
     incoming.tombstones.map((item) => ({ ...item, updatedAt: item.deletedAt })),
   ).map(({ updatedAt: _, ...item }) => item);
   const deleted = new Set(tombstones.map((item) => `${item.entity}:${item.id}`));
-  return spaceDataSchema.parse({
+  return reconcileMergedContainers({
     groups: merge(local.groups, incoming.groups).filter((item) => !deleted.has(`group:${item.id}`)),
     folders: merge(local.folders, incoming.folders).filter(
       (item) => !deleted.has(`folder:${item.id}`),

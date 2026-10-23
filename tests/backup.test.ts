@@ -225,4 +225,117 @@ describe('versioned backup', () => {
       await repo.close();
     },
   );
+
+  it.each(['normal', 'private'] as const)(
+    'merges concurrent additions from a deleted %s group and preserves them across saving and reloading',
+    async (spaceId) => {
+      const initial = createInitialState();
+      const groupId = initial.spaces[spaceId].groups[0].id;
+      applyCommand(initial, { type: 'save-group', spaceId, id: 'target', name: 'Target' });
+      const local = structuredClone(initial);
+      const incoming = structuredClone(initial);
+      applyCommand(local, {
+        type: 'delete-group',
+        spaceId,
+        id: groupId,
+        destinationGroupId: 'target',
+      });
+      applyCommand(incoming, {
+        type: 'save-folder',
+        spaceId,
+        id: 'incoming-folder',
+        groupId,
+        name: 'Incoming folder',
+      });
+      applyCommand(incoming, {
+        type: 'save-site',
+        spaceId,
+        id: 'incoming-site',
+        groupId,
+        folderId: 'incoming-folder',
+        site: {
+          title: 'Incoming site',
+          url: 'https://incoming.example/',
+          icon: { source: 'resource', resourceId: 'incoming-icon' },
+          iconBackground: { mode: 'auto' },
+        },
+      });
+      const password = spaceId === 'private' ? 'backup-password' : undefined;
+      const backup = await createBackup(
+        incoming,
+        new Map([['incoming-icon', new Blob(['saved image'], { type: 'image/webp' })]]),
+        spaceId,
+        password,
+      );
+      const restored = await restoreBackup(local, await parseBackup(backup), 'merge', password);
+      const recovery = restored.recoveries[spaceId]!;
+      expect(recovery).toMatchObject({ sites: 1, folders: 1, createdGroup: true });
+      expect(restored.state.spaces[spaceId].sites.map((site) => site.url).sort()).toEqual(
+        incoming.spaces[spaceId].sites.map((site) => site.url).sort(),
+      );
+      expect(
+        restored.state.spaces[spaceId].folders.find((folder) => folder.id === 'incoming-folder')
+          ?.groupId,
+      ).toBe(recovery.groupId);
+      expect(
+        restored.state.spaces[spaceId].sites.find((site) => site.id === 'incoming-site'),
+      ).toMatchObject({ groupId: recovery.groupId, folderId: 'incoming-folder' });
+
+      const name = crypto.randomUUID();
+      const destination = createRepository(name);
+      await destination.restore(local, new Map());
+      await destination.restore(restored.state, restored.resources, { range: spaceId });
+      await destination.close();
+      const reopened = createRepository(name);
+      try {
+        const saved = await reopened.read();
+        expect(saved.spaces[spaceId]).toEqual(restored.state.spaces[spaceId]);
+        expect(await (await reopened.resource('incoming-icon'))?.text()).toBe('saved image');
+        const repeated = await restoreBackup(saved, backup, 'merge', password);
+        expect(repeated.state.spaces[spaceId]).toEqual(saved.spaces[spaceId]);
+        expect(repeated.recoveries).toEqual({});
+      } finally {
+        await reopened.close();
+      }
+
+      const replaced = await restoreBackup(local, backup, 'replace', password);
+      expect(replaced.state.spaces[spaceId]).toEqual(incoming.spaces[spaceId]);
+      expect(replaced.recoveries).toEqual({});
+    },
+  );
+
+  it('retains newly added websites at group root when merging a backup of a dissolved folder', async () => {
+    const initial = createInitialState();
+    const groupId = initial.local.activeGroup.normal;
+    applyCommand(initial, {
+      type: 'save-folder',
+      spaceId: 'normal',
+      id: 'folder',
+      groupId,
+      name: 'Folder',
+    });
+    const local = structuredClone(initial);
+    const incoming = structuredClone(initial);
+    applyCommand(local, { type: 'delete-folder', spaceId: 'normal', id: 'folder' });
+    applyCommand(incoming, {
+      type: 'save-site',
+      spaceId: 'normal',
+      id: 'incoming-site',
+      groupId,
+      folderId: 'folder',
+      site: {
+        title: 'Incoming site',
+        url: 'https://incoming.example/',
+        icon: { source: 'auto' },
+        iconBackground: { mode: 'auto' },
+      },
+    });
+    const backup = await createBackup(incoming, new Map(), 'normal');
+    const restored = await restoreBackup(local, backup, 'merge');
+    expect(restored.state.spaces.normal.folders).toEqual([]);
+    expect(
+      restored.state.spaces.normal.sites.find((site) => site.id === 'incoming-site'),
+    ).toMatchObject({ groupId, folderId: null });
+    expect(restored.recoveries).toEqual({});
+  });
 });

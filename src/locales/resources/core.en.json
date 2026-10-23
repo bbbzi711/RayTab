@@ -22,6 +22,7 @@
       "conflictChanged": "This conflict changed. Refresh and try again.",
       "invalidRemoteResponse": "The sync service returned an invalid response. Check the service and try again.",
       "invalidConflict": "This conflict could not be recognized. Existing data was not changed.",
+      "connectionSaveRollbackFailed": "The sync configuration could not be saved, and the previous session password could not be restored. Save the connection settings again before syncing.",
       "unauthorized": "Authentication was rejected (HTTP {{status}}, {{method}}). Check the account, password or token. WebDAV services may require a separate app password.",
       "forbidden": "The server forbids this operation (HTTP {{status}}, {{method}}). Check the target file or folder permissions, app authorization and service restrictions.",
       "webdavUrlRequired": "The WebDAV server URL is invalid. Edit the connection and paste the HTTP or HTTPS URL provided by your cloud service. For Nutstore, use https://dav.jianguoyun.com/dav/."
@@ -40,7 +41,8 @@
     "organizeTitle": "Arrange it your way",
     "organizeDescription": "Organize with groups and folders, then drag sites into place.",
     "privacyTitle": "Keep control of your data",
-    "privacyDescription": "Data stays local by default. Private space and sync are optional."
+    "privacyDescription": "Data stays local by default. Private space and sync are optional.",
+    "saving": "Saving…"
   },
   "clock": {
     "label": "Clock",
@@ -58,7 +60,10 @@
   "popup": {
     "tabReadFailed": "Could not read the current tab. Enter the URL manually.",
     "saveFailed": "The site was not saved. Check it and try again.",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "iconFetchFailed": "Could not fetch the website icon. Retry or add it with a text placeholder.",
+    "addWithoutIcon": "Add with text placeholder",
+    "fetchingIcon": "Fetching icon…"
   },
   "counts": {
     "sites_one": "{{count}} site",

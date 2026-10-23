@@ -32,7 +32,12 @@ type VaultSession = Omit<VaultSerialized, 'resources' | 'schemaVersion'> & {
   resources: Map<string, Blob>;
 };
 
-export function createRepository(name = RAY_DATABASE_NAME, onCommit = () => {}) {
+export type RepositoryCommit = { revision: number; resourceIds: string[] };
+
+export function createRepository(
+  name = RAY_DATABASE_NAME,
+  onCommit: (commit?: RepositoryCommit) => void = () => {},
+) {
   let session: VaultSession | null = null;
   let sessionPassword: string | null = null;
   let sessionGeneration = 0;
@@ -185,7 +190,7 @@ export function createRepository(name = RAY_DATABASE_NAME, onCommit = () => {}) 
       session = nextSession;
       sessionEnvelope = envelope?.ciphertext;
     }
-    onCommit();
+    onCommit({ revision: valid.revision, resourceIds: [...assets.keys()] });
     return sessionChanged ? read() : valid;
   }
 
@@ -222,7 +227,7 @@ export function createRepository(name = RAY_DATABASE_NAME, onCommit = () => {}) 
       next.revision++;
       await persist(stored, next, new Map(), envelope);
       clearSession();
-      onCommit();
+      onCommit({ revision: next.revision, resourceIds: [] });
       return read();
     },
     async unlockPrivate(password: string) {
@@ -273,7 +278,7 @@ export function createRepository(name = RAY_DATABASE_NAME, onCommit = () => {}) 
       const next = { ...stored.state, revision: stored.state.revision + 1 };
       await persist(stored, next, new Map(), envelope);
       clearSession();
-      onCommit();
+      onCommit({ revision: next.revision, resourceIds: [] });
     },
     async removePrivatePassword(password: string) {
       const stored = await readStored();
@@ -289,7 +294,7 @@ export function createRepository(name = RAY_DATABASE_NAME, onCommit = () => {}) 
       next.revision++;
       await persist(stored, rayStateSchema.parse(next), payload.resources);
       clearSession();
-      onCommit();
+      onCommit({ revision: next.revision, resourceIds: [...payload.resources.keys()] });
       return read();
     },
     async snapshot(range: SpaceId | 'all' = 'all') {

@@ -5,7 +5,9 @@ import { bingDailyUrl } from './wallpapers';
 let scope = 'normal';
 let generation = 0;
 let requestedSource: string | undefined;
-let loaded: { source: string; url: string; cache: WallpaperCache } | undefined;
+let requestedVersion: string | undefined;
+let loaded:
+  { source: string; resourceVersion: string; url: string; cache: WallpaperCache } | undefined;
 let pending: AbortController | undefined;
 let pendingTask: Promise<void> | undefined;
 let background: HTMLDivElement | undefined;
@@ -158,13 +160,20 @@ export function displayWallpaper(
   display: WallpaperDisplay,
   nextScope = 'normal',
   localOnly = false,
+  resourceVersion = '0:0',
 ) {
-  const task = renderWallpaper(display, nextScope, localOnly);
-  if (pending && requestedSource === display.source) pendingTask = task;
+  const task = renderWallpaper(display, nextScope, localOnly, resourceVersion);
+  if (pending && requestedSource === display.source && requestedVersion === resourceVersion)
+    pendingTask = task;
   return task;
 }
 
-async function renderWallpaper(display: WallpaperDisplay, nextScope: string, localOnly: boolean) {
+async function renderWallpaper(
+  display: WallpaperDisplay,
+  nextScope: string,
+  localOnly: boolean,
+  resourceVersion: string,
+) {
   const layer = layers();
   if (scope !== nextScope) {
     clearImage();
@@ -186,10 +195,16 @@ async function renderWallpaper(display: WallpaperDisplay, nextScope: string, loc
     requestedSource = undefined;
     return;
   }
-  if (requestedSource === display.source && pending && !pending.signal.aborted) return pendingTask;
   if (
-    !display.resourceId &&
+    requestedSource === display.source &&
+    requestedVersion === resourceVersion &&
+    pending &&
+    !pending.signal.aborted
+  )
+    return pendingTask;
+  if (
     loaded?.source === display.source &&
+    (!display.resourceId || loaded.resourceVersion === resourceVersion) &&
     (display.remoteUrl !== bingDailyUrl ||
       new Date(loaded.cache.fetchedAt).toDateString() === new Date().toDateString())
   ) {
@@ -207,6 +222,7 @@ async function renderWallpaper(display: WallpaperDisplay, nextScope: string, loc
   const controller = new AbortController();
   pending = controller;
   requestedSource = display.source;
+  requestedVersion = resourceVersion;
   let candidate: string | undefined;
   try {
     let cache = nextScope === 'normal' ? await localImage(display, localOnly) : undefined;
@@ -245,6 +261,7 @@ async function renderWallpaper(display: WallpaperDisplay, nextScope: string, loc
     const previous = loaded;
     loaded = {
       source: cache.source,
+      resourceVersion,
       url: candidate,
       cache: { ...cache, blob: cache.source.startsWith('resource:') ? undefined : cache.blob },
     };
@@ -269,6 +286,7 @@ async function renderWallpaper(display: WallpaperDisplay, nextScope: string, loc
       pending = undefined;
       pendingTask = undefined;
       requestedSource = undefined;
+      requestedVersion = undefined;
     }
   }
 }

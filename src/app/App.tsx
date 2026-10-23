@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -31,10 +31,10 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import i18n from '@/locales';
 import { resolveHomeTextColors } from '@/features/appearance/text-colors';
-import SettingsPanel from '@/features/settings/SettingsPanel';
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip';
 
 const unlockSchema = z.object({ password: z.string().min(1, 'navigation.passwordRequired') });
+const SettingsPanel = lazy(() => import('@/features/settings/SettingsPanel'));
 
 export default function App() {
   const { t } = useTranslation();
@@ -447,22 +447,26 @@ export default function App() {
               </div>
             )}
             {settingsOpen && (
-              <SettingsPanel
-                key={spaceId}
-                spaceId={spaceId}
-                open={settingsOpen}
-                onClose={() => setSettingsOpen(false)}
-                target={settingsTarget}
-              />
+              <Suspense
+                fallback={
+                  <Dialog open onOpenChange={(open) => !open && setSettingsOpen(false)}>
+                    <DialogContent aria-describedby={undefined} aria-busy>
+                      <DialogTitle role="status">{t('settings.loading')}</DialogTitle>
+                    </DialogContent>
+                  </Dialog>
+                }
+              >
+                <SettingsPanel
+                  key={spaceId}
+                  spaceId={spaceId}
+                  open={settingsOpen}
+                  onClose={() => setSettingsOpen(false)}
+                  target={settingsTarget}
+                />
+              </Suspense>
             )}
             {!onboardingComplete && (
-              <Onboarding
-                onFinish={() =>
-                  void dispatch({ type: 'complete-onboarding' }).catch((reason) =>
-                    toast.error(errorMessage(reason)),
-                  )
-                }
-              />
+              <Onboarding onFinish={() => dispatch({ type: 'complete-onboarding' })} />
             )}
             <Dialog
               open={unlockOpen}

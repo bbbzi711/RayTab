@@ -128,6 +128,7 @@
     "anErrorOccurredTryAgain": "发生错误，请重试",
     "chooseAValidImageFilePngJpegWebpIcoOrSvg": "请选择有效的图片文件（PNG、JPEG、WebP、ICO 或 SVG）",
     "enterTheBackupEncryptionPassword": "请填写备份加密密码",
-    "thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable": "当前浏览器不支持 Web Locks，无法安全同步"
+    "thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable": "当前浏览器不支持 Web Locks，无法安全同步",
+    "protectedPrivateAutomaticSyncUnavailable": "受密码保护的私密空间需要解锁后手动同步。关闭“包含私密空间”即可使用定时同步。"
   }
 }
