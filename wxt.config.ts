@@ -54,6 +54,7 @@ export default defineConfig({
       'docs/plan/**',
       'dist/**',
       'artifacts/**',
+      'logs/**',
       '.output/**',
       'gecko.log',
       'skills-lock.json',

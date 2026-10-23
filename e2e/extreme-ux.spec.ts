@@ -40,15 +40,22 @@ test('长分组名称的存入位置列表在窄屏内完整换行且可用键�
   await newTab.setViewportSize({ width: 320, height: 360 });
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
-  await editor.getByLabel('存入位置', { exact: true }).click();
+  const location = editor.getByLabel('存入位置', { exact: true });
+  await location.click();
   const options = newTab.getByRole('listbox');
+  const lastOption = options.getByRole('option', { name, exact: true });
   await expect(options).toBeVisible();
   await noHorizontalOverflow(options);
-  await noHorizontalOverflow(options.getByRole('option', { name, exact: true }));
+  await noHorizontalOverflow(lastOption);
   await newTab.screenshot({ path: 'artifacts/acceptance/ui-extremes/long-location.png' });
-  await options.press('End');
-  await options.press('Enter');
-  await expect(editor.getByLabel('存入位置', { exact: true })).toHaveText(name);
+  await newTab.keyboard.press('Home');
+  await expect(options.getByRole('option').first()).toBeFocused();
+  await newTab.keyboard.press('End');
+  await expect(lastOption).toBeFocused();
+  await newTab.keyboard.press('Enter');
+  await expect(options).not.toBeVisible();
+  await expect(location).toHaveText(name);
+  await expect(location).toBeFocused();
   await editor.getByRole('button', { name: '取消', exact: true }).click();
 });
 
@@ -173,12 +180,18 @@ test('千个网站与百个文件夹下搜索、打开文件夹和设置仍可�
   await expect(
     settings.getByRole('switch', { name: '显示网站标题', exact: true }),
   ).not.toBeChecked();
-  await expect(settings.getByRole('status')).toHaveText('已保存');
+  await expect(settings.locator('.settings-autosave')).toHaveText('已保存');
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(settings).not.toBeVisible();
   await expect(query).toHaveValue('大量数据下的搜索草稿');
   await newTab.reload();
   await expect(newTab.locator('.site-card')).toHaveCount(600);
+  await newTab.getByRole('button', { name: '设置', exact: true }).click();
+  await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
+  await expect(
+    settings.getByRole('switch', { name: '显示网站标题', exact: true }),
+  ).not.toBeChecked();
+  await settings.getByRole('button', { name: '关闭', exact: true }).click();
 });
 
 test('英文设置在横向小窗口和320px内保留可达分类与关闭入口', async ({ newTab }) => {
