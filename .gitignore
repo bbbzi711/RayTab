@@ -3,6 +3,7 @@ dist/
 .output/
 .wxt/
 artifacts/
+logs/
 *.log
 *.tsbuildinfo
 .env*

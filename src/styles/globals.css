@@ -696,7 +696,7 @@ select:focus-visible {
 }
 
 @media (max-height: 480px) {
-  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog) {
+  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog, .onboarding-card) {
     max-height: calc(100dvh - 20px);
     padding-block: 16px;
   }
