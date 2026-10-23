@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { Toaster, toast } from 'sonner';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { Check, ExternalLink, Globe2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,7 +130,7 @@ export default function Popup() {
     ) : null;
   return (
     <main className="popup-shell">
-      <Toaster richColors position="bottom-center" theme={settings?.theme ?? 'system'} />
+      <Toaster theme={settings?.theme ?? 'system'} />
       {!settings || !normalSpace ? (
         <div className="popup-loading">
           <p>{error ? storedErrorMessage(error) : t('messages.openingYourSpace')}</p>

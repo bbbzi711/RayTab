@@ -436,14 +436,11 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     };
 
     return (
-      <div
-        className="flex flex-wrap items-center gap-2 p-2 bg-black/10 dark:bg-white/10 rounded-xl mb-4 backdrop-blur-md w-full"
-        style={{ maxWidth: gridStyle.maxWidth }}
-      >
+      <div className="manage-toolbar" style={{ maxWidth: gridStyle.maxWidth }}>
         <Button
           type="button"
           variant="ghost"
-          className="rounded-xl cursor-pointer"
+          className="manage-toolbar-action"
           aria-label={
             allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')
           }
@@ -457,7 +454,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
           type="button"
           variant="ghost"
           disabled={selectedIds.size === 0}
-          className="rounded-xl cursor-pointer"
+          className="manage-toolbar-action"
           aria-label={t('messages.moveSelected')}
           title={t('messages.moveSelected')}
           onClick={() => setMoveTarget({ type: 'sites', ids: Array.from(selectedIds) })}
@@ -467,7 +464,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
         <Button
           type="button"
           variant="ghost"
-          className="text-red-500 rounded-xl cursor-pointer hover:bg-red-500/10"
+          className="manage-toolbar-action manage-toolbar-action--danger"
           disabled={selectedIds.size === 0}
           aria-label={t('messages.deleteSelected')}
           title={t('messages.deleteSelected')}
@@ -489,7 +486,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
           {t('messages.deleteSelected')}
         </Button>
         {selectedIds.size > 0 && (
-          <span className="text-xs text-muted-foreground px-2">
+          <span className="manage-toolbar-count">
             {t('navigation.selectedSites', { count: selectedIds.size })}
           </span>
         )}
@@ -497,7 +494,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
         <Button
           type="button"
           variant="default"
-          className="rounded-xl cursor-pointer px-4 bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+          className="manage-toolbar-action manage-toolbar-action--primary"
           aria-label={t('messages.done')}
           title={t('messages.done')}
           onClick={() => {
@@ -549,7 +546,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
                             }
                           >
                             {group.id === activeGroup.id && (
-                              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[22px] bg-blue-400 rounded-r-md" />
+                              <div className="group-tab-active-indicator" />
                             )}
                             <GroupIcon size={19} strokeWidth={1.6} />
                             <span className="text-[11px] font-medium leading-none truncate w-full text-center px-1">
@@ -578,7 +575,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
                 <button
                   type="button"
                   aria-label={t('messages.addGroup')}
-                  className="flex flex-col items-center justify-center w-full min-h-[54px] gap-[5px] rounded-xl text-white/75 hover:text-white hover:bg-white/10 transition-all duration-150 cursor-pointer"
+                  className="flex flex-col items-center justify-center w-full min-h-[54px] gap-[5px] rounded-xl opacity-75 hover:opacity-100 hover:bg-white/10 transition-all duration-150 cursor-pointer"
                   onClick={() => setNameTarget({ type: 'group' })}
                 >
                   <Plus size={19} strokeWidth={1.6} />

@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { toast, Toaster } from 'sonner';
+import { toast } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
 import type { SettingsTarget } from '@/features/settings/settings-target';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -525,7 +526,7 @@ export default function App() {
           <NavigationMenuItems actions={desktopActions} />
         </ContextMenuContent>
       </ContextMenu>
-      <Toaster theme={settings.theme} richColors position="bottom-center" />
+      <Toaster theme={settings.theme} />
     </TooltipProvider>
   );
 }

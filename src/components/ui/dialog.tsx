@@ -45,6 +45,7 @@ function DialogContent({
   closeLabel,
   overlayClassName,
   variant = 'center',
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -76,6 +77,13 @@ function DialogContent({
           className,
         )}
         {...props}
+        onInteractOutside={(event) => {
+          if (event.target instanceof Element && event.target.closest('[data-sonner-toaster]')) {
+            event.preventDefault();
+            return;
+          }
+          onInteractOutside?.(event);
+        }}
       >
         {children}
         {showCloseButton && (

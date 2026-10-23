@@ -67,6 +67,13 @@ test('提交保存失败保留搜索引擎输入，重试仅新增一次', async
   await failNextWrite(newTab);
   await form.getByRole('button', { name: '添加', exact: true }).click();
   await expect(form.getByRole('alert')).toBeVisible();
+  expect(
+    await form.getByRole('alert').evaluate((element) => getComputedStyle(element).color),
+  ).not.toBe(
+    await form
+      .getByLabel('搜索引擎名称', { exact: true })
+      .evaluate((element) => getComputedStyle(element).color),
+  );
   await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('失败重试引擎');
   expect(
     (await storedState(newTab)).normalSettings.searchEngines.filter(

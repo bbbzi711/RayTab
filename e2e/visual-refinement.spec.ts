@@ -12,6 +12,14 @@ async function openSettings(page: Page) {
   return settings;
 }
 
+async function settleTheme(page: Page) {
+  await page.mouse.move(0, 0);
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await Promise.allSettled(document.getAnimations().map((animation) => animation.finished));
+  });
+}
+
 async function menuAppearance(menu: Locator) {
   return menu.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -56,7 +64,9 @@ test('平板设置居中且边界完整，窄屏组件深链完整显示当前�
   expect(bounds.height).toBeGreaterThanOrEqual(44);
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(320);
+  await settleTheme(newTab);
   await newTab.screenshot({ path: 'artifacts/acceptance/refined-settings-widget-deeplink.png' });
+  await newTab.screenshot({ path: 'artifacts/acceptance/ui-round2/narrow-settings.png' });
 });
 
 test('设置使用独立居中工作区，布局修改保存且不挤压桌面或改变简洁模式', async ({ newTab }) => {
@@ -169,7 +179,22 @@ test('右键与键盘菜单使用同一主题，删除聚焦和Esc返回正确',
     await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
     await settings.getByRole('combobox', { name: '主题', exact: true }).click();
     await newTab.getByRole('option', { name: theme, exact: true }).click();
+    await settleTheme(newTab);
+    const appearance = theme === '明亮' ? 'light' : 'dark';
+    await newTab.screenshot({
+      path: `artifacts/acceptance/antigravity-ui/settings-${appearance}.png`,
+    });
+    await newTab.screenshot({
+      path: `artifacts/acceptance/ui-round2/settings-${appearance}.png`,
+    });
     await settings.getByRole('button', { name: '关闭', exact: true }).click();
+    await settleTheme(newTab);
+    await newTab.screenshot({
+      path: `artifacts/acceptance/antigravity-ui/home-${appearance}.png`,
+    });
+    await newTab.screenshot({
+      path: `artifacts/acceptance/ui-round2/home-${appearance}.png`,
+    });
     await site.hover();
     await link.focus();
     await link.press('Shift+F10');
@@ -194,6 +219,20 @@ test('右键与键盘菜单使用同一主题，删除聚焦和Esc返回正确',
     expect(await remove.evaluate((node) => getComputedStyle(node).color)).toBe(dangerColor);
     await menu.press('Escape');
   }
+
+  const settings = await openSettings(newTab);
+  await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
+  await settings.getByRole('combobox', { name: '主题', exact: true }).click();
+  await newTab.getByRole('option', { name: '跟随系统', exact: true }).click();
+  await settleTheme(newTab);
+  await newTab.screenshot({
+    path: 'artifacts/acceptance/ui-round2/settings-system.png',
+  });
+  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  await settleTheme(newTab);
+  await newTab.screenshot({
+    path: 'artifacts/acceptance/ui-round2/home-system.png',
+  });
 });
 
 test('现有图标可手动裁切透明边，保存及重载保留像素和底色', async ({ newTab }) => {
@@ -231,6 +270,7 @@ test('现有图标可手动裁切透明边，保存及重载保留像素和底�
     'true',
   );
   await newTab.screenshot({ path: 'artifacts/acceptance/refined-icon-editor.png' });
+  await newTab.screenshot({ path: 'artifacts/acceptance/ui-round2/editor.png' });
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
   await newTab.reload();
@@ -261,4 +301,25 @@ test('现有图标可手动裁切透明边，保存及重载保留像素和底�
       .locator('xpath=ancestor::article')
       .evaluate((node) => getComputedStyle(node).backgroundColor),
   ).toBe('rgba(0, 0, 0, 0)');
+});
+
+test('Popup 首屏表单和主操作完整可达，明暗主题均无横向溢出', async ({ context, extensionId }) => {
+  const popup = await context.newPage();
+  await popup.setViewportSize({ width: 350, height: 420 });
+  await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  for (const name of ['名称', '网址', '存入位置']) {
+    await expect(popup.getByLabel(name, { exact: true })).toBeInViewport({ ratio: 1 });
+  }
+  for (const name of ['打开主页', '添加网站']) {
+    await expect(popup.getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
+  }
+  const noHorizontalOverflow = () =>
+    popup.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
+  expect(await noHorizontalOverflow()).toBe(true);
+  await settleTheme(popup);
+  await popup.screenshot({ path: 'artifacts/acceptance/ui-round2/popup.png' });
+  await popup.emulateMedia({ colorScheme: 'dark' });
+  await settleTheme(popup);
+  expect(await noHorizontalOverflow()).toBe(true);
+  await popup.screenshot({ path: 'artifacts/acceptance/ui-round2/popup-dark.png' });
 });
