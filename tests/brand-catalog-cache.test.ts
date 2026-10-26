@@ -153,11 +153,12 @@ describe('explicit website icon resolution', () => {
   it('downloads a newly cataloged brand without adding it to the bundled index', async () => {
     const svg =
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M0 0h32v32z"/></svg>';
-    const fetch = vi.fn(async (url: string) =>
-      url === 'https://api.svgl.app'
-        ? Response.json([entry])
-        : new Response(svg, { headers: { 'content-type': 'image/svg+xml' } }),
-    );
+    const fetch = vi.fn(async (url: string) => {
+      if (url === 'https://api.svgl.app') return Response.json([entry]);
+      if (url === 'https://svgl.app/library/new-product.svg')
+        return new Response(svg, { headers: { 'content-type': 'image/svg+xml' } });
+      return new Response('', { status: 404 });
+    });
     vi.stubGlobal('fetch', fetch);
     vi.stubGlobal(
       'createImageBitmap',
@@ -169,10 +170,13 @@ describe('explicit website icon resolution', () => {
     expect(result.title).toBe('New Product');
     expect(result.background).toBe('#ffffff');
     expect(await result.icon?.text()).toBe(svg);
-    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
-      'https://api.svgl.app',
-      'https://svgl.app/library/new-product.svg',
-    ]);
+    const requests = fetch.mock.calls.map(([url]) => url);
+    expect(requests).toContain('https://newproduct.com/tools?token=secret');
+    expect(requests).toContain('https://api.svgl.app');
+    expect(requests).toContain('https://svgl.app/library/new-product.svg');
+    expect(
+      requests.filter((url) => !url.startsWith('https://newproduct.com/')).join(' '),
+    ).not.toContain('secret');
   });
 
   it('keeps local curated icons usable offline and makes no public request in private space', async () => {
@@ -183,13 +187,40 @@ describe('explicit website icon resolution', () => {
       (await resolveWebsiteIcon('https://tieba.baidu.com', { allowPublicService: false }))
         .localBrand,
     ).toBe(true);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://tieba.baidu.com/',
+      'https://tieba.baidu.com/favicon.ico',
+    ]);
     await resolveWebsiteIcon('https://newproduct.com/tools?private=1', {
       allowPublicService: false,
     });
     expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://tieba.baidu.com/',
+      'https://tieba.baidu.com/favicon.ico',
       'https://newproduct.com/tools?private=1',
       'https://newproduct.com/favicon.ico',
+    ]);
+    expect(stored).toEqual({});
+  });
+
+  it('checks the origin again for a bundled brand and replaces stale catalog artwork with a clear official icon', async () => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width: 256, height: 256, close() {} })),
+    );
+    const fetch = vi.fn(async (url: string) =>
+      url === 'https://tieba.baidu.com/favicon.ico'
+        ? new Response('official', { headers: { 'content-type': 'image/png' } })
+        : new Response('', { status: 403 }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const { resolveWebsiteIcon } = await import('../src/features/navigation/site-metadata');
+    const result = await resolveWebsiteIcon('https://tieba.baidu.com');
+    expect(result.localBrand).toBe(false);
+    expect(await result.icon?.text()).toBe('official');
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      'https://tieba.baidu.com/',
+      'https://tieba.baidu.com/favicon.ico',
     ]);
     expect(stored).toEqual({});
   });

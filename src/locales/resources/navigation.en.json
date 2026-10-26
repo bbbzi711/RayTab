@@ -32,6 +32,8 @@
     "cropPreservesBackground": "Cropping only removes content outside the selection; it keeps white and transparent backgrounds.",
     "customColor": "Custom background color",
     "iconFetchFailed": "Could not fetch the icon. Use a text icon or upload an image.",
+    "iconRefreshFailed": "No high-resolution website icon was found. Your current image is kept. Retry or upload an image.",
+    "localBrandFallback": "No high-resolution website icon was found. Using the local brand icon.",
     "metadataUpdated": "Site details updated",
     "noImage": "No image is available. Upload an icon.",
     "desktopMenu": "Desktop actions",

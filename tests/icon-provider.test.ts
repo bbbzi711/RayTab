@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchWebsiteIcon, publicIconDomain } from '../src/features/navigation/site-metadata';
+import {
+  fetchSiteIcon,
+  fetchWebsiteIcon,
+  publicIconDomain,
+} from '../src/features/navigation/site-metadata';
 import { findCatalogIcon } from '../src/features/navigation/brand-catalog';
 import { getBrandAppearance } from '../src/features/navigation/brandIcons';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -37,7 +41,8 @@ describe('public favicon requests', () => {
     expect(publicIconDomain('https://example.com.evil.local')).toBeUndefined();
   });
 
-  it('obtains original pixels from the provider while direct access is blocked, then cancels the blocked lookup', async () => {
+  it('uses verified provider pixels after the blocked origin exhausts the shared lookup budget', async () => {
+    vi.useFakeTimers();
     let cancelled = false;
     const calls: string[] = [];
     vi.stubGlobal(
@@ -72,7 +77,9 @@ describe('public favicon requests', () => {
         });
       }),
     );
-    const result = await fetchWebsiteIcon('https://example.com/account?secret=1#profile');
+    const pending = fetchWebsiteIcon('https://example.com/account?secret=1#profile');
+    await vi.advanceTimersByTimeAsync(8_001);
+    const result = await pending;
     expect(result.icon?.type).toBe('image/png');
     expect(cancelled).toBe(true);
     expect(calls).toEqual([
@@ -132,6 +139,125 @@ describe('public favicon requests', () => {
       }),
     );
     expect(await (await fetchWebsiteIcon('https://example.com')).icon?.text()).toBe('large');
+  });
+
+  it('prefers the official icon even when a different adequate service image arrives first', async () => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async (blob: Blob) => ({
+        width: (await blob.text()) === 'official' ? 192 : 256,
+        height: (await blob.text()) === 'official' ? 192 : 256,
+        close() {},
+      })),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input.endsWith('?response=json'))
+          return Response.json({ source: 'link-tag', width: 256, height: 256, format: 'png' });
+        if (input === 'https://favicon.vemetric.com/example.com')
+          return new Response('cached', { headers: { 'content-type': 'image/png' } });
+        if (input === 'https://example.com/favicon.ico') {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return new Response('official', { headers: { 'content-type': 'image/png' } });
+        }
+        return new Response('', { status: 403 });
+      }),
+    );
+    expect(await (await fetchWebsiteIcon('https://example.com')).icon?.text()).toBe('official');
+  });
+
+  it('compares actual dimensions beyond the first 128px candidate and rejects a wide header logo', async () => {
+    const dimensions: Record<string, [number, number]> = {
+      small: [128, 128],
+      large: [512, 512],
+      header: [1024, 256],
+    };
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async (blob: Blob) => {
+        const [width, height] = dimensions[await blob.text()];
+        return { width, height, close() {} };
+      }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (input: string) =>
+          new Response(input.split('/').at(-1), { headers: { 'content-type': 'image/png' } }),
+      ),
+    );
+    const icon = await fetchSiteIcon('https://example.com/small', undefined, [
+      'https://example.com/header',
+      'https://example.com/large',
+    ]);
+    expect(await icon?.text()).toBe('large');
+  });
+
+  it('does not treat an SVG wrapper around a bitmap as scalable artwork', async () => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width: 256, height: 256, close() {} })),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input.endsWith('.svg')
+          ? new Response('<svg><image href="data:image/png;base64,AA=="/></svg>', {
+              headers: { 'content-type': 'image/svg+xml' },
+            })
+          : new Response('original', { headers: { 'content-type': 'image/png' } }),
+      ),
+    );
+    const icon = await fetchSiteIcon('https://example.com/wrapped.svg', undefined, [
+      'https://example.com/original.png',
+    ]);
+    expect(await icon?.text()).toBe('original');
+  });
+
+  it('selects ordinary manifest artwork without downloading maskable-only or monochrome icons', async () => {
+    vi.stubGlobal(
+      'DOMParser',
+      class {
+        parseFromString() {
+          return {
+            querySelector: (selector: string) =>
+              selector === 'link[rel="manifest" i]'
+                ? { getAttribute: () => '/app.webmanifest' }
+                : null,
+            querySelectorAll: () => [],
+          };
+        }
+      },
+    );
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ width: 192, height: 192, close() {} })),
+    );
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        calls.push(input);
+        if (input === 'https://example.com/')
+          return new Response('<html/>', { headers: { 'content-type': 'text/html' } });
+        if (input.endsWith('.webmanifest'))
+          return Response.json({
+            icons: [
+              { src: '/mask.png', sizes: '1024x1024', purpose: 'maskable' },
+              { src: '/mono.png', sizes: '512x512', purpose: 'monochrome' },
+              { src: '/ordinary.png', sizes: '192x192', purpose: 'any maskable' },
+            ],
+          });
+        if (input.endsWith('/ordinary.png'))
+          return new Response('ordinary', { headers: { 'content-type': 'image/png' } });
+        return new Response('', { status: 404 });
+      }),
+    );
+    const result = await fetchWebsiteIcon('https://example.com', { allowPublicService: false });
+    expect(await result.icon?.text()).toBe('ordinary');
+    expect(calls).not.toContain('https://example.com/mask.png');
+    expect(calls).not.toContain('https://example.com/mono.png');
   });
 
   it('recovers original pixels if a provider deployment still shrinks images to its documented 64px default', async () => {

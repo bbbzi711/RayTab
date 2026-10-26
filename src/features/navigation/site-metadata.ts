@@ -1,7 +1,7 @@
 import { normalizeUrl } from '@/storage/model';
 import { imageDimensions } from '@/lib/images';
 import { z } from 'zod';
-import { findCatalogIcon, findPublicCatalogIcon, refreshBrandCatalog } from './brand-catalog';
+import { findPublicCatalogIcon } from './brand-catalog';
 import { getBrandAppearance } from './brandIcons';
 
 export type SiteMetadata = {
@@ -10,6 +10,39 @@ export type SiteMetadata = {
   iconUrls?: string[];
   manifestUrl?: string;
 };
+
+type IconCandidate = { image: Blob; score: number; highQuality: boolean };
+const compareIcons = (a: IconCandidate, b: IconCandidate) =>
+  Number(b.highQuality) - Number(a.highQuality) || b.score - a.score;
+
+async function inspectIcon(image: Blob): Promise<IconCandidate | undefined> {
+  const { width, height } = await imageDimensions(image);
+  const size = Math.min(width, height);
+  const ratio = Math.max(width, height) / size;
+  const vector = image.type === 'image/svg+xml';
+  // Wide header logos and tiny favicons are not suitable launcher artwork.
+  if (!Number.isFinite(ratio) || ratio > 2 || (!vector && size < 32)) return undefined;
+  return {
+    image,
+    score: (vector ? 1_024 : Math.min(size, 512)) / ratio,
+    highQuality: ratio <= 1.5 && (vector || size >= 128),
+  };
+}
+
+async function bestIcon(images: (Blob | undefined)[]) {
+  const candidates = await Promise.all(
+    images.map(async (image) => {
+      try {
+        return image ? await inspectIcon(image) : undefined;
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+  return candidates
+    .filter((candidate): candidate is IconCandidate => Boolean(candidate))
+    .sort(compareIcons)[0];
+}
 
 export function siteFaviconUrl(rawUrl: string) {
   try {
@@ -121,8 +154,11 @@ export async function fetchSiteMetadata(
     const response = await fetch(url, {
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
+      cache: 'no-cache',
       redirect: 'follow',
-      signal: signal ?? AbortSignal.timeout(6_000),
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(3_000)])
+        : AbortSignal.timeout(6_000),
     });
     if (response.ok) {
       const contentType = response.headers.get('content-type') ?? '';
@@ -152,12 +188,16 @@ export async function fetchSiteIcon(
   if (!targetUrl) return undefined;
 
   const tryFetch = async (src: string) => {
+    if (signal?.aborted) return undefined;
     try {
       const response = await fetch(src, {
         credentials: 'omit',
         referrerPolicy: 'no-referrer',
+        cache: 'no-cache',
         redirect,
-        signal: signal ?? AbortSignal.timeout(6_000),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(2_500)])
+          : AbortSignal.timeout(6_000),
       });
       if (!response.ok) return undefined;
       const blob = await response.blob();
@@ -181,44 +221,31 @@ export async function fetchSiteIcon(
         const svg = await image.text();
         if (
           !svg.includes('<svg') ||
-          /<(?:script|foreignObject|iframe)\b|\bon\w+\s*=|<!ENTITY|@import/i.test(svg) ||
+          /<(?:script|foreignObject|iframe|image)\b|\bon\w+\s*=|<!ENTITY|@import/i.test(svg) ||
           /(?:href|src)\s*=\s*["']\s*(?!#|data:image\/)[^"']+/i.test(svg) ||
           /url\(\s*["']?(?!#)[^)]/i.test(svg)
         )
           return undefined;
       }
-      const dimensions = await imageDimensions(image);
-      // Retain a genuine 32px original only if every sharper candidate fails.
-      // Preparing the saved image preserves its pixels; it never upscales bitmaps.
-      if (normalizedType !== 'image/svg+xml' && Math.min(dimensions.width, dimensions.height) < 32)
-        return undefined;
-      return { image, size: Math.min(dimensions.width, dimensions.height) };
+      return await inspectIcon(image);
     } catch {
       return undefined;
     }
   };
 
-  const candidates = new Set([
-    targetUrl,
-    ...iconUrls,
-    ...(pageUrl ? [siteFaviconUrl(pageUrl)] : []),
-  ]);
-  let fallback: Blob | undefined;
-  let fallbackSize = 0;
-  // Bound remote work even on pages with many icon declarations.
-  for (const candidate of [...candidates]
-    .filter((url): url is string => Boolean(url))
-    .slice(0, 6)) {
-    const result = await tryFetch(candidate);
-    if (!result) continue;
-    const { image: icon, size } = result;
-    if (icon.type === 'image/svg+xml' || size >= 128) return icon;
-    if (size > fallbackSize) {
-      fallback = icon;
-      fallbackSize = size;
-    }
+  const candidates = [...new Set([targetUrl, ...iconUrls])].slice(0, 6);
+  const results = await Promise.all(candidates.map(tryFetch));
+  const ranked = results
+    .filter((candidate): candidate is IconCandidate => Boolean(candidate))
+    .sort(compareIcons);
+  if (ranked[0]?.highQuality) return ranked[0].image;
+  const favicon = pageUrl ? siteFaviconUrl(pageUrl) : undefined;
+  if (favicon && !candidates.includes(favicon) && candidates.length < 6) {
+    const fallback = await tryFetch(favicon);
+    if (fallback) ranked.push(fallback);
+    ranked.sort(compareIcons);
   }
-  return fallback;
+  return ranked[0]?.image;
 }
 
 function resolveImageUrl(src: string | null | undefined, base: string) {
@@ -259,7 +286,14 @@ const providerMetadata = z.object({
 });
 const manifestSchema = z.object({
   icons: z
-    .array(z.object({ src: z.string(), sizes: z.string().optional(), type: z.string().optional() }))
+    .array(
+      z.object({
+        src: z.string(),
+        sizes: z.string().optional(),
+        type: z.string().optional(),
+        purpose: z.string().optional(),
+      }),
+    )
     .default([]),
 });
 
@@ -269,25 +303,30 @@ async function manifestIcons(url: string | undefined, signal: AbortSignal) {
     const response = await fetch(url, {
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
+      cache: 'no-cache',
       signal: AbortSignal.any([signal, AbortSignal.timeout(1_500)]),
     });
     if (!response.ok) return [];
     const manifest = manifestSchema.parse(await response.json());
-    return manifest.icons
-      .map((icon) => ({
-        url: resolveImageUrl(icon.src, response.url || url),
-        score:
-          icon.type === 'image/svg+xml' || icon.sizes === 'any'
-            ? 10_000
-            : Math.max(
-                0,
-                ...Array.from((icon.sizes ?? '').matchAll(/(\d+)x(\d+)/g), (size) =>
-                  Math.min(+size[1], +size[2]),
+    return (
+      manifest.icons
+        // Maskable-only artwork requires a mask; monochrome artwork requires tinting.
+        .filter((icon) => (icon.purpose ?? 'any').split(/\s+/).includes('any'))
+        .map((icon) => ({
+          url: resolveImageUrl(icon.src, response.url || url),
+          score:
+            icon.type === 'image/svg+xml' || icon.sizes === 'any'
+              ? 10_000
+              : Math.max(
+                  0,
+                  ...Array.from((icon.sizes ?? '').matchAll(/(\d+)x(\d+)/g), (size) =>
+                    Math.min(+size[1], +size[2]),
+                  ),
                 ),
-              ),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .flatMap((icon) => (icon.url ? [icon.url] : []));
+        }))
+        .sort((a, b) => b.score - a.score)
+        .flatMap((icon) => (icon.url ? [icon.url] : []))
+    );
   } catch {
     return [];
   }
@@ -301,6 +340,7 @@ async function providerIcon(domain: string, signal: AbortSignal) {
     const response = await fetch(`${endpoint}?response=json`, {
       credentials: 'omit',
       referrerPolicy: 'no-referrer',
+      cache: 'no-cache',
       redirect: 'error',
       signal,
     });
@@ -337,48 +377,71 @@ async function providerIcon(domain: string, signal: AbortSignal) {
   }
 }
 
-export async function fetchWebsiteIcon(
+async function catalogWebsiteIcon(url: string, signal: AbortSignal) {
+  try {
+    const catalog = await findPublicCatalogIcon(url);
+    if (!catalog || signal.aborted) return undefined;
+    const icon = await fetchSiteIcon(
+      catalog.light,
+      undefined,
+      [],
+      AbortSignal.any([signal, AbortSignal.timeout(2_500)]),
+      'error',
+    );
+    if (icon?.type === 'image/svg+xml')
+      return { title: catalog.title, icon, background: '#ffffff' };
+  } catch {
+    // A failed public directory must not discard a usable website or provider image.
+  }
+}
+
+async function discoverWebsiteIcon(
   rawUrl: string,
-  { allowPublicService = true }: { allowPublicService?: boolean } = {},
-) {
+  {
+    allowPublicService = true,
+    localBrand = false,
+    publicCatalog = false,
+  }: { allowPublicService?: boolean; localBrand?: boolean; publicCatalog?: boolean } = {},
+): Promise<{ title: string; icon?: Blob; background?: string }> {
   const url = normalizeUrl(rawUrl);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const timeout = setTimeout(() => controller.abort(), localBrand ? 3_000 : 8_000);
   const signal = controller.signal;
   let title = formatDomainTitle(new URL(url).hostname);
   const direct = (async () => {
     const metadata = await fetchSiteMetadata(url, signal);
     title = metadata.title;
-    const manifest = await manifestIcons(metadata.manifestUrl, signal);
-    return fetchSiteIcon(
-      manifest[0] ?? metadata.iconUrl,
-      url,
-      [...manifest.slice(1), ...(metadata.iconUrls ?? [])],
-      signal,
-    );
+    const declared = fetchSiteIcon(metadata.iconUrl, url, metadata.iconUrls, signal);
+    const manifest = (async () => {
+      const icons = await manifestIcons(metadata.manifestUrl, signal);
+      return icons.length ? fetchSiteIcon(icons[0], undefined, icons.slice(1), signal) : undefined;
+    })();
+    return bestIcon(await Promise.all([declared, manifest]));
   })();
-  const domain = allowPublicService ? publicIconDomain(url) : undefined;
-  const attempts = domain ? [direct, providerIcon(domain, signal)] : [direct];
-  const fallbacks: { icon: Blob; size: number }[] = [];
+  // Known brands already have a local fallback; do not disclose new domains to a provider.
+  const domain = allowPublicService && !localBrand ? publicIconDomain(url) : undefined;
+  const catalog = domain && publicCatalog ? catalogWebsiteIcon(url, signal) : undefined;
+  const provider = domain ? providerIcon(domain, signal) : undefined;
   try {
-    const icon = await Promise.any(
-      attempts.map(async (attempt) => {
-        const result = await attempt;
-        if (!result) throw new Error('No suitable icon');
-        const dimensions = await imageDimensions(result);
-        const size = Math.min(dimensions.width, dimensions.height);
-        if (result.type !== 'image/svg+xml' && size < 128) {
-          fallbacks.push({ icon: result, size });
-          throw new Error('Try higher-resolution sources first');
-        }
-        return result;
-      }),
-    ).catch(() => fallbacks.sort((a, b) => b.size - a.size)[0]?.icon);
-    return { title, icon };
+    // Source priority is deliberate: a fast cached API result must not cancel the origin.
+    const original = await direct;
+    if (original?.highQuality) return { title, icon: original.image };
+    if (localBrand) return { title };
+    const catalogResult = await catalog;
+    if (catalogResult) return catalogResult;
+    const fallback = await bestIcon([original?.image, await provider]);
+    return { title, icon: fallback?.image };
   } finally {
     clearTimeout(timeout);
     controller.abort();
   }
+}
+
+export async function fetchWebsiteIcon(
+  rawUrl: string,
+  options: { allowPublicService?: boolean } = {},
+) {
+  return discoverWebsiteIcon(rawUrl, options);
 }
 
 /** Explicit icon discovery. Saved site resources are persisted by the editor's transaction. */
@@ -388,36 +451,11 @@ export async function resolveWebsiteIcon(
 ): Promise<{ title: string; icon?: Blob; background?: string; localBrand: boolean }> {
   const url = normalizeUrl(rawUrl);
   const local = getBrandAppearance(url);
-  const bundled = findCatalogIcon(url);
-  const domain = allowPublicService ? publicIconDomain(url) : undefined;
-  const localResult = {
-    title: formatDomainTitle(new URL(url).hostname),
-    background: local?.background,
-    localBrand: true,
-  };
-  if (
-    local &&
-    (!domain || bundled?.tile || new URL(url).pathname === '/' || bundled?.pathname !== '/')
-  ) {
-    if (domain) void refreshBrandCatalog();
-    return localResult;
-  }
-  if (domain) {
-    const catalog = await findPublicCatalogIcon(url);
-    if (catalog && (!local || catalog.pathname.length > (bundled?.pathname.length ?? 1))) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2_500);
-      try {
-        const icon = await fetchSiteIcon(catalog.light, undefined, [], controller.signal, 'error');
-        // SVGL is a vector catalog; don't label an embedded bitmap as a vector brand asset.
-        if (icon?.type === 'image/svg+xml' && !/<image\b/i.test(await icon.text()))
-          return { title: catalog.title, icon, background: '#ffffff', localBrand: false };
-      } finally {
-        clearTimeout(timeout);
-        controller.abort();
-      }
-    }
-  }
-  if (local) return localResult;
-  return { ...(await fetchWebsiteIcon(url, { allowPublicService })), localBrand: false };
+  const result = await discoverWebsiteIcon(url, {
+    allowPublicService,
+    localBrand: Boolean(local),
+    publicCatalog: true,
+  });
+  if (result.icon) return { ...result, localBrand: false };
+  return { ...result, background: local?.background, localBrand: Boolean(local) };
 }

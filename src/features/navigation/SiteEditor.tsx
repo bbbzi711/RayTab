@@ -51,7 +51,7 @@ import { SiteIcon } from './SiteIcon';
 import { siteEditorSchema } from './navigation-form-schemas';
 import { getBrandAppearance } from './brandIcons';
 import { resolveWebsiteIcon } from './site-metadata';
-import { prepareImage, validateImageFile } from '@/lib/images';
+import { imageDimensions, prepareImage, validateImageFile } from '@/lib/images';
 import { AppError, errorMessage } from '@/lib/errors';
 import './site-editor.css';
 
@@ -231,18 +231,47 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
         form.getValues('url') !== requestedUrl
       )
         return;
+      const currentResourceId = form.getValues('websiteResourceId');
+      if (icon && icon.type !== 'image/svg+xml' && currentResourceId) {
+        const currentImage =
+          images.auto?.id === currentResourceId
+            ? images.auto.blob
+            : await repository.resource(currentResourceId);
+        const [nextSize, previousSize] = await Promise.all([
+          imageDimensions(icon),
+          currentImage ? imageDimensions(currentImage).catch(() => undefined) : undefined,
+        ]);
+        if (
+          !active.current ||
+          generation !== fetchGeneration.current ||
+          form.getValues('url') !== requestedUrl
+        )
+          return;
+        if (
+          previousSize &&
+          Math.min(nextSize.width, nextSize.height) <
+            Math.min(previousSize.width, previousSize.height, 128)
+        ) {
+          form.setError('websiteResourceId', { message: 'navigation.iconRefreshFailed' });
+          return;
+        }
+      }
       if (!form.getValues('title').trim()) {
         form.setValue('title', metadata.title, { shouldDirty: true });
         if (!textEdited.current)
           form.setValue('textIcon', iconTextFromName(metadata.title), { shouldDirty: true });
       }
       if (metadata.localBrand) {
+        if (form.getValues('websiteResourceId')) {
+          form.setError('websiteResourceId', { message: 'navigation.iconRefreshFailed' });
+          return;
+        }
         invalidateFetch();
         setImages((current) => ({ ...current, auto: undefined }));
         form.setValue('websiteResourceId', '', { shouldDirty: true });
         form.setValue('iconType', 'auto', { shouldDirty: true });
         form.clearErrors('websiteResourceId');
-        if (!automatic) toast.success(t('navigation.metadataUpdated'));
+        if (!automatic) toast.info(t('navigation.localBrandFallback'));
       } else if (icon) {
         setImageSelection('auto', icon);
         if (metadata.background && form.getValues('iconBackground').mode === 'auto')

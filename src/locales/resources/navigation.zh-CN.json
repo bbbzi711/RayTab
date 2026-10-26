@@ -32,6 +32,8 @@
     "cropPreservesBackground": "裁切只移除选中区域外的内容，不自动去除白色或透明背景。",
     "customColor": "自定义底色",
     "iconFetchFailed": "未能获取图标，请使用文字图标或上传图片。",
+    "iconRefreshFailed": "未获取到更清晰的官网图标，已保留当前图片。你可以重试或上传图片。",
+    "localBrandFallback": "未找到高清官网图标，使用本地品牌图标。",
     "metadataUpdated": "网站信息已更新",
     "noImage": "没有可用的图片，请上传图标",
     "desktopMenu": "桌面操作",
