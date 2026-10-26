@@ -143,67 +143,69 @@ async function prepareResources(page: Page) {
   await expect(page.locator('.page-background')).toHaveCSS('background-color', 'rgb(51, 102, 153)');
 }
 
-test('首次引导隔离键盘、适应小高度并在保存失败后允许重试', async ({
-  page,
-  extensionId,
-}, testInfo) => {
-  await page.setViewportSize({ width: 320, height: 480 });
-  await page.goto(`chrome-extension://${extensionId}/newtab.html`);
-  const onboarding = page.getByRole('dialog', {
-    name: '从常用网站开始，整理你的浏览入口',
-    exact: true,
+for (const height of [480, 360]) {
+  test(`首次引导隔离键盘、适应320×${height}窗口并在保存失败后允许重试`, async ({
+    page,
+    extensionId,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 320, height });
+    await page.goto(`chrome-extension://${extensionId}/newtab.html`);
+    const onboarding = page.getByRole('dialog', {
+      name: '从常用网站开始，整理你的浏览入口',
+      exact: true,
+    });
+    await expect(onboarding).toBeVisible();
+    await expect(onboarding.getByRole('heading', { level: 1 })).toBeFocused();
+    const geometry = await onboarding.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        scrollable: element.scrollHeight > element.clientHeight,
+      };
+    });
+    expect(geometry.top).toBeGreaterThanOrEqual(15);
+    expect(geometry.bottom).toBeLessThanOrEqual(height - 15);
+    expect(geometry.scrollable).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('onboarding-narrow-top.png') });
+    for (const key of ['Shift+Tab', 'Tab', 'Tab', 'Shift+Tab']) {
+      await page.keyboard.press(key);
+      expect(await onboarding.evaluate((element) => element.contains(document.activeElement))).toBe(
+        true,
+      );
+    }
+    await page.keyboard.press('Escape');
+    await page.mouse.click(2, 2);
+    await expect(onboarding).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(1);
+    await page.evaluate(() => {
+      const put = IDBObjectStore.prototype.put;
+      let pending = true;
+      IDBObjectStore.prototype.put = function (
+        this: IDBObjectStore,
+        ...args: Parameters<typeof put>
+      ) {
+        if (pending && this.name === 'state') {
+          pending = false;
+          throw new DOMException('Onboarding save fixture', 'QuotaExceededError');
+        }
+        return Reflect.apply(put, this, args);
+      };
+    });
+    const finish = onboarding.getByRole('button', { name: '进入首页', exact: true });
+    await finish.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('onboarding-narrow-action.png') });
+    await finish.click();
+    await expect(onboarding.getByRole('alert')).toBeVisible();
+    expect((await storedState(page)).local.onboardingComplete).toBe(false);
+    await expect(finish).toBeEnabled();
+    await finish.click();
+    await expect(onboarding).not.toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect((await storedState(page)).local.onboardingComplete).toBe(true);
   });
-  await expect(onboarding).toBeVisible();
-  await expect(onboarding.getByRole('heading', { level: 1 })).toBeFocused();
-  const geometry = await onboarding.evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    return {
-      top: rect.top,
-      bottom: rect.bottom,
-      scrollable: element.scrollHeight > element.clientHeight,
-    };
-  });
-  expect(geometry.top).toBeGreaterThanOrEqual(15);
-  expect(geometry.bottom).toBeLessThanOrEqual(465);
-  expect(geometry.scrollable).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('onboarding-narrow-top.png') });
-  for (const key of ['Shift+Tab', 'Tab', 'Tab', 'Shift+Tab']) {
-    await page.keyboard.press(key);
-    expect(await onboarding.evaluate((element) => element.contains(document.activeElement))).toBe(
-      true,
-    );
-  }
-  await page.keyboard.press('Escape');
-  await page.mouse.click(2, 2);
-  await expect(onboarding).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(1);
-  await page.evaluate(() => {
-    const put = IDBObjectStore.prototype.put;
-    let pending = true;
-    IDBObjectStore.prototype.put = function (
-      this: IDBObjectStore,
-      ...args: Parameters<typeof put>
-    ) {
-      if (pending && this.name === 'state') {
-        pending = false;
-        throw new DOMException('Onboarding save fixture', 'QuotaExceededError');
-      }
-      return Reflect.apply(put, this, args);
-    };
-  });
-  const finish = onboarding.getByRole('button', { name: '进入首页', exact: true });
-  await finish.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath('onboarding-narrow-action.png') });
-  await finish.click();
-  await expect(onboarding.getByRole('alert')).toBeVisible();
-  expect((await storedState(page)).local.onboardingComplete).toBe(false);
-  await expect(finish).toBeEnabled();
-  await finish.click();
-  await expect(onboarding).not.toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  expect((await storedState(page)).local.onboardingComplete).toBe(true);
-});
+}
 
 test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢复更新图片字节', async ({
   newTab,
