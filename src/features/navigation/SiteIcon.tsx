@@ -4,6 +4,7 @@ import { useResourceUrl } from '@/hooks/useResourceUrl';
 import type { Site } from '@/storage/model';
 import { getBrandAppearance } from './brandIcons';
 import { cn } from '@/lib/utils';
+import { IconArtwork } from './IconArtwork';
 
 type SiteIconSource = Pick<Site, 'title' | 'url' | 'icon' | 'iconBackground'>;
 
@@ -22,9 +23,16 @@ export function SiteIcon({
 }) {
   const brand = site.icon.source === 'auto' ? getBrandAppearance(site.url) : null;
   const resourceId = 'resourceId' in site.icon ? site.icon.resourceId : undefined;
-  const resourceUrl = useResourceUrl(resourceId);
+  // Apply the same vector priority to existing automatic icons without rewriting user data.
+  // Explicit crops, uploads and current image previews retain their saved composition.
+  const preferBrand =
+    site.icon.source === 'auto' &&
+    site.icon.fit !== 'original' &&
+    Boolean(brand && !brand.tile) &&
+    !previewUrl;
+  const resourceUrl = useResourceUrl(preferBrand ? undefined : resourceId);
   const imageUrl =
-    site.icon.source === 'text'
+    site.icon.source === 'text' || preferBrand
       ? undefined
       : (previewUrl ?? (resourceId ? resourceUrl : undefined));
   const [failedUrl, setFailedUrl] = useState<string>();
@@ -47,50 +55,43 @@ export function SiteIcon({
       size={size}
       image={hasImage}
       interactive={interactive}
-      className={cn(
-        'site-icon-frame',
-        !hasImage && Boolean(graphic) && !brand?.tile && 'site-icon-frame--brand',
-        site.icon.source === 'text' && 'site-icon-frame--text',
-      )}
+      className={cn('site-icon-frame', site.icon.source === 'text' && 'site-icon-frame--text')}
       style={{
         background,
         color: foreground,
         borderRadius: radius === undefined ? 'var(--site-icon-radius, 24%)' : `${radius}%`,
       }}
     >
-      {hasImage ? (
-        <img
-          src={imageUrl}
-          alt=""
-          className="icon-frame__image"
-          draggable={false}
-          onLoad={(event) => {
-            const image = event.currentTarget;
-            if (
-              !previewUrl &&
-              site.icon.source === 'auto' &&
-              Math.min(image.naturalWidth, image.naturalHeight) < 32
-            )
-              setFailedUrl(imageUrl);
-          }}
-          onError={() => setFailedUrl(imageUrl)}
-        />
-      ) : (
-        ((foreground === '#ffffff' ? (brand?.darkGraphic ?? graphic) : graphic) ?? (
-          <span
-            className="icon-frame__letter"
-            style={
-              site.icon.source === 'text'
-                ? ({ '--icon-text-length': Array.from(site.icon.text).length } as CSSProperties)
-                : undefined
-            }
-          >
-            {site.icon.source === 'text'
-              ? site.icon.text
-              : (Array.from(site.title.trim())[0]?.toUpperCase() ?? '')}
-          </span>
-        ))
-      )}
+      <IconArtwork
+        identity={`${imageUrl ?? site.url}/${foreground}/${hasImage}/${site.icon.source}`}
+        normalize={site.icon.source === 'auto' && site.icon.fit !== 'original'}
+        tile={!hasImage && brand?.tile}
+      >
+        {hasImage ? (
+          <img
+            src={imageUrl}
+            alt=""
+            className="icon-frame__image"
+            draggable={false}
+            onError={() => setFailedUrl(imageUrl)}
+          />
+        ) : (
+          ((foreground === '#ffffff' ? (brand?.darkGraphic ?? graphic) : graphic) ?? (
+            <span
+              className="icon-frame__letter"
+              style={
+                site.icon.source === 'text'
+                  ? ({ '--icon-text-length': Array.from(site.icon.text).length } as CSSProperties)
+                  : undefined
+              }
+            >
+              {site.icon.source === 'text'
+                ? site.icon.text
+                : (Array.from(site.title.trim())[0]?.toUpperCase() ?? '')}
+            </span>
+          ))
+        )}
+      </IconArtwork>
     </IconFrame>
   );
 }

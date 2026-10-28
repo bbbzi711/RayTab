@@ -53,7 +53,12 @@ export const siteIconSchema = z.discriminatedUnion('source', [
         return length >= 1 && length <= 4;
       }, 'navigation.invalidIconText'),
   }),
-  z.object({ source: z.literal('auto'), resourceId: idSchema.optional() }),
+  z.object({
+    source: z.literal('auto'),
+    resourceId: idSchema.optional(),
+    // A user crop is deliberate composition; automatic optical fitting must leave it alone.
+    fit: z.literal('original').optional(),
+  }),
   z.object({
     source: z.literal('resource'),
     resourceId: idSchema,

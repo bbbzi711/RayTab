@@ -3010,17 +3010,6 @@
       }
     },
     {
-      "title": "Developer Student Club",
-      "hostname": "gdsc.community.dev",
-      "pathname": "/",
-      "website": "https://gdsc.community.dev/",
-      "light": {
-        "file": "f51127cd21a42a29fccbb9d6caaf63f81248f0f7fea35ef79055b98515dd8f96.svg",
-        "source": "https://svgl.app/library/gdsc.svg",
-        "sha256": "f51127cd21a42a29fccbb9d6caaf63f81248f0f7fea35ef79055b98515dd8f96"
-      }
-    },
-    {
       "title": "Gemini",
       "hostname": "gemini.google.com",
       "pathname": "/",
@@ -4312,17 +4301,6 @@
       }
     },
     {
-      "title": "PowerToys",
-      "hostname": "learn.microsoft.com",
-      "pathname": "/en-us/windows/powertoys",
-      "website": "https://learn.microsoft.com/en-us/windows/powertoys/",
-      "light": {
-        "file": "af347e679676251332599f8d79cb9bf884d7b1ad9c0c74cc981601bb77609c5b.svg",
-        "source": "https://svgl.app/library/powertoys.svg",
-        "sha256": "af347e679676251332599f8d79cb9bf884d7b1ad9c0c74cc981601bb77609c5b"
-      }
-    },
-    {
       "title": "PowerShell",
       "hostname": "learn.microsoft.com",
       "pathname": "/en-us/powershell",
@@ -5593,17 +5571,6 @@
         "file": "935238661147be3915ab0807cfa3220b6472c2e9d6354bd820b2cde119885e25.svg",
         "source": "https://svgl.app/library/opensea.svg",
         "sha256": "935238661147be3915ab0807cfa3220b6472c2e9d6354bd820b2cde119885e25"
-      }
-    },
-    {
-      "title": "Open WebUI",
-      "hostname": "openwebui.com",
-      "pathname": "/",
-      "website": "https://openwebui.com/",
-      "light": {
-        "file": "3a773b745a78a572af439a3e5984583696f145f96e0cebd5cb3fdcda6f4a5174.svg",
-        "source": "https://svgl.app/library/openwebui.svg",
-        "sha256": "3a773b745a78a572af439a3e5984583696f145f96e0cebd5cb3fdcda6f4a5174"
       }
     },
     {
@@ -8727,6 +8694,21 @@
       "title": "Google Maps",
       "source": "https://svgl.app/library/googleMaps.svg",
       "reason": "SVG is not self-contained"
+    },
+    {
+      "title": "Open WebUI",
+      "source": "https://svgl.app/library/openwebui.svg",
+      "reason": "SVG is not self-contained vector artwork"
+    },
+    {
+      "title": "PowerToys",
+      "source": "https://svgl.app/library/powertoys.svg",
+      "reason": "SVG is not self-contained vector artwork"
+    },
+    {
+      "title": "Developer Student Club",
+      "source": "https://svgl.app/library/gdsc.svg",
+      "reason": "SVG is not self-contained vector artwork"
     }
   ]
 }

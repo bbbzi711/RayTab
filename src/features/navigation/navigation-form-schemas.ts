@@ -28,6 +28,7 @@ const siteEditorDraftSchema = siteSchema.pick({ iconBackground: true }).extend({
   iconType: z.enum(['text', 'auto', 'resource']),
   textIcon: z.string(),
   websiteResourceId: z.string().max(100),
+  websiteFit: z.literal('original').optional(),
   uploadResourceId: z.string().max(100),
 });
 
@@ -49,15 +50,17 @@ export const siteEditorSchema = siteEditorDraftSchema
         message: 'navigation.uploadRequired',
       });
   })
-  .transform(({ iconType, textIcon, websiteResourceId, uploadResourceId, ...values }) => ({
-    ...values,
-    icon:
-      iconType === 'text'
-        ? { source: 'text' as const, text: textIcon.trim() }
-        : iconType === 'resource'
-          ? { source: 'resource' as const, resourceId: uploadResourceId }
-          : {
-              source: 'auto' as const,
-              ...(websiteResourceId ? { resourceId: websiteResourceId } : {}),
-            },
-  }));
+  .transform(
+    ({ iconType, textIcon, websiteResourceId, websiteFit, uploadResourceId, ...values }) => ({
+      ...values,
+      icon:
+        iconType === 'text'
+          ? { source: 'text' as const, text: textIcon.trim() }
+          : iconType === 'resource'
+            ? { source: 'resource' as const, resourceId: uploadResourceId }
+            : {
+                source: 'auto' as const,
+                ...(websiteResourceId ? { resourceId: websiteResourceId, fit: websiteFit } : {}),
+              },
+    }),
+  );

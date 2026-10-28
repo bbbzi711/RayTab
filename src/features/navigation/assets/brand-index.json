@@ -1756,13 +1756,6 @@
     "tile": false
   },
   {
-    "title": "Developer Student Club",
-    "hostname": "gdsc.community.dev",
-    "pathname": "/",
-    "light": "f51127cd21a42a29fccbb9d6caaf63f81248f0f7fea35ef79055b98515dd8f96.svg",
-    "tile": false
-  },
-  {
     "title": "Gemini",
     "hostname": "gemini.google.com",
     "pathname": "/",
@@ -2503,13 +2496,6 @@
     "hostname": "leapwallet.io",
     "pathname": "/",
     "light": "4cf08c7504dc55a8abdb0373f198c9d27a100dd2a06ae8fddcecf825266ee2e3.svg",
-    "tile": false
-  },
-  {
-    "title": "PowerToys",
-    "hostname": "learn.microsoft.com",
-    "pathname": "/en-us/windows/powertoys",
-    "light": "af347e679676251332599f8d79cb9bf884d7b1ad9c0c74cc981601bb77609c5b.svg",
     "tile": false
   },
   {
@@ -3254,13 +3240,6 @@
     "hostname": "opensea.io",
     "pathname": "/",
     "light": "935238661147be3915ab0807cfa3220b6472c2e9d6354bd820b2cde119885e25.svg",
-    "tile": false
-  },
-  {
-    "title": "Open WebUI",
-    "hostname": "openwebui.com",
-    "pathname": "/",
-    "light": "3a773b745a78a572af439a3e5984583696f145f96e0cebd5cb3fdcda6f4a5174.svg",
     "tile": false
   },
   {

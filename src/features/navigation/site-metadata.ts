@@ -1,5 +1,6 @@
 import { normalizeUrl } from '@/storage/model';
-import { imageDimensions } from '@/lib/images';
+import { imageDimensions, validateImageFile } from '@/lib/images';
+import { validateSvgImage } from '@/lib/svg';
 import { z } from 'zod';
 import { findPublicCatalogIcon } from './brand-catalog';
 import { getBrandAppearance } from './brandIcons';
@@ -55,6 +56,10 @@ export function siteFaviconUrl(rawUrl: string) {
 
 const KNOWN_DOMAINS: Record<string, string> = {
   'github.com': 'GitHub',
+  'chatgpt.com': 'ChatGPT',
+  'chat.openai.com': 'ChatGPT',
+  'deepseek.com': 'DeepSeek',
+  'csdn.net': 'CSDN',
   'google.com': 'Google',
   'gemini.google.com': 'Google Gemini',
   'bilibili.com': '哔哩哔哩',
@@ -218,14 +223,8 @@ export async function fetchSiteIcon(
       const image =
         normalizedType === blob.type ? blob : new Blob([blob], { type: normalizedType });
       if (normalizedType === 'image/svg+xml') {
-        const svg = await image.text();
-        if (
-          !svg.includes('<svg') ||
-          /<(?:script|foreignObject|iframe|image)\b|\bon\w+\s*=|<!ENTITY|@import/i.test(svg) ||
-          /(?:href|src)\s*=\s*["']\s*(?!#|data:image\/)[^"']+/i.test(svg) ||
-          /url\(\s*["']?(?!#)[^)]/i.test(svg)
-        )
-          return undefined;
+        validateImageFile(image);
+        await validateSvgImage(image);
       }
       return await inspectIcon(image);
     } catch {
@@ -418,17 +417,17 @@ async function discoverWebsiteIcon(
     })();
     return bestIcon(await Promise.all([declared, manifest]));
   })();
-  // Known brands already have a local fallback; do not disclose new domains to a provider.
-  const domain = allowPublicService && !localBrand ? publicIconDomain(url) : undefined;
+  // The public directory receives no user domain. Only unknown brands use the domain API.
+  const domain = allowPublicService ? publicIconDomain(url) : undefined;
   const catalog = domain && publicCatalog ? catalogWebsiteIcon(url, signal) : undefined;
-  const provider = domain ? providerIcon(domain, signal) : undefined;
+  const provider = domain && !localBrand ? providerIcon(domain, signal) : undefined;
   try {
-    // Source priority is deliberate: a fast cached API result must not cancel the origin.
+    // Curated vectors take precedence over even a high-resolution website bitmap.
+    const catalogResult = await catalog;
+    if (catalogResult) return catalogResult;
     const original = await direct;
     if (original?.highQuality) return { title, icon: original.image };
     if (localBrand) return { title };
-    const catalogResult = await catalog;
-    if (catalogResult) return catalogResult;
     const fallback = await bestIcon([original?.image, await provider]);
     return { title, icon: fallback?.image };
   } finally {
@@ -448,14 +447,31 @@ export async function fetchWebsiteIcon(
 export async function resolveWebsiteIcon(
   rawUrl: string,
   { allowPublicService = true }: { allowPublicService?: boolean } = {},
-): Promise<{ title: string; icon?: Blob; background?: string; localBrand: boolean }> {
+): Promise<{
+  title: string;
+  icon?: Blob;
+  background?: string;
+  localBrand: boolean;
+  localFallback?: boolean;
+}> {
   const url = normalizeUrl(rawUrl);
   const local = getBrandAppearance(url);
+  if (local && !local.tile)
+    return {
+      title: formatDomainTitle(new URL(url).hostname),
+      background: local.background,
+      localBrand: true,
+    };
   const result = await discoverWebsiteIcon(url, {
     allowPublicService,
     localBrand: Boolean(local),
     publicCatalog: true,
   });
   if (result.icon) return { ...result, localBrand: false };
-  return { ...result, background: local?.background, localBrand: Boolean(local) };
+  return {
+    ...result,
+    background: local?.background,
+    localBrand: Boolean(local),
+    localFallback: Boolean(local),
+  };
 }

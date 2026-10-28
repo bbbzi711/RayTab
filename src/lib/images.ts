@@ -1,4 +1,5 @@
 import { AppError } from '@/lib/errors';
+import { validateSvgImage } from '@/lib/svg';
 const ALLOWED_TYPES = [
   'image/png',
   'image/jpeg',
@@ -73,6 +74,16 @@ async function loadDrawable(file: Blob): Promise<Drawable> {
 }
 
 export async function prepareImage(file: Blob, kind: 'icon' | 'wallpaper') {
+  validateImageFile(file);
+  if (kind === 'icon' && file.type === 'image/svg+xml') {
+    await validateSvgImage(file);
+    // Decode once before saving, but retain the original vector instead of a canvas export.
+    const { width, height } = await imageDimensions(file);
+    if (!width || !height) throw new AppError('messages.thisImageCannotBeRead');
+    if (width * height > 40_000_000)
+      throw new AppError('messages.useAnImageSmallerThan40Megapixels');
+    return { id: crypto.randomUUID(), blob: file };
+  }
   return {
     id: crypto.randomUUID(),
     blob: await renderImage(file, kind === 'icon' ? 256 : 2560),

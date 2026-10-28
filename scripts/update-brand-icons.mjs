@@ -3,19 +3,47 @@ import { createHash } from 'node:crypto';
 
 // Explicit maintenance command; ordinary builds and extension startup never call the catalog API.
 const appsOnly = process.argv.includes('--apps-only');
-const previous = appsOnly
-  ? JSON.parse(await readFile('public/brand-icons/catalog.json', 'utf8'))
-  : undefined;
-const catalog = appsOnly
-  ? []
-  : await fetch('https://api.svgl.app').then((response) => {
-      if (!response.ok) throw new Error(`SVGL catalog: ${response.status}`);
-      return response.json();
-    });
+const localOnly = process.argv.includes('--local-only');
+const previous =
+  appsOnly || localOnly
+    ? JSON.parse(await readFile('public/brand-icons/catalog.json', 'utf8'))
+    : undefined;
+const catalog =
+  appsOnly || localOnly
+    ? []
+    : await fetch('https://api.svgl.app').then((response) => {
+        if (!response.ok) throw new Error(`SVGL catalog: ${response.status}`);
+        return response.json();
+      });
 const directory = 'public/brand-icons';
 await mkdir(directory, { recursive: true });
-const entries = previous?.entries.filter((entry) => !entry.packageName) ?? [];
+const entries = previous?.entries.filter((entry) => localOnly || !entry.packageName) ?? [];
 const rejected = previous?.rejected ?? [];
+function standaloneSvg(svg) {
+  return (
+    svg.includes('<svg') &&
+    !/<(?:script|foreignObject|iframe|image)\b|\bon\w+\s*=|<!ENTITY|@import/i.test(svg) &&
+    !/(?:href|src)\s*=\s*["']\s*(?!#|data:image\/)[^"']+/i.test(svg) &&
+    !/url\(\s*["']?(?!#)[^)]/i.test(svg)
+  );
+}
+// Rebuild an existing snapshot offline after tightening asset requirements.
+if (localOnly) {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    for (const asset of [entry.light, entry.dark].filter(Boolean)) {
+      if (!asset.file.endsWith('.svg')) continue;
+      if (standaloneSvg(await readFile(`${directory}/${asset.file}`, 'utf8'))) continue;
+      rejected.push({
+        title: entry.title,
+        source: asset.source,
+        reason: 'SVG is not self-contained vector artwork',
+      });
+      entries.splice(index, 1);
+      break;
+    }
+  }
+}
 let cursor = 0;
 await Promise.all(
   Array.from({ length: 6 }, async () => {
@@ -35,12 +63,7 @@ await Promise.all(
         // Normalize before hashing so Git checkouts preserve identical bytes on every platform.
         const svg = (await response.text()).replace(/\r\n?/g, '\n').replace(/[ \t]+$/gm, '');
         // SVGs remain image resources, with no executable or remote dependencies.
-        if (
-          !svg.includes('<svg') ||
-          /<(?:script|foreignObject|iframe)\b|\bon\w+\s*=|<!ENTITY|@import/i.test(svg) ||
-          /(?:href|src)\s*=\s*["']\s*(?!#|data:image\/)[^"']+/i.test(svg) ||
-          /url\(\s*["']?(?!#)[^)]/i.test(svg)
-        ) {
+        if (!standaloneSvg(svg)) {
           rejected.push({ title: item.title, source, reason: 'SVG is not self-contained' });
           invalid = true;
           break;
@@ -64,7 +87,7 @@ await Promise.all(
 );
 // Official app-store artwork fills regional gaps in SVGL. This is a maintenance-time
 // lookup, never a request from a user's new tab or private space.
-const apps = JSON.parse(await readFile('scripts/app-brand-sources.json', 'utf8'));
+const apps = localOnly ? [] : JSON.parse(await readFile('scripts/app-brand-sources.json', 'utf8'));
 const downloadedApps = new Map();
 function findApp(value, packageName) {
   if (!value || typeof value !== 'object') return undefined;
@@ -177,7 +200,7 @@ const retained = new Set(
 for (const file of await readdir(directory))
   if (/^[a-f\d]{64}\.(?:svg|png|ico)$/.test(file) && !retained.has(file))
     await unlink(`${directory}/${file}`);
-if (!appsOnly) {
+if (!appsOnly && !localOnly) {
   const license = await fetch('https://raw.githubusercontent.com/pheralb/svgl/main/LICENSE').then(
     (r) => {
       if (!r.ok) throw new Error(`SVGL license: ${r.status}`);
@@ -187,5 +210,5 @@ if (!appsOnly) {
   await writeFile('third-party/svgl-LICENSE.txt', license);
 }
 console.log(
-  `Brands: ${entries.length} entries including ${apps.length} app domains, ${rejected.length} non-self-contained assets excluded.`,
+  `Brands: ${entries.length} entries including ${entries.filter((entry) => entry.packageName).length} app domains, ${rejected.length} non-self-contained assets excluded.`,
 );

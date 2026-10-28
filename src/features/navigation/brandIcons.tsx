@@ -2,6 +2,7 @@ import { useId, type ReactNode } from 'react';
 import {
   siBaidu,
   siBilibili,
+  siCsdn,
   siDuckduckgo,
   siDeepseek,
   siZhihu,
@@ -21,7 +22,6 @@ import {
 } from 'simple-icons';
 import { IconFrame } from '@/components/ui/icon-frame';
 import { normalizeUrl } from '@/storage/model';
-import geminiIcon from './assets/gemini.svg';
 import { findCatalogIcon } from './brand-catalog';
 
 const brands: Array<{
@@ -31,6 +31,7 @@ const brands: Array<{
   foreground: string;
   monochrome?: boolean;
 }> = [
+  { domains: ['csdn.net'], icon: siCsdn, background: '#ffffff', foreground: '#fc5531' },
   {
     domains: ['notion.so', 'notion.com'],
     icon: siNotion,
@@ -255,7 +256,12 @@ export function getBrandAppearance(url: string): BrandAppearance | null {
   const host = siteHost(url);
   if (!host) return null;
   const catalog = findCatalogIcon(normalizeUrl(url));
-  if (catalog?.tile)
+  const brand = brands.find(({ domains }) =>
+    domains.some((domain) =>
+      domain === 'baidu.com' ? host === domain || host === `www.${domain}` : isDomain(host, domain),
+    ),
+  );
+  if (catalog?.tile && !brand)
     return {
       background: '#ffffff',
       foreground: '#202124',
@@ -270,12 +276,6 @@ export function getBrandAppearance(url: string): BrandAppearance | null {
           draggable={false}
         />
       ),
-    };
-  if (host === 'gemini.google.com')
-    return {
-      background: '#ffffff',
-      foreground: '#4285f4',
-      graphic: <img src={geminiIcon} className="brand-icon-glyph" alt="" draggable={false} />,
     };
   if (
     ['google.com', 'google.com.hk', 'google.co.uk'].some(
@@ -293,13 +293,9 @@ export function getBrandAppearance(url: string): BrandAppearance | null {
       foreground: '#048fce',
       graphic: <BingIcon className="brand-icon-glyph brand-icon-glyph--bing" />,
     };
-  const brand = brands.find(({ domains }) =>
-    domains.some((domain) =>
-      domain === 'baidu.com' ? host === domain || host === `www.${domain}` : isDomain(host, domain),
-    ),
-  );
   if (
     catalog &&
+    !catalog.tile &&
     (!brand ||
       catalog.pathname !== '/' ||
       brand.icon === siTiktok ||

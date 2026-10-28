@@ -103,29 +103,40 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
       iconType: site?.icon.source ?? defaultSiteIcon.source,
       textIcon: site?.icon.source === 'text' ? site.icon.text : iconTextFromName(site?.title ?? ''),
       websiteResourceId: site?.icon.source === 'auto' ? (site.icon.resourceId ?? '') : '',
+      websiteFit: site?.icon.source === 'auto' ? site.icon.fit : undefined,
       uploadResourceId: site?.icon.source === 'resource' ? site.icon.resourceId : '',
       iconBackground: site?.iconBackground ?? defaultSiteIconBackground,
     },
   });
-  const [title, url, iconType, textIcon, websiteResourceId, uploadResourceId, iconBackground] =
-    useWatch({
-      control: form.control,
-      name: [
-        'title',
-        'url',
-        'iconType',
-        'textIcon',
-        'websiteResourceId',
-        'uploadResourceId',
-        'iconBackground',
-      ],
-    });
+  const [
+    title,
+    url,
+    iconType,
+    textIcon,
+    websiteResourceId,
+    websiteFit,
+    uploadResourceId,
+    iconBackground,
+  ] = useWatch({
+    control: form.control,
+    name: [
+      'title',
+      'url',
+      'iconType',
+      'textIcon',
+      'websiteResourceId',
+      'websiteFit',
+      'uploadResourceId',
+      'iconBackground',
+    ],
+  });
   const values = {
     title,
     url,
     iconType,
     textIcon,
     websiteResourceId,
+    websiteFit,
     uploadResourceId,
     iconBackground,
   };
@@ -174,12 +185,18 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     fetchGeneration.current++;
     setFetching(false);
   };
-  const setImageSelection = (source: ImageSource, blob: Blob, original = blob) => {
+  const setImageSelection = (
+    source: ImageSource,
+    blob: Blob,
+    original = blob,
+    fit?: 'original',
+  ) => {
     validateImageFile(blob);
     invalidateFetch();
     const selection = crypto.randomUUID();
     setImages((current) => ({ ...current, [source]: { id: selection, blob, original } }));
     form.setValue(resourceField(source), selection, { shouldDirty: true });
+    if (source === 'auto') form.setValue('websiteFit', fit, { shouldDirty: true });
     form.setValue('iconType', source, { shouldDirty: true });
     form.clearErrors('uploadResourceId');
     form.clearErrors('websiteResourceId');
@@ -262,16 +279,20 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
           form.setValue('textIcon', iconTextFromName(metadata.title), { shouldDirty: true });
       }
       if (metadata.localBrand) {
-        if (form.getValues('websiteResourceId')) {
+        if (metadata.localFallback && form.getValues('websiteResourceId')) {
           form.setError('websiteResourceId', { message: 'navigation.iconRefreshFailed' });
           return;
         }
         invalidateFetch();
         setImages((current) => ({ ...current, auto: undefined }));
         form.setValue('websiteResourceId', '', { shouldDirty: true });
+        form.setValue('websiteFit', undefined, { shouldDirty: true });
         form.setValue('iconType', 'auto', { shouldDirty: true });
         form.clearErrors('websiteResourceId');
-        if (!automatic) toast.info(t('navigation.localBrandFallback'));
+        if (!automatic) {
+          if (metadata.localFallback) toast.info(t('navigation.localBrandFallback'));
+          else toast.success(t('navigation.metadataUpdated'));
+        }
       } else if (icon) {
         setImageSelection('auto', icon);
         if (metadata.background && form.getValues('iconBackground').mode === 'auto')
@@ -338,9 +359,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
               title: data.title,
               url: data.url,
               icon:
-                prepared && icon.source !== 'text'
-                  ? { source: icon.source, resourceId: prepared.id }
-                  : icon,
+                prepared && icon.source !== 'text' ? { ...icon, resourceId: prepared.id } : icon,
               iconBackground: data.iconBackground,
             },
           },
@@ -386,7 +405,9 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
           ? { source: 'resource', resourceId: values.uploadResourceId ?? '' }
           : {
               source: 'auto',
-              ...(values.websiteResourceId ? { resourceId: values.websiteResourceId } : {}),
+              ...(values.websiteResourceId
+                ? { resourceId: values.websiteResourceId, fit: values.websiteFit }
+                : {}),
             },
   };
   return (
@@ -931,6 +952,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                     cropImage.source,
                     blob,
                     images[cropImage.source]?.original ?? cropImage.blob,
+                    'original',
                   );
                 }
                 setCropImage(undefined);
