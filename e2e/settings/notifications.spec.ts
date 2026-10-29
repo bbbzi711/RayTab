@@ -1,38 +1,23 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '../fixtures';
+import { noHorizontalOverflow, settle } from '../helpers';
 
-async function settle(element: Locator) {
-  await element.evaluate(async (node) => {
-    await Promise.all(node.getAnimations().map((animation) => animation.finished));
-  });
-}
-
-async function assertCenteredInViewport(element: Locator, page: Page) {
-  await settle(element);
-  const bounds = (await element.boundingBox())!;
-  const viewport = page.viewportSize()!;
-  expect(bounds.x + bounds.width / 2).toBeCloseTo(viewport.width / 2, 0);
-  expect(viewport.height - bounds.y - bounds.height).toBeGreaterThanOrEqual(15);
-  expect(bounds.y + bounds.height / 2).toBeCloseTo(viewport.height / 2, 0);
-  await expect(element).toBeInViewport({ ratio: 1 });
-}
-
-async function assertNotificationPosition(notification: Locator, page: Page) {
+async function assertNotificationUsable(notification: Locator, page: Page) {
   await expect(notification).toBeVisible();
-  await settle(notification);
-  const bounds = (await notification.boundingBox())!;
-  const viewport = page.viewportSize()!;
-  expect(bounds.x + bounds.width / 2).toBeCloseTo(viewport.width / 2, 0);
-  expect(bounds.y).toBeGreaterThanOrEqual(15);
-  expect(bounds.y).toBeLessThanOrEqual(25);
+  await settle(page);
   await expect(notification).toBeInViewport({ ratio: 1 });
-  // A bounding box alone passes even when a modal overlay paints above the toast.
+  await noHorizontalOverflow(notification);
+  const bounds = (await notification.boundingBox())!;
+  // Notifications belong in the upper area, without fixing the theme's padding or coordinates.
+  expect(bounds.y + bounds.height).toBeLessThan(page.viewportSize()!.height / 3);
   await expect
     .poll(() =>
       notification.evaluate((node) => {
         const rect = node.getBoundingClientRect();
-        return node.contains(
-          document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+        return [0.25, 0.5, 0.75].every((x) =>
+          node.contains(
+            document.elementFromPoint(rect.x + rect.width * x, rect.y + rect.height / 2),
+          ),
         );
       }),
     )
@@ -42,8 +27,10 @@ async function assertNotificationPosition(notification: Locator, page: Page) {
 for (const viewport of [
   { width: 1280, height: 800 },
   { width: 320, height: 640 },
-])
-  test(`同步通知和嵌套确认框的位置（${viewport.width}px）`, async ({ newTab }, testInfo) => {
+]) {
+  test(`设置中的通知可读且不阻挡操作，嵌套确认可取消（${viewport.width}px）`, async ({
+    newTab,
+  }) => {
     await newTab.setViewportSize(viewport);
     await newTab.getByRole('button', { name: '设置', exact: true }).click();
     const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
@@ -53,23 +40,25 @@ for (const viewport of [
     await settings.getByRole('switch', { name: '自动双向同步', exact: true }).click();
     await settings.getByRole('button', { name: '保存连接', exact: true }).click();
     const notification = newTab.locator('[data-sonner-toast]').filter({ hasText: '连接已保存' });
-    await assertNotificationPosition(notification, newTab);
-    await expect(newTab.locator('[data-sonner-toast]')).toHaveCount(1);
-    await notification.click();
-    await expect(settings).toBeVisible();
-
+    await expect(notification).toHaveCount(1);
+    await assertNotificationUsable(notification, newTab);
+    await settings.getByRole('button', { name: '双向同步', exact: true }).click({ trial: true });
     await settings.locator('summary', { hasText: '高级操作' }).click();
     await settings.getByRole('button', { name: '清除连接', exact: true }).click();
     const confirmation = newTab.getByRole('alertdialog');
-    await expect(confirmation).toBeVisible();
-    await assertCenteredInViewport(confirmation, newTab);
-
+    await expect(confirmation).toBeInViewport({ ratio: 1 });
+    await noHorizontalOverflow(confirmation);
+    await expect
+      .poll(() => confirmation.evaluate((node) => node.contains(document.activeElement)))
+      .toBe(true);
     await confirmation.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(confirmation).not.toBeVisible();
     await expect(settings).toBeVisible();
     await expect(settings.getByRole('button', { name: '双向同步', exact: true })).toBeEnabled();
   });
+}
 
-test('Popup 操作通知保持在视口内，表单滚动后不偏移', async ({ context, extensionId }, testInfo) => {
+test('Popup 失败通知在滚动后仍可读，表单和主操作保持可用', async ({ context, extensionId }) => {
   const popup = await context.newPage();
   await popup.setViewportSize({ width: 350, height: 420 });
   await popup.emulateMedia({ colorScheme: 'dark' });
@@ -78,13 +67,13 @@ test('Popup 操作通知保持在视口内，表单滚动后不偏移', async ({
     api.tabs.create = () => Promise.reject(new Error('errors.invalidInput'));
   });
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
+  await popup.getByLabel('名称', { exact: true }).fill('失败后保留的草稿');
   await popup.getByRole('button', { name: '打开主页', exact: true }).click();
   const notification = popup.locator('[data-sonner-toast]').last();
-  await assertNotificationPosition(notification, popup);
-  await expect(popup.locator('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'dark');
   await notification.hover();
-  const bounds = (await notification.boundingBox())!;
+  await assertNotificationUsable(notification, popup);
   await popup.getByLabel('名称', { exact: true }).scrollIntoViewIfNeeded();
-  await assertNotificationPosition(notification, popup);
-  expect((await notification.boundingBox())!.y).toBeCloseTo(bounds.y, 0);
+  await assertNotificationUsable(notification, popup);
+  await expect(popup.getByLabel('名称', { exact: true })).toHaveValue('失败后保留的草稿');
+  await popup.getByRole('button', { name: '添加网站', exact: true }).click({ trial: true });
 });

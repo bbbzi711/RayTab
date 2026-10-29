@@ -117,6 +117,7 @@ describe('navigation data model', () => {
     const state = createInitialState();
     applyCommand(state, { type: 'save-group', spaceId: 'normal', id: 'work', name: '工作' });
     const oldGroup = state.local.activeGroup.normal;
+    const originalSites = state.spaces.normal.sites.map(({ id, url }) => ({ id, url }));
     applyCommand(state, {
       type: 'delete-group',
       spaceId: 'normal',
@@ -124,7 +125,7 @@ describe('navigation data model', () => {
       destinationGroupId: 'work',
     });
     expect(state.local.activeGroup.normal).toBe('work');
-    expect(state.spaces.normal.sites).toHaveLength(5);
+    expect(state.spaces.normal.sites.map(({ id, url }) => ({ id, url }))).toEqual(originalSites);
     expect(() =>
       applyCommand(state, {
         type: 'delete-group',

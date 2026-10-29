@@ -1,40 +1,15 @@
 import { expect, test } from '../fixtures';
 import { savedIcon } from '../helpers';
 import type { Locator } from '@playwright/test';
+import { paintedArtwork } from '../artwork';
 
 const ns = 'xmlns="http://www.w3.org/2000/svg"';
 const mark = `<svg ${ns} viewBox="0 0 24 24"><path fill="#1677ff" d="M4 4h16v16H4z"/></svg>`;
 
 async function visibleArtwork(link: Locator) {
-  return link.locator('.icon-artwork img').evaluate(async (image: HTMLImageElement) => {
-    await image.decode();
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 128;
-    const context = canvas.getContext('2d')!;
-    context.drawImage(image, 0, 0, 128, 128);
-    const pixels = context.getImageData(0, 0, 128, 128).data;
-    let left = 128,
-      top = 128,
-      right = -1,
-      bottom = -1;
-    for (let y = 0; y < 128; y++)
-      for (let x = 0; x < 128; x++) {
-        if (pixels[(y * 128 + x) * 4 + 3] <= 24) continue;
-        left = Math.min(left, x);
-        right = Math.max(right, x + 1);
-        top = Math.min(top, y);
-        bottom = Math.max(bottom, y + 1);
-      }
-    if (right < 0) throw new Error('The icon has no visible pixels');
-    const frame = image.closest('.site-icon-frame')!.getBoundingClientRect();
-    const graphic = image.getBoundingClientRect();
-    return {
-      left: (graphic.left + (left / 128) * graphic.width - frame.left) / frame.width,
-      right: (graphic.left + (right / 128) * graphic.width - frame.left) / frame.width,
-      top: (graphic.top + (top / 128) * graphic.height - frame.top) / frame.height,
-      bottom: (graphic.top + (bottom / 128) * graphic.height - frame.top) / frame.height,
-    };
-  });
+  const { bounds } = await paintedArtwork(link.locator('.site-icon-frame'), [22, 119, 255]);
+  if (!bounds) throw new Error('The icon has no painted foreground');
+  return bounds;
 }
 
 test('真实解析网页与 Manifest，保留小 viewBox SVG 原文，忽略仅用于蒙版和单色的图片', async ({

@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test } from '../fixtures';
+import { storedState } from '../helpers';
+import { paintedArtwork } from '../artwork';
 
 async function wallpaperSettings(page: Page) {
   await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -58,14 +60,15 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
     .toEqual({ source: url, color: '#a4c9dc', hasBlob: true });
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.addInitScript(() => {
-    const evidence = { beforeReact: false, opacity: '', transition: '' };
+    const evidence = { beforeReact: false, fullyVisible: false };
     Object.assign(window, { wallpaperStartupEvidence: evidence });
     const observer = new MutationObserver(() => {
       const image = document.querySelector<HTMLElement>('.page-background-image');
       if (image?.style.backgroundImage && !document.getElementById('root')?.childElementCount) {
         evidence.beforeReact = true;
-        evidence.opacity = getComputedStyle(image).opacity;
-        evidence.transition = getComputedStyle(image).transitionDuration;
+        evidence.fullyVisible =
+          image.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
+          Number(getComputedStyle(image).opacity) >= 0.99;
       }
     });
     observer.observe(document, {
@@ -80,14 +83,21 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   await expect(newTab.getByRole('button', { name: '设置', exact: true })).toBeVisible();
   expect(await newTab.evaluate(() => Reflect.get(window, 'wallpaperStartupEvidence'))).toEqual({
     beforeReact: true,
-    opacity: '1',
-    transition: '0s',
+    fullyVisible: true,
   });
   await expect(newTab.locator('.page-background')).toHaveCSS(
     'background-color',
     'rgb(164, 201, 220)',
   );
-  await expect(newTab.locator('.app-shell')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const overlay = (await storedState(newTab)).normalSettings.overlay;
+  const visibleColor: [number, number, number] = [164, 201, 220];
+  visibleColor.forEach((channel, index) => {
+    visibleColor[index] = Math.round(channel * (1 - overlay));
+  });
+  // Observe what the user sees: a covering app layer must not hide the restored wallpaper.
+  expect((await paintedArtwork(newTab.locator('body'), visibleColor)).coverage).toBeGreaterThan(
+    0.25,
+  );
   expect(requests).toBe(1);
   const previous = await newTab
     .locator('.page-background-image')

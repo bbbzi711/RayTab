@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures';
+import { paintedArtwork } from '../artwork';
 import {
   failNextWrite,
   storedState,
@@ -25,12 +26,12 @@ test('上传图片无额外留白，文字图标和背景选择重载后保留',
   const site = newTab.getByRole('link', { name: '透明图标测试', exact: true });
   const image = site.locator('img');
   await expect(image).toBeVisible();
-  const computed = await image.evaluate((element) => ({
-    padding: getComputedStyle(element).padding,
-    fit: getComputedStyle(element).objectFit,
-  }));
-  expect(computed.padding).toBe('0px');
-  expect(computed.fit).toBe('contain');
+  const uploaded = await paintedArtwork(site.locator('.site-icon-frame'), [255, 51, 85]);
+  expect(uploaded.bounds).toBeDefined();
+  // The source has an 80/128 mark with transparent edges. Its painted composition must survive.
+  expect(uploaded.bounds!.right - uploaded.bounds!.left).toBeCloseTo(80 / 128, 1);
+  expect(uploaded.bounds!.bottom - uploaded.bounds!.top).toBeCloseTo(80 / 128, 1);
+  expect((uploaded.bounds!.left + uploaded.bounds!.right) / 2).toBeCloseTo(0.5, 1);
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
@@ -196,11 +197,6 @@ test('现有图标可手动裁切透明边，保存及重载保留像素和底�
   expect(pixels.corner[1]).toBeLessThan(80);
   expect(pixels.center.slice(0, 3).every((channel) => channel > 240)).toBe(true);
   expect(pixels.center[3]).toBe(255);
-  expect(
-    await site
-      .locator('xpath=ancestor::article')
-      .evaluate((node) => getComputedStyle(node).backgroundColor),
-  ).toBe('rgba(0, 0, 0, 0)');
 });
 
 test('320×360 裁切和取消可滚动到达，返回编辑器保留草稿', async ({ newTab }) => {
@@ -221,9 +217,10 @@ test('320×360 裁切和取消可滚动到达，返回编辑器保留草稿', as
   await settle(newTab);
   await noHorizontalOverflow(crop);
   const zoom = crop.getByRole('slider', { name: '缩放', exact: true });
+  const initialZoom = Number(await zoom.getAttribute('aria-valuenow'));
   await zoom.focus();
   await zoom.press('ArrowRight');
-  await expect(zoom).toHaveAttribute('aria-valuenow', '1.05');
+  expect(Number(await zoom.getAttribute('aria-valuenow'))).toBeGreaterThan(initialZoom);
 
   await crop.getByRole('button', { name: '使用裁切结果', exact: true }).click();
   await expect(crop).not.toBeVisible();

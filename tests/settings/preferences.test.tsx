@@ -9,34 +9,33 @@ import { createRepository } from '../../src/storage/database';
 afterEach(() => vi.useRealTimers());
 
 describe('home preferences', () => {
-  it('renders date and the default greeting independently of the clock', () => {
+  it('shows time, date and greeting independently according to their switches', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 8, 29, 9, 30));
-    const html = renderToStaticMarkup(
-      <Clock
-        language="en"
-        hour12={false}
-        showClock={false}
-        showDate
-        showLunar={false}
-        showGreeting
-      />,
-    );
-    expect(html).not.toContain('<time');
-    expect(html).toContain('9/29');
-    expect(html).toContain('早上好，开启新的一天');
-    const hidden = renderToStaticMarkup(
-      <Clock
-        language="en"
-        hour12={false}
-        showClock
-        showDate={false}
-        showLunar={false}
-        showGreeting={false}
-      />,
-    );
-    expect(hidden).toContain('<time');
-    expect(hidden).not.toContain('<p');
+    const text = (showClock: boolean, showDate: boolean, showGreeting: boolean) =>
+      renderToStaticMarkup(
+        <Clock
+          language="en"
+          hour12={false}
+          showClock={showClock}
+          showDate={showDate}
+          showLunar={false}
+          showGreeting={showGreeting}
+        />,
+      )
+        .replace(/<[^>]*>/g, '')
+        .trim();
+    const time = text(true, false, false);
+    const date = text(false, true, false);
+    const greeting = text(false, false, true);
+    expect(time).toBe('09:30');
+    expect(date).toContain('9/29');
+    expect(date).not.toContain(time);
+    expect(greeting).not.toBe('');
+    expect(text(false, true, true)).toContain(date);
+    expect(text(false, true, true)).toContain(greeting);
+    expect(text(false, true, true)).not.toContain(time);
+    expect(text(false, false, false)).toBe('');
   });
 
   it('uses a valid private engine when its inherited engine list changes', async () => {

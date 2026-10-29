@@ -1,4 +1,4 @@
-import { storedState } from '../helpers';
+import { storedState, noHorizontalOverflow } from '../helpers';
 import type { Page } from '@playwright/test';
 import type { BackupDocument } from '../../src/features/backup/backup';
 import type { RayState } from '../../src/storage/model';
@@ -138,17 +138,9 @@ for (const height of [480, 360]) {
     });
     await expect(onboarding).toBeVisible();
     await expect(onboarding.getByRole('heading', { level: 1 })).toBeFocused();
-    const geometry = await onboarding.evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        top: rect.top,
-        bottom: rect.bottom,
-        scrollable: element.scrollHeight > element.clientHeight,
-      };
-    });
-    expect(geometry.top).toBeGreaterThanOrEqual(15);
-    expect(geometry.bottom).toBeLessThanOrEqual(height - 15);
-    expect(geometry.scrollable).toBe(true);
+    await expect(onboarding).toBeInViewport({ ratio: 1 });
+    await noHorizontalOverflow(onboarding);
+    await expect(onboarding.getByRole('heading', { level: 1 })).toBeInViewport({ ratio: 1 });
 
     for (const key of ['Shift+Tab', 'Tab', 'Tab', 'Shift+Tab']) {
       await page.keyboard.press(key);
@@ -176,6 +168,7 @@ for (const height of [480, 360]) {
     });
     const finish = onboarding.getByRole('button', { name: '进入首页', exact: true });
     await finish.scrollIntoViewIfNeeded();
+    await expect(finish).toBeInViewport({ ratio: 1 });
 
     await finish.click();
     await expect(onboarding.getByRole('alert')).toBeVisible();
