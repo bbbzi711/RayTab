@@ -35,6 +35,14 @@ export const test = base.extend<{
       locale,
       args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
     });
+    // A functional test must explicitly supply its external services. Never depend on
+    // real website availability, favicon changes or the developer's network/proxy.
+    await context.route(/^https?:\/\//, (route) => {
+      const host = new URL(route.request().url()).hostname;
+      return host === '127.0.0.1' || host === '[::1]'
+        ? route.continue()
+        : route.abort('blockedbyclient');
+    });
     // Keep the default remote wallpaper deterministic and avoid an external
     // service dependency in extension acceptance tests.
     await context.route('https://images.unsplash.com/**', (route) =>
@@ -49,20 +57,28 @@ export const test = base.extend<{
       route.fulfill({ contentType: 'application/json', body: '[]' }),
     );
     const cspViolations: string[] = [];
-    const watchCsp = (page: Page) =>
+    const pageErrors: string[] = [];
+    const watchCsp = (page: Page) => {
+      page.on('pageerror', (error) => pageErrors.push(error.message));
       page.on('console', (message) => {
         if (message.type() === 'error' && /Content Security Policy/i.test(message.text()))
           cspViolations.push(message.text());
       });
+    };
     context.pages().forEach(watchCsp);
     context.on('page', watchCsp);
     await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     try {
       await use(context);
       base.expect(cspViolations, 'The production extension must satisfy its CSP.').toEqual([]);
+      base.expect(pageErrors, 'User flows must not throw uncaught page errors.').toEqual([]);
     } finally {
       try {
-        if (testInfo.status !== testInfo.expectedStatus || cspViolations.length > 0) {
+        if (
+          testInfo.status !== testInfo.expectedStatus ||
+          cspViolations.length > 0 ||
+          pageErrors.length > 0
+        ) {
           for (const [index, page] of context.pages().entries()) {
             if (page.isClosed() || !page.url().startsWith('chrome-extension://')) continue;
             const path = testInfo.outputPath(`extension-page-${index}.png`);
