@@ -18,6 +18,50 @@ body {
   color: #fff;
 }
 
+.desktop-workspace--navigation {
+  height: 100dvh;
+  min-height: 0;
+  padding: 57px 92px 0;
+}
+.desktop-workspace--navigation .desktop-content {
+  flex: 1;
+  min-height: 0;
+}
+.desktop-workspace--navigation .desktop-navigation {
+  flex: 1;
+  min-height: 0;
+  margin-top: 43px;
+  padding: 8px 4px 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 639px) {
+  .desktop-workspace--navigation {
+    padding: 70px 68px 0;
+  }
+}
+@media (max-height: 600px) {
+  .desktop-workspace--navigation {
+    padding-top: 16px;
+  }
+  .desktop-workspace--navigation .desktop-header time {
+    margin-bottom: 8px;
+    font-size: 36px;
+    line-height: 1.1;
+  }
+  .desktop-workspace--navigation .desktop-header section > p + p {
+    margin-top: 6px;
+  }
+  .desktop-workspace--navigation .desktop-search {
+    margin-top: 16px;
+  }
+  .desktop-workspace--navigation .desktop-navigation {
+    margin-top: 16px;
+    padding-bottom: 12px;
+  }
+}
+
 .group-more-trigger {
   position: absolute;
   z-index: 10;

@@ -386,44 +386,46 @@ export default function App() {
                   setIsSidebarPinnedOpen(false);
               }}
               className={cn(
-                'desktop-workspace relative w-full min-h-screen flex flex-col items-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                'desktop-workspace relative w-full flex flex-col items-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
                 !navigationVisible
-                  ? 'pt-[118px] px-4 pb-8'
-                  : 'pt-[70px] sm:pt-[57px] px-[68px] sm:px-[92px] pb-[88px]',
+                  ? 'min-h-screen pt-[118px] px-4 pb-8'
+                  : 'desktop-workspace--navigation',
               )}
             >
-              <div className="w-full mx-auto flex flex-col transition-all duration-500">
-                {(settings.showClock ||
-                  settings.showDate ||
-                  settings.showLunar ||
-                  settings.showGreeting) && (
-                  <WidgetSettingsMenu onSettings={() => openSettings('widgets')}>
-                    <Clock
-                      language={settings.language}
-                      hour12={settings.hour12}
-                      showClock={settings.showClock}
-                      showDate={settings.showDate}
-                      showLunar={settings.showLunar}
-                      showGreeting={settings.showGreeting}
-                      compact={navigationVisible}
-                    />
-                  </WidgetSettingsMenu>
-                )}
-                {settings.showSearch && (
-                  <div className="relative z-30 w-full flex justify-center mt-[29px]">
+              <div className="desktop-content w-full mx-auto flex flex-col transition-all duration-500">
+                <div className="desktop-header flex shrink-0 flex-col">
+                  {(settings.showClock ||
+                    settings.showDate ||
+                    settings.showLunar ||
+                    settings.showGreeting) && (
                     <WidgetSettingsMenu onSettings={() => openSettings('widgets')}>
-                      <SearchBar key={spaceId} spaceId={spaceId} />
+                      <Clock
+                        language={settings.language}
+                        hour12={settings.hour12}
+                        showClock={settings.showClock}
+                        showDate={settings.showDate}
+                        showLunar={settings.showLunar}
+                        showGreeting={settings.showGreeting}
+                        compact={navigationVisible}
+                      />
                     </WidgetSettingsMenu>
-                  </div>
-                )}
+                  )}
+                  {settings.showSearch && (
+                    <div className="desktop-search relative z-20 w-full flex justify-center mt-[29px]">
+                      <WidgetSettingsMenu onSettings={() => openSettings('widgets')}>
+                        <SearchBar key={spaceId} spaceId={spaceId} />
+                      </WidgetSettingsMenu>
+                    </div>
+                  )}
+                </div>
 
                 {/* 导航卡片区域 */}
                 <div
                   className={cn(
-                    'relative z-10 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                    'desktop-navigation relative z-10 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
                     !navigationVisible
                       ? 'opacity-0 max-h-0 pointer-events-none overflow-hidden translate-y-6 scale-[0.98]'
-                      : 'opacity-100 max-h-[10000px] translate-y-0 scale-100 mt-[51px]',
+                      : 'opacity-100 translate-y-0 scale-100',
                   )}
                   aria-hidden={!navigationVisible}
                   inert={!navigationVisible}
