@@ -1,169 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  fetchSiteIcon,
-  fetchWebsiteIcon,
-  publicIconDomain,
-} from '../../src/features/navigation/site-metadata';
+import { fetchSiteIcon, resolveWebsiteIcon } from '../../src/features/navigation/site-metadata';
+import { prepareImage } from '../../src/lib/images';
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
-describe('public favicon requests', () => {
-  it.each([
-    'http://127.0.0.1',
-    'http://10.0.0.1',
-    'http://[::1]',
-    'http://[fd00::1]',
-    'http://localhost',
-    'https://nas.local',
-    'https://app.internal',
-    'https://private.test',
-    'https://company',
-    'https://example.com:8443',
-    'https://user:password@example.com',
-    'file:///etc/passwd',
-  ])('keeps private or non-web locations off the public provider: %s', (url) => {
-    expect(publicIconDomain(url)).toBeUndefined();
-  });
-
-  it('discloses only the hostname, without a path, parameters, fragment or credentials', () => {
-    expect(publicIconDomain('https://example.com/Private?token=secret#section')).toBe(
-      'example.com',
-    );
-    expect(publicIconDomain('https://example.com.evil.local')).toBeUndefined();
-  });
-
-  it('uses verified provider pixels after the blocked origin exhausts the shared lookup budget', async () => {
-    vi.useFakeTimers();
-    let cancelled = false;
-    const calls: string[] = [];
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn().mockResolvedValue({ width: 192, height: 192, close() {} }),
-    );
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((input: string, options: RequestInit) => {
-        calls.push(input);
-        expect(options.credentials).toBe('omit');
-        expect(options.referrerPolicy).toBe('no-referrer');
-        if (input.endsWith('?response=json'))
-          return Promise.resolve(
-            Response.json({
-              source: 'link-tag',
-              width: 192,
-              height: 192,
-              format: 'png',
-              sourceUrl: 'https://blocked.example.com/touch.png',
-            }),
-          );
-        if (input === 'https://favicon.vemetric.com/example.com')
-          return Promise.resolve(
-            new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }),
-          );
-        return new Promise<Response>((_resolve, reject) => {
-          options.signal?.addEventListener('abort', () => {
-            cancelled = true;
-            reject(new DOMException('Aborted', 'AbortError'));
-          });
-        });
-      }),
-    );
-    const pending = fetchWebsiteIcon('https://example.com/account?secret=1#profile');
-    await vi.advanceTimersByTimeAsync(8_001);
-    const result = await pending;
-    expect(result.icon?.type).toBe('image/png');
-    expect(cancelled).toBe(true);
-    expect(calls).toEqual([
-      'https://example.com/account?secret=1#profile',
-      'https://favicon.vemetric.com/example.com?response=json',
-      'https://favicon.vemetric.com/example.com',
-    ]);
-    expect(calls.filter((call) => call.includes('vemetric')).join(' ')).not.toMatch(
-      /secret|account|sourceUrl|size=/,
-    );
-  });
-
-  it.each([
-    { source: 'default', width: 256, height: 256 },
-    { source: 'link-tag', width: 31, height: 31 },
-  ])(
-    'rejects a placeholder or tiny original instead of requesting an upscaled version',
-    async (metadata) => {
-      const calls: string[] = [];
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async (input: string) => {
-          calls.push(input);
-          return input.includes('vemetric')
-            ? Response.json({ ...metadata, format: 'png' })
-            : new Response('', { status: 404 });
-        }),
-      );
-      expect((await fetchWebsiteIcon('https://example.com')).icon).toBeUndefined();
-      expect(calls.filter((call) => call.includes('vemetric'))).toEqual([
-        'https://favicon.vemetric.com/example.com?response=json',
-      ]);
-    },
+function decodeImages(dimensions: Record<string, [number, number]>) {
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async (blob: Blob) => {
+      const size = dimensions[await blob.text()];
+      if (!size) throw new Error('Broken image');
+      return { width: size[0], height: size[1], close() {} };
+    }),
   );
+}
 
-  it.each([96, 256])(
-    'prefers an official original even after a %ipx public result is ready',
-    async (serviceSize) => {
-      let ready!: () => void;
-      const serviceReady = new Promise<void>((resolve) => {
-        ready = resolve;
-      });
-      let release!: (response: Response) => void;
-      const original = new Promise<Response>((resolve) => {
-        release = resolve;
-      });
-      vi.stubGlobal(
-        'createImageBitmap',
-        vi.fn(async (blob: Blob) => {
-          const size = (await blob.text()) === 'official' ? 192 : serviceSize;
-          if ((await blob.text()) === 'cached') ready();
-          return { width: size, height: size, close() {} };
-        }),
-      );
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async (input: string) => {
-          if (input.endsWith('?response=json'))
-            return Response.json({
-              source: 'link-tag',
-              width: serviceSize,
-              height: serviceSize,
-              format: 'png',
-            });
-          if (input === 'https://favicon.vemetric.com/example.com')
-            return new Response('cached', { headers: { 'content-type': 'image/png' } });
-          if (input === 'https://example.com/favicon.ico') return original;
-          return new Response('', { status: 403 });
-        }),
-      );
-      const lookup = fetchWebsiteIcon('https://example.com');
-      await serviceReady;
-      release(new Response('official', { headers: { 'content-type': 'image/png' } }));
-      expect(await (await lookup).icon?.text()).toBe('official');
-    },
-  );
-
-  it('compares actual dimensions beyond the first 128px candidate and rejects a wide header logo', async () => {
-    const dimensions: Record<string, [number, number]> = {
-      small: [128, 128],
-      large: [512, 512],
-      header: [1024, 256],
-    };
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn(async (blob: Blob) => {
-        const [width, height] = dimensions[await blob.text()];
-        return { width, height, close() {} };
-      }),
-    );
+describe('official website icon discovery', () => {
+  it('compares actual pixels, ignores broken and wide artwork, and retains original bytes', async () => {
+    decodeImages({ tiny: [8, 8], small: [128, 128], large: [512, 512], header: [1024, 256] });
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -171,107 +28,139 @@ describe('public favicon requests', () => {
           new Response(input.split('/').at(-1), { headers: { 'content-type': 'image/png' } }),
       ),
     );
-    const icon = await fetchSiteIcon('https://example.com/small', undefined, [
+    const icon = await fetchSiteIcon([
+      'https://example.com/tiny',
+      'https://example.com/small',
+      'https://example.com/broken',
       'https://example.com/header',
       'https://example.com/large',
     ]);
-    expect(await icon?.text()).toBe('large');
+    expect(icon?.image.type).toBe('image/png');
+    expect(await icon?.image.text()).toBe('large');
   });
 
-  it('recovers original pixels if a provider deployment still shrinks images to its documented 64px default', async () => {
-    const calls: string[] = [];
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn(async (blob: Blob) => {
-        const size = (await blob.text()) === 'original' ? 192 : 64;
-        return { width: size, height: size, close() {} };
-      }),
-    );
+  it('tries the origin favicon when website discovery finds no usable artwork', async () => {
+    decodeImages({ original: [48, 48] });
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: string) => {
-        calls.push(input);
-        if (input.endsWith('?response=json'))
-          return Response.json({ source: 'link-tag', width: 192, height: 192, format: 'png' });
-        if (input === 'https://favicon.vemetric.com/example.com?size=192')
-          return new Response('original', { headers: { 'content-type': 'image/png' } });
-        if (input === 'https://favicon.vemetric.com/example.com')
-          return new Response('shrunk', { headers: { 'content-type': 'image/png' } });
-        return new Response('', { status: 404 });
-      }),
+      vi.fn(async (input: string) =>
+        input === 'https://example.com/favicon.ico'
+          ? new Response('original', { headers: { 'content-type': 'image/png' } })
+          : new Response('', { status: 404 }),
+      ),
     );
-    expect(await (await fetchWebsiteIcon('https://example.com')).icon?.text()).toBe('original');
-    expect(calls).toContain('https://favicon.vemetric.com/example.com?size=192');
+    const result = await resolveWebsiteIcon('https://example.com/page');
+    expect(await result.icon?.text()).toBe('original');
   });
 
-  it('rejects service pixels larger than the verified original instead of treating upscaling as quality', async () => {
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn().mockResolvedValue({ width: 192, height: 192, close() {} }),
-    );
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string) => {
-        if (input.endsWith('?response=json'))
-          return Response.json({ source: 'link-tag', width: 96, height: 96, format: 'png' });
-        if (input === 'https://favicon.vemetric.com/example.com')
-          return new Response('upscaled', { headers: { 'content-type': 'image/png' } });
-        return new Response('', { status: 404 });
-      }),
-    );
-    expect((await fetchWebsiteIcon('https://example.com')).icon).toBeUndefined();
-  });
-
-  it('does not contact the provider for a private-space public website', async () => {
-    const calls: string[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: string) => {
-        calls.push(input);
-        return new Response('', { status: 404 });
-      }),
-    );
-    await fetchWebsiteIcon('https://example.com/private', { allowPublicService: false });
-    expect(calls).toEqual(['https://example.com/private', 'https://example.com/favicon.ico']);
-  });
-
-  it.each([32, 64, 96])(
-    'retains a usable %ipx original when no higher-resolution source exists',
+  it.each([16, 32, 48, 192])(
+    'retains a usable %ipx official favicon when the page is unavailable',
     async (size) => {
-      vi.stubGlobal(
-        'createImageBitmap',
-        vi.fn().mockResolvedValue({ width: size, height: size, close() {} }),
-      );
+      decodeImages({ original: [size, size] });
+      const calls: string[] = [];
       vi.stubGlobal(
         'fetch',
-        vi.fn(async (input: string) => {
-          if (input.endsWith('?response=json'))
-            return Response.json({ source: 'link-tag', width: size, height: size, format: 'png' });
-          if (input === 'https://favicon.vemetric.com/example.com')
-            return new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } });
-          return new Response('', { status: 404 });
+        vi.fn(async (input: string, options: RequestInit) => {
+          calls.push(input);
+          expect(options.credentials).toBe('omit');
+          expect(options.referrerPolicy).toBe('no-referrer');
+          return input === 'https://example.com/favicon.ico'
+            ? new Response('original', { headers: { 'content-type': 'image/png' } })
+            : new Response('', { status: 403 });
         }),
       );
-      expect((await fetchWebsiteIcon('https://example.com')).icon?.type).toBe('image/png');
+      const result = await resolveWebsiteIcon('https://example.com/account?token=keep#profile');
+      expect(await result.icon?.text()).toBe('original');
+      expect(calls.every((url) => new URL(url).origin === 'https://example.com')).toBe(true);
     },
   );
 
-  it('bounds the whole lookup, including a stalled direct website and public provider', async () => {
+  it('reports no image after network failure instead of substituting a brand or placeholder', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Offline')));
+    expect((await resolveWebsiteIcon('https://github.com')).icon).toBeUndefined();
+  });
+
+  it('bounds stalled website lookups and cancels unfinished requests', async () => {
     vi.useFakeTimers();
+    let cancelled = false;
     vi.stubGlobal(
       'fetch',
       vi.fn(
         (_input: string, options: RequestInit) =>
           new Promise<Response>((_resolve, reject) => {
-            options.signal?.addEventListener('abort', () =>
-              reject(new DOMException('Aborted', 'AbortError')),
-            );
-            if (options.signal?.aborted) reject(new DOMException('Aborted', 'AbortError'));
+            const abort = () => {
+              cancelled = true;
+              reject(new DOMException('Aborted', 'AbortError'));
+            };
+            options.signal?.addEventListener('abort', abort);
+            if (options.signal?.aborted) abort();
           }),
       ),
     );
-    const result = fetchWebsiteIcon('https://example.com');
+    const result = resolveWebsiteIcon('https://example.com');
     await vi.advanceTimersByTimeAsync(8_001);
     expect((await result).icon).toBeUndefined();
+    expect(cancelled).toBe(true);
+  });
+});
+
+describe('icon persistence preparation', () => {
+  it.each([32, 128, 512])(
+    'keeps original PNG bytes and %ipx dimensions when resizing is unnecessary',
+    async (size) => {
+      decodeImages({ pixels: [size, size] });
+      const image = new Blob(['pixels'], { type: 'image/png' });
+      const prepared = await prepareImage(image, 'icon');
+      expect(prepared.blob.type).toBe('image/png');
+      expect(await prepared.blob.arrayBuffer()).toEqual(await image.arrayBuffer());
+    },
+  );
+});
+
+describe('website artwork priority and fallback', () => {
+  function network({ touch = false, declared = false } = {}) {
+    decodeImages({ favicon: [32, 32], touch: [180, 180], declared: [48, 48] });
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        calls.push(input);
+        if (input.endsWith('/favicon.ico'))
+          return new Response('favicon', { headers: { 'content-type': 'image/png' } });
+        if (touch && input.endsWith('/apple-touch-icon.png'))
+          return new Response('touch', { headers: { 'content-type': 'image/png' } });
+        if (declared && input === 'https://example.com/')
+          return new Response('<title>Example</title><link rel="icon" href="/declared.png">', {
+            headers: { 'content-type': 'text/html' },
+          });
+        if (declared && input.endsWith('/declared.png'))
+          return new Response('declared', { headers: { 'content-type': 'image/png' } });
+        return new Response('', { status: 404 });
+      }),
+    );
+    return calls;
+  }
+
+  it('discovers a conventional high-resolution Touch Icon ahead of a small favicon', async () => {
+    const calls = network({ touch: true });
+    const result = await resolveWebsiteIcon('https://example.com');
+    expect(await result.icon?.text()).toBe('touch');
+    expect(result.iconSource).toMatchObject({
+      kind: 'website',
+      url: 'https://example.com/apple-touch-icon.png',
+    });
+    expect(calls.every((url) => new URL(url).origin === 'https://example.com')).toBe(true);
+  });
+
+  it('retains the clearest available official image without consulting an external service', async () => {
+    const calls = network({ declared: true });
+    const result = await resolveWebsiteIcon('https://example.com');
+    expect(await result.icon?.text()).toBe('declared');
+    expect(result.iconSource).toMatchObject({
+      kind: 'website',
+      url: 'https://example.com/declared.png',
+    });
+    expect(calls.every((url) => new URL(url).origin === 'https://example.com')).toBe(true);
+    expect(await (await prepareImage(result.icon!, 'icon')).blob.text()).toBe('declared');
   });
 });

@@ -4,45 +4,27 @@ import { savedIcon } from '../helpers';
 const mark =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect x="12" y="12" width="104" height="104" rx="24" fill="#1677ff"/><path d="M40 64h48M64 40v48" stroke="white" stroke-width="12"/></svg>';
 
-test('未打包品牌自动从公开目录获取，保存后离线重载且新标签页不查询图标服务', async ({
-  newTab,
-  context,
-}) => {
-  const domain = 'runtime-brand-acceptance.com';
-  const catalogRequests: string[] = [];
-  const logoRequests: string[] = [];
-  let fallbackRequests = 0;
-  await context.route('https://api.svgl.app/**', (route) => {
-    catalogRequests.push(route.request().url());
-    return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify([
-        {
-          id: 901,
-          title: 'Runtime Brand',
-          category: 'Software',
-          route: 'https://svgl.app/library/runtime-brand-acceptance.svg',
-          url: `https://${domain}/`,
-        },
-      ]),
-    });
-  });
-  await context.route('https://svgl.app/library/runtime-brand-acceptance.svg', (route) => {
-    logoRequests.push(route.request().url());
-    return route.fulfill({ contentType: 'image/svg+xml', body: mark });
+test('官网 SVG 保存后离线重载，新标签页不重新请求图标', async ({ newTab, context }) => {
+  const domain = 'github.com';
+  const requests: string[] = [];
+  const unexpected: string[] = [];
+  newTab.on('request', (request) => {
+    if (/^https?:/.test(request.url()) && new URL(request.url()).hostname !== domain)
+      unexpected.push(request.url());
   });
   await context.route(`https://${domain}/**`, (route) => {
-    fallbackRequests++;
-    return route.abort();
-  });
-  await context.route('https://favicon.vemetric.com/**', (route) => {
-    fallbackRequests++;
-    return route.abort();
+    requests.push(route.request().url());
+    return route.fulfill({
+      contentType: route.request().url().endsWith('/mark.svg') ? 'image/svg+xml' : 'text/html',
+      body: route.request().url().endsWith('/mark.svg')
+        ? mark
+        : '<title>官网图标</title><link rel="icon" href="/mark.svg" sizes="any">',
+    });
   });
 
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
-  await editor.getByLabel('名称', { exact: true }).fill('在线目录图标');
+  await editor.getByLabel('名称', { exact: true }).fill('官网图标');
   await editor
     .getByLabel('网址', { exact: true })
     .fill(`https://${domain}/account?token=secret#profile`);
@@ -51,14 +33,11 @@ test('未打包品牌自动从公开目录获取，保存后离线重载且新�
   await expect(editor.getByText('图标已获取，保存后可离线使用。', { exact: true })).toBeVisible();
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  const icon = newTab.getByRole('link', { name: '在线目录图标', exact: true }).locator('img');
+  const icon = newTab.getByRole('link', { name: '官网图标', exact: true }).locator('img');
   await expect(icon).toBeVisible();
-  expect(catalogRequests).toHaveLength(1);
-  expect(catalogRequests[0]).not.toContain(domain);
-  expect(catalogRequests[0]).not.toContain('secret');
-  expect(logoRequests).toHaveLength(1);
-  const initialFallbackRequests = fallbackRequests;
-  expect(await savedIcon(newTab, '在线目录图标')).toMatchObject({
+  expect(unexpected).toEqual([]);
+  const initialRequests = requests.length;
+  expect(await savedIcon(newTab, '官网图标')).toMatchObject({
     type: 'image/svg+xml',
     text: mark,
   });
@@ -66,21 +45,20 @@ test('未打包品牌自动从公开目录获取，保存后离线重载且新�
   await context.setOffline(true);
   await newTab.reload();
   await expect(
-    newTab.getByRole('link', { name: '在线目录图标', exact: true }).locator('img'),
+    newTab.getByRole('link', { name: '官网图标', exact: true }).locator('img'),
   ).toBeVisible();
   expect(
     await newTab
-      .getByRole('link', { name: '在线目录图标', exact: true })
+      .getByRole('link', { name: '官网图标', exact: true })
       .locator('img')
       .evaluate(
         (image: HTMLImageElement) =>
           image.src.startsWith('blob:') && image.complete && image.naturalWidth > 0,
       ),
   ).toBe(true);
-  expect(catalogRequests).toHaveLength(1);
-  expect(logoRequests).toHaveLength(1);
-  expect(fallbackRequests).toBe(initialFallbackRequests);
-  expect(await savedIcon(newTab, '在线目录图标')).toMatchObject({
+  expect(requests).toHaveLength(initialRequests);
+  expect(unexpected).toEqual([]);
+  expect(await savedIcon(newTab, '官网图标')).toMatchObject({
     type: 'image/svg+xml',
     text: mark,
   });
@@ -99,7 +77,6 @@ test('网站图标重新获取失败保留已保存图片，重试保存与离�
         : '<html><head><title>保留网站图片</title><link rel="icon" href="/mark.svg" sizes="any"></head></html>',
     }),
   );
-  await context.route('https://favicon.vemetric.com/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
   await editor.getByLabel('名称', { exact: true }).fill('保留网站图片');

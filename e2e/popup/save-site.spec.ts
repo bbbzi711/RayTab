@@ -101,7 +101,7 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
   });
   expect(saved.resourceCount).toBe(1);
   expect(saved.referencedImagesExist).toBe(true);
-  expect(providerRequests).toEqual([`https://favicon.vemetric.com/${domain}?response=json`]);
+  expect(providerRequests).toEqual([]);
   const requestCount = requests.length;
   await context.setOffline(true);
   await newTab.reload();
@@ -118,7 +118,7 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
     text: mark,
   });
   expect(requests).toHaveLength(requestCount);
-  expect(providerRequests).toHaveLength(1);
+  expect(providerRequests).toHaveLength(0);
 });
 
 test('Popup 获取失败保留表单，可以重试或明确选择文字占位后添加', async ({

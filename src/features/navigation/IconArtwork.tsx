@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
-type ArtworkFit = { scale: number; x: number; y: number };
+type ArtworkFit = { scale: number; x: number; y: number; tile?: boolean };
 const MARK_FIT: ArtworkFit = { scale: 0.72, x: 0, y: 0 };
-const TILE_FIT: ArtworkFit = { scale: 1, x: 0, y: 0 };
+const TILE_FIT: ArtworkFit = { scale: 1, x: 0, y: 0, tile: true };
 const SAMPLE_SIZE = 128;
 
 function measureArtwork(image: HTMLImageElement): ArtworkFit | undefined {
@@ -67,7 +67,7 @@ export function IconArtwork({
   const element = useRef<HTMLSpanElement>(null);
   const [measured, setMeasured] = useState<{ identity: string; fit: ArtworkFit }>();
   useEffect(() => {
-    if (!normalize || tile) return;
+    if (tile) return;
     const graphic = element.current?.querySelector('img, svg');
     if (!graphic) return;
     let active = true;
@@ -105,13 +105,16 @@ export function IconArtwork({
       image.removeEventListener('load', onLoad);
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [identity, normalize, tile]);
+  }, [identity, tile]);
   const fit =
     !normalize || tile ? TILE_FIT : measured?.identity === identity ? measured.fit : MARK_FIT;
   return (
     <span
       ref={element}
       className="icon-artwork"
+      data-artwork-tile={
+        tile || (measured?.identity === identity && measured.fit.tile) || undefined
+      }
       style={
         {
           '--artwork-scale': fit.scale,

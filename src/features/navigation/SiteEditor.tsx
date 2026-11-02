@@ -49,7 +49,6 @@ import {
 } from '@/storage/model';
 import { SiteIcon } from './SiteIcon';
 import { siteEditorSchema } from './navigation-form-schemas';
-import { getBrandAppearance } from './brandIcons';
 import { resolveWebsiteIcon } from './site-metadata';
 import { imageDimensions, prepareImage, validateImageFile } from '@/lib/images';
 import { AppError, errorMessage } from '@/lib/errors';
@@ -238,9 +237,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     setFetching(true);
     try {
       const url = normalizeUrl(requestedUrl);
-      const metadata = await resolveWebsiteIcon(url, {
-        allowPublicService: spaceId === 'normal',
-      });
+      const metadata = await resolveWebsiteIcon(url);
       const icon = metadata.icon;
       if (
         !active.current ||
@@ -267,7 +264,9 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
         if (
           previousSize &&
           Math.min(nextSize.width, nextSize.height) <
-            Math.min(previousSize.width, previousSize.height, 128)
+            (currentImage?.type === 'image/svg+xml'
+              ? 128
+              : Math.min(previousSize.width, previousSize.height, 128))
         ) {
           form.setError('websiteResourceId', { message: 'navigation.iconRefreshFailed' });
           return;
@@ -278,31 +277,8 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
         if (!textEdited.current)
           form.setValue('textIcon', iconTextFromName(metadata.title), { shouldDirty: true });
       }
-      if (metadata.localBrand) {
-        if (metadata.localFallback && form.getValues('websiteResourceId')) {
-          form.setError('websiteResourceId', { message: 'navigation.iconRefreshFailed' });
-          return;
-        }
-        invalidateFetch();
-        setImages((current) => ({ ...current, auto: undefined }));
-        form.setValue('websiteResourceId', '', { shouldDirty: true });
-        form.setValue('websiteFit', undefined, { shouldDirty: true });
-        form.setValue('iconType', 'auto', { shouldDirty: true });
-        form.clearErrors('websiteResourceId');
-        if (!automatic) {
-          if (metadata.localFallback) toast.info(t('navigation.localBrandFallback'));
-          else toast.success(t('navigation.metadataUpdated'));
-        }
-      } else if (icon) {
+      if (icon) {
         setImageSelection('auto', icon);
-        if (metadata.background && form.getValues('iconBackground').mode === 'auto')
-          form.setValue(
-            'iconBackground',
-            { mode: 'color', color: metadata.background },
-            {
-              shouldDirty: true,
-            },
-          );
         if (!automatic) toast.success(t('navigation.metadataUpdated'));
       } else form.setError('websiteResourceId', { message: 'navigation.iconFetchFailed' });
     } catch (reason) {
@@ -394,8 +370,6 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
   const selectedResourceId = selectedImageSource
     ? values[resourceField(selectedImageSource)]
     : undefined;
-  const selectedBrand =
-    selectedSource === 'auto' && !selectedResourceId ? getBrandAppearance(values.url ?? '') : null;
   const previewSite: Pick<Site, 'title' | 'url' | 'icon' | 'iconBackground'> = {
     ...previewBase,
     icon:
@@ -601,7 +575,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                 <div className="site-edit-icon-workspace">
                   <aside className="site-edit-preview" aria-label={t('navigation.iconPreview')}>
                     <div className="site-edit-preview-stage" aria-busy={fetching}>
-                      {fetching && !selectedResourceId && !selectedBrand ? (
+                      {fetching && !selectedResourceId ? (
                         <LoaderCircle
                           className="site-edit-preview-empty spin"
                           size={24}
@@ -609,7 +583,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                         />
                       ) : selectedSource === 'resource' && !selectedResourceId ? (
                         <Upload className="site-edit-preview-empty" size={28} aria-hidden="true" />
-                      ) : selectedSource === 'auto' && !selectedBrand && !selectedResourceId ? (
+                      ) : selectedSource === 'auto' && !selectedResourceId ? (
                         <Globe2 className="site-edit-preview-empty" size={28} aria-hidden="true" />
                       ) : (
                         <SiteIcon
@@ -675,15 +649,13 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                             fetching
                               ? 'navigation.fetchingIcon'
                               : selectedImageSource === 'auto'
-                                ? selectedBrand
-                                  ? 'navigation.brandIconHelp'
-                                  : selectedResourceId
-                                    ? images.auto?.id === selectedResourceId
-                                      ? 'navigation.draftIconHelp'
-                                      : 'navigation.savedIconHelp'
-                                    : spaceId === 'normal'
-                                      ? 'navigation.websiteIconHelp'
-                                      : 'navigation.privateIconHelp'
+                                ? selectedResourceId
+                                  ? images.auto?.id === selectedResourceId
+                                    ? 'navigation.draftIconHelp'
+                                    : 'navigation.savedIconHelp'
+                                  : spaceId === 'normal'
+                                    ? 'navigation.websiteIconHelp'
+                                    : 'navigation.privateIconHelp'
                                 : 'navigation.uploadIconHelp',
                           )}
                         </p>
@@ -703,7 +675,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                                 <Globe2 size={14} />
                               )}
                               {t(
-                                selectedResourceId || selectedBrand
+                                selectedResourceId
                                   ? 'navigation.refreshIcon'
                                   : 'navigation.getIcon',
                               )}
@@ -815,97 +787,93 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                         )}
                       </div>
                     )}
-                    {!selectedBrand?.tile && (
-                      <div className="site-edit-field">
-                        <label id={`${id}-color`}>{t('navigation.iconColor')}</label>
-                        <Controller
-                          control={form.control}
-                          name="iconBackground"
-                          render={({ field }) => (
-                            <div
-                              className="site-edit-palette"
-                              role="group"
-                              aria-labelledby={`${id}-color`}
+                    <div className="site-edit-field">
+                      <label id={`${id}-color`}>{t('navigation.iconColor')}</label>
+                      <Controller
+                        control={form.control}
+                        name="iconBackground"
+                        render={({ field }) => (
+                          <div
+                            className="site-edit-palette"
+                            role="group"
+                            aria-labelledby={`${id}-color`}
+                          >
+                            <button
+                              type="button"
+                              className="site-edit-auto-color"
+                              aria-label={t('navigation.automaticBackground')}
+                              title={t('navigation.automaticBackground')}
+                              aria-pressed={field.value.mode === 'auto'}
+                              disabled={busy}
+                              onClick={() => field.onChange({ mode: 'auto' })}
                             >
+                              <Sparkles size={14} aria-hidden="true" />
+                            </button>
+                            {BACKGROUND_COLORS.map(({ color, label }) => (
                               <button
+                                key={color}
                                 type="button"
-                                className="site-edit-auto-color"
-                                aria-label={t('navigation.automaticBackground')}
-                                title={t('navigation.automaticBackground')}
-                                aria-pressed={field.value.mode === 'auto'}
-                                disabled={busy}
-                                onClick={() => field.onChange({ mode: 'auto' })}
-                              >
-                                <Sparkles size={14} aria-hidden="true" />
-                              </button>
-                              {BACKGROUND_COLORS.map(({ color, label }) => (
-                                <button
-                                  key={color}
-                                  type="button"
-                                  className="site-edit-color"
-                                  style={{ '--icon-color': color } as CSSProperties}
-                                  aria-label={t(label)}
-                                  title={t(label)}
-                                  aria-pressed={
-                                    field.value.mode === 'color' && field.value.color === color
-                                  }
-                                  disabled={busy}
-                                  onClick={() => field.onChange({ mode: 'color', color })}
-                                >
-                                  {field.value.mode === 'color' && field.value.color === color && (
-                                    <Check size={14} aria-hidden="true" />
-                                  )}
-                                </button>
-                              ))}
-                              <label
-                                className="site-edit-custom-color"
-                                title={t('navigation.customBackground')}
-                                data-state={
-                                  field.value.mode === 'color' &&
-                                  !BACKGROUND_COLORS.map(({ color }) => color).includes(
-                                    field.value.color,
-                                  )
-                                    ? 'checked'
-                                    : 'unchecked'
+                                className="site-edit-color"
+                                style={{ '--icon-color': color } as CSSProperties}
+                                aria-label={t(label)}
+                                title={t(label)}
+                                aria-pressed={
+                                  field.value.mode === 'color' && field.value.color === color
                                 }
+                                disabled={busy}
+                                onClick={() => field.onChange({ mode: 'color', color })}
                               >
-                                <input
-                                  type="color"
-                                  aria-label={t('navigation.customColor')}
-                                  value={
-                                    field.value.mode === 'color'
-                                      ? field.value.color
-                                      : BACKGROUND_COLORS[2].color
-                                  }
-                                  disabled={busy}
-                                  onChange={(event) =>
-                                    field.onChange({ mode: 'color', color: event.target.value })
-                                  }
-                                />
-                                <span
-                                  className="site-edit-picker-preview"
-                                  aria-hidden="true"
-                                  style={
-                                    {
-                                      '--picker-colors': `conic-gradient(${BACKGROUND_COLORS.slice(
-                                        2,
-                                      )
-                                        .map(({ color }) => color)
-                                        .join(',')})`,
-                                    } as CSSProperties
-                                  }
-                                />
-                              </label>
-                            </div>
-                          )}
-                        />
-                        {errors.iconBackground && (
-                          <p className="form-error" role="alert">
-                            {t('navigation.invalidIcon')}
-                          </p>
+                                {field.value.mode === 'color' && field.value.color === color && (
+                                  <Check size={14} aria-hidden="true" />
+                                )}
+                              </button>
+                            ))}
+                            <label
+                              className="site-edit-custom-color"
+                              title={t('navigation.customBackground')}
+                              data-state={
+                                field.value.mode === 'color' &&
+                                !BACKGROUND_COLORS.map(({ color }) => color).includes(
+                                  field.value.color,
+                                )
+                                  ? 'checked'
+                                  : 'unchecked'
+                              }
+                            >
+                              <input
+                                type="color"
+                                aria-label={t('navigation.customColor')}
+                                value={
+                                  field.value.mode === 'color'
+                                    ? field.value.color
+                                    : BACKGROUND_COLORS[2].color
+                                }
+                                disabled={busy}
+                                onChange={(event) =>
+                                  field.onChange({ mode: 'color', color: event.target.value })
+                                }
+                              />
+                              <span
+                                className="site-edit-picker-preview"
+                                aria-hidden="true"
+                                style={
+                                  {
+                                    '--picker-colors': `conic-gradient(${BACKGROUND_COLORS.slice(2)
+                                      .map(({ color }) => color)
+                                      .join(',')})`,
+                                  } as CSSProperties
+                                }
+                              />
+                            </label>
+                          </div>
                         )}
-                      </div>
-                    )}
+                      />
+                      {errors.iconBackground && (
+                        <p className="form-error" role="alert">
+                          {t('navigation.invalidIcon')}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

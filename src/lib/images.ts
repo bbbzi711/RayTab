@@ -24,6 +24,27 @@ type Drawable = {
 
 export type ImageCropArea = { x: number; y: number; width: number; height: number };
 
+// The largest icon is 104 CSS pixels; 512px retains detail on high-density screens.
+const ICON_MAX_SIZE = 512;
+
+async function isAnimatedIcon(file: Blob) {
+  if (file.type === 'image/gif') return true;
+  if (file.type !== 'image/png' && file.type !== 'image/webp') return false;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const view = new DataView(bytes.buffer);
+  const png = file.type === 'image/png';
+  // PNG and WebP declare animation in chunks. Do not flatten them to a canvas frame.
+  for (let offset = png ? 8 : 12; offset + (png ? 12 : 8) <= bytes.length;) {
+    const tagOffset = png ? offset + 4 : offset;
+    const tag = String.fromCharCode(...bytes.subarray(tagOffset, tagOffset + 4));
+    if (tag === 'acTL' || tag === 'ANIM') return true;
+    if (png && tag === 'IDAT') return false;
+    const length = view.getUint32(png ? offset : offset + 4, !png);
+    offset += length + (png ? 12 : 8 + (length % 2));
+  }
+  return false;
+}
+
 export function validateImageFile(file: Blob) {
   const isAllowed = ALLOWED_TYPES.includes(file.type) || file.type.startsWith('image/');
   if (!isAllowed) throw new AppError('messages.chooseAValidImageFilePngJpegWebpIcoOrSvg');
@@ -75,18 +96,30 @@ async function loadDrawable(file: Blob): Promise<Drawable> {
 
 export async function prepareImage(file: Blob, kind: 'icon' | 'wallpaper') {
   validateImageFile(file);
-  if (kind === 'icon' && file.type === 'image/svg+xml') {
-    await validateSvgImage(file);
-    // Decode once before saving, but retain the original vector instead of a canvas export.
+  if (kind === 'icon') {
+    if (file.type === 'image/svg+xml') await validateSvgImage(file);
+    // Keep vectors and small images intact; resize oversized static artwork only.
     const { width, height } = await imageDimensions(file);
     if (!width || !height) throw new AppError('messages.thisImageCannotBeRead');
     if (width * height > 40_000_000)
       throw new AppError('messages.useAnImageSmallerThan40Megapixels');
-    return { id: crypto.randomUUID(), blob: file };
+    let blob = file;
+    if (
+      Math.max(width, height) > ICON_MAX_SIZE &&
+      ['image/png', 'image/jpeg', 'image/webp'].includes(file.type) &&
+      !(await isAnimatedIcon(file))
+    ) {
+      const resized = await renderImage(file, ICON_MAX_SIZE, undefined, {
+        type: file.type,
+        quality: 0.92,
+      });
+      if (resized.size < file.size) blob = resized;
+    }
+    return { id: crypto.randomUUID(), blob };
   }
   return {
     id: crypto.randomUUID(),
-    blob: await renderImage(file, kind === 'icon' ? 256 : 2560),
+    blob: await renderImage(file, 2560),
   };
 }
 
@@ -105,7 +138,12 @@ export function cropImage(file: Blob, area: ImageCropArea) {
   return renderImage(file, 256, area);
 }
 
-async function renderImage(file: Blob, limit: number, area?: ImageCropArea) {
+async function renderImage(
+  file: Blob,
+  limit: number,
+  area?: ImageCropArea,
+  output = { type: 'image/webp', quality: 0.88 },
+) {
   validateImageFile(file);
   const drawable = await loadDrawable(file);
   try {
@@ -133,13 +171,14 @@ async function renderImage(file: Blob, limit: number, area?: ImageCropArea) {
     canvas.height = Math.max(1, Math.round(height * scale));
     const context = canvas.getContext('2d');
     if (!context) throw new AppError('messages.theBrowserCannotProcessThisImage');
+    context.imageSmoothingQuality = 'high';
     drawable.draw(context, canvas.width, canvas.height, area);
     return await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob(
         (value) =>
           value ? resolve(value) : reject(new AppError('messages.imageProcessingFailed')),
-        'image/webp',
-        0.88,
+        output.type,
+        output.quality,
       ),
     );
   } finally {

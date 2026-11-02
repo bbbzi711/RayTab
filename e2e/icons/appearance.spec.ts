@@ -1,17 +1,27 @@
-import { addSite, expect, test } from '../fixtures';
+import { expect, test } from '../fixtures';
 import { paintedArtwork } from '../artwork';
 
-test('品牌底色独立保存，重新打开和重载不改变图形颜色或产品身份', async ({ newTab, context }) => {
-  await addSite(newTab, 'Gemini 产品', 'https://gemini.google.com/app');
-  const gemini = newTab.getByRole('link', { name: 'Gemini 产品', exact: true });
-  const google = newTab.getByRole('link', { name: 'Google', exact: true });
-  expect((await paintedArtwork(gemini.locator('.site-icon-frame'))).palette).not.toEqual(
-    (await paintedArtwork(google.locator('.site-icon-frame'))).palette,
+test('官网图标的底色独立保存，重新打开和离线重载不改变原图颜色', async ({ newTab, context }) => {
+  const mark =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" fill="#1677ff"/></svg>';
+  await context.route('https://gemini.google.com/**', (route) =>
+    route.fulfill({
+      contentType: route.request().url().endsWith('.svg') ? 'image/svg+xml' : 'text/html',
+      body: route.request().url().endsWith('.svg') ? mark : '<link rel="icon" href="/mark.svg">',
+    }),
   );
-  const youtube = newTab.getByRole('link', { name: 'YouTube', exact: true });
-  const original = (await paintedArtwork(youtube.locator('.site-icon-frame'))).dominant;
+  await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
+  const add = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await add.getByLabel('名称', { exact: true }).fill('Gemini 产品');
+  await add.getByLabel('网址', { exact: true }).fill('https://gemini.google.com/app');
+  await add.getByRole('button', { name: '获取网站图标', exact: true }).click();
+  await expect(add.locator('.site-edit-preview img')).toBeVisible();
+  await add.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(add).not.toBeVisible();
+  const site = newTab.getByRole('link', { name: 'Gemini 产品', exact: true });
+  const original = (await paintedArtwork(site.locator('.site-icon-frame'))).dominant;
   expect(original).toBeDefined();
-  await youtube.click({ button: 'right' });
+  await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
   await editor
@@ -22,8 +32,8 @@ test('品牌底色独立保存，重新打开和重载不改变图形颜色或�
   await expect(editor).not.toBeVisible();
   await context.setOffline(true);
   await newTab.reload();
-  expect((await paintedArtwork(youtube.locator('.site-icon-frame'))).dominant).toBe(original);
-  await youtube.click({ button: 'right' });
+  expect((await paintedArtwork(site.locator('.site-icon-frame'))).dominant).toBe(original);
+  await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   await expect(editor.getByRole('button', { name: '绿色', exact: true })).toHaveAttribute(
     'aria-pressed',

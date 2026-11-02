@@ -33,7 +33,6 @@
     "customColor": "Custom background color",
     "iconFetchFailed": "Could not fetch the icon. Use a text icon or upload an image.",
     "iconRefreshFailed": "No high-resolution website icon was found. Your current image is kept. Retry or upload an image.",
-    "localBrandFallback": "No high-resolution website icon was found. Using the local brand icon.",
     "metadataUpdated": "Site details updated",
     "noImage": "No image is available. Upload an icon.",
     "desktopMenu": "Desktop actions",
@@ -58,7 +57,6 @@
     "draftIconHelp": "Icon fetched. Save it to make it available offline.",
     "privateIconHelp": "Fetch an icon to save it in the private space.",
     "uploadIconHelp": "PNG, JPG, WebP, SVG and ICO supported",
-    "brandIconHelp": "Brand icon matched, available offline.",
     "colors": {
       "white": "White",
       "black": "Black",

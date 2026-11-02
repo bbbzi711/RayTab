@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 
 import type { AddressInfo } from 'node:net';
 
-import { addSite, expect, test } from '../fixtures';
+import { expect, test } from '../fixtures';
 import { savedIcon } from '../helpers';
 import { artworkSource } from '../artwork';
 test('自动图标跳过低清和损坏候选，矢量与实色底板保存后保留', async ({ newTab }) => {
@@ -19,7 +19,7 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
       'base64',
     );
   const tiny = await png(16);
-  const large = await png(192);
+  const large = await png(1024);
   const requests: string[] = [];
   const server = createServer((request, response) => {
     requests.push(request.url!);
@@ -76,7 +76,26 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
           background: getComputedStyle(image.closest('.site-icon-frame')!).backgroundColor,
         };
       }),
-    ).toEqual({ width: 192, background: 'rgb(255, 255, 255)' });
+    ).toMatchObject({ width: 512, background: 'rgb(255, 255, 255)' });
+    expect(await savedIcon(newTab, '高清测试')).toMatchObject({ type: 'image/png' });
+    const savedBytes = await site
+      .locator('img')
+      .evaluate(async (image: HTMLImageElement) =>
+        Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())),
+      );
+    expect(savedBytes.length).toBeLessThan(large.length);
+    const pixels = await site.locator('img').evaluate(async (image: HTMLImageElement) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(image, 0, 0);
+      return {
+        corner: [...context.getImageData(0, 0, 1, 1).data],
+        center: [...context.getImageData(canvas.width / 2, canvas.height / 2, 1, 1).data],
+      };
+    });
+    expect(pixels).toEqual({ corner: [0, 0, 0, 0], center: [34, 102, 221, 255] });
     await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
     await editor
       .getByLabel('网址', { exact: true })
@@ -94,83 +113,12 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
     expect(await artworkSource(vector)).toMatchObject({ vector: true, local: true });
     expect(await savedIcon(newTab, '矢量测试')).toMatchObject({ type: 'image/svg+xml' });
     expect(requests).toContain('/mark.svg');
-    await addSite(newTab, '清晰 Google', 'https://www.google.com');
-    const google = newTab.getByRole('link', { name: '清晰 Google', exact: true });
-    expect(await artworkSource(google.locator('.site-icon-frame'))).toMatchObject({
-      vector: true,
-      local: true,
-    });
-    await google.click({ button: 'right' });
-    await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
-    const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
-    await expect(edit.getByRole('combobox', { name: '存入位置', exact: true })).toHaveText('主页');
-    expect(await artworkSource(edit.locator('.site-icon-frame'))).toMatchObject({
-      vector: true,
-      local: true,
-    });
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
   }
-});
-
-test('公共图标服务在目标站不可达时取回原图，社区彩色素材与保存图标离线显示', async ({
-  newTab,
-  context,
-}) => {
-  const domain = 'icons-public-acceptance.com';
-  const calls: string[] = [];
-  await context.route(`https://${domain}/**`, (route) => route.abort());
-  await context.route('https://favicon.vemetric.com/**', (route) => {
-    calls.push(route.request().url());
-    const metadata = new URL(route.request().url()).searchParams.has('response');
-    return route.fulfill({
-      contentType: metadata ? 'application/json' : 'image/svg+xml',
-      body: metadata
-        ? JSON.stringify({
-            source: 'link-tag',
-            width: 24,
-            height: 24,
-            format: 'svg',
-            sourceUrl: `https://${domain}/mark.svg`,
-          })
-        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#4285f4" d="M2 2h10v20H2z"/><path fill="#ea4335" d="M12 2h10v20H12z"/></svg>',
-    });
-  });
-  await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
-  const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
-  await editor
-    .getByLabel('网址', { exact: true })
-    .fill(`https://${domain}/account?token=private#profile`);
-  await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
-  await expect(editor.locator('.site-edit-preview img')).toBeVisible();
-  await editor.getByLabel('名称', { exact: true }).fill('公共服务原图');
-  await editor.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(editor).not.toBeVisible();
-  expect(calls).toEqual([
-    `https://favicon.vemetric.com/${domain}?response=json`,
-    `https://favicon.vemetric.com/${domain}`,
-  ]);
-  await addSite(newTab, 'Figma', 'https://figma.com');
-  await addSite(newTab, 'Claude', 'https://claude.ai');
-  await addSite(newTab, 'ChatGPT', 'https://chatgpt.com');
-  await addSite(newTab, 'TikTok', 'https://douyin.com');
-  await addSite(newTab, 'YouTube Music', 'https://music.youtube.com');
-  await context.setOffline(true);
-  await newTab.reload();
-  const saved = newTab.getByRole('link', { name: '公共服务原图', exact: true }).locator('img');
-  await expect(saved).toBeVisible();
-  expect(await savedIcon(newTab, '公共服务原图')).toMatchObject({ type: 'image/svg+xml' });
-  for (const name of ['Figma', 'Claude', 'ChatGPT', 'TikTok', 'YouTube Music']) {
-    const icon = newTab.getByRole('link', { name, exact: true }).locator('.site-icon-frame');
-    await expect(icon).toBeVisible();
-    const source = await artworkSource(icon);
-    expect(source).toMatchObject({ vector: true, local: true });
-    expect(Math.min(source.width, source.height)).toBeGreaterThan(0);
-  }
-  expect(calls).toHaveLength(2);
 });
 
 test('私密空间直接读取 PWA 高清图标，不向公共服务发送域名', async ({ newTab, context }) => {

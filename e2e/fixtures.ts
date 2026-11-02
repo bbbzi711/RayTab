@@ -51,11 +51,6 @@ export const test = base.extend<{
         body: '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800"><defs><linearGradient id="wallpaper" x2="1" y2="1"><stop stop-color="#101829"/><stop offset="1" stop-color="#253c60"/></linearGradient></defs><rect width="1280" height="800" fill="url(#wallpaper)"/></svg>',
       }),
     );
-    // Public catalog contents are tested explicitly; other flows must not
-    // depend on changing upstream data or network availability.
-    await context.route('https://api.svgl.app/**', (route) =>
-      route.fulfill({ contentType: 'application/json', body: '[]' }),
-    );
     const cspViolations: string[] = [];
     const pageErrors: string[] = [];
     const watchCsp = (page: Page) => {

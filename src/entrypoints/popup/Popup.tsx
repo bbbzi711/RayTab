@@ -147,9 +147,9 @@ export default function Popup() {
         try {
           const { resolveWebsiteIcon } = await import('@/features/navigation/site-metadata');
           if (!isCurrent()) return;
-          const metadata = await resolveWebsiteIcon(data.url, { allowPublicService: true });
+          const metadata = await resolveWebsiteIcon(data.url);
           if (!isCurrent()) return;
-          if (!metadata.localBrand && !metadata.icon) {
+          if (!metadata.icon) {
             setIconFailure({ url: requestedUrl });
             return;
           }
@@ -158,10 +158,7 @@ export default function Popup() {
           draft = {
             url: data.url,
             icon: resource ? { source: 'auto', resourceId: resource.id } : defaultSiteIcon,
-            background:
-              resource && metadata.background
-                ? { mode: 'color', color: metadata.background }
-                : defaultSiteIconBackground,
+            background: defaultSiteIconBackground,
             resource,
           };
           iconDraft.current = draft;

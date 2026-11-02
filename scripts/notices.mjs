@@ -42,14 +42,6 @@ const sections = [
 sections.push(
   'shadcn/ui components\n\n' + (await readFile('third-party/shadcn-ui-LICENSE.txt', 'utf8')),
 );
-sections.push(
-  'SVGL community asset catalog\n\n' +
-    (await readFile('third-party/svgl-LICENSE.txt', 'utf8')) +
-    '\nLogos and trademarks belong to their respective owners; see the bundled brand-icons/catalog.json for source and brand guidelines.',
-);
-sections.push(
-  'Official application artwork\n\nApplication logos and trademarks belong to their respective publishers. The bundled brand-icons/catalog.json records the verified package name, publisher, app-store metadata page, original image URL and SHA-256. These assets are not relicensed as SVGL artwork.',
-);
 for (const directory of [...packages.keys()].sort()) {
   const info = packages.get(directory);
   const licenses = (await readdir(directory)).filter((name) =>

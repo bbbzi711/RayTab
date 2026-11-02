@@ -2,7 +2,6 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { IconFrame } from '@/components/ui/icon-frame';
 import { useResourceUrl } from '@/hooks/useResourceUrl';
 import type { Site } from '@/storage/model';
-import { getBrandAppearance } from './brandIcons';
 import { cn } from '@/lib/utils';
 import { IconArtwork } from './IconArtwork';
 
@@ -21,35 +20,19 @@ export function SiteIcon({
   interactive?: boolean;
   radius?: number;
 }) {
-  const brand = site.icon.source === 'auto' ? getBrandAppearance(site.url) : null;
   const resourceId = 'resourceId' in site.icon ? site.icon.resourceId : undefined;
-  // Apply the same vector priority to existing automatic icons without rewriting user data.
-  // Explicit crops, uploads and current image previews retain their saved composition.
-  const preferBrand =
-    site.icon.source === 'auto' &&
-    site.icon.fit !== 'original' &&
-    Boolean(brand && !brand.tile) &&
-    !previewUrl;
-  const resourceUrl = useResourceUrl(preferBrand ? undefined : resourceId);
-  const imageUrl =
-    site.icon.source === 'text' || preferBrand
-      ? undefined
-      : (previewUrl ?? (resourceId ? resourceUrl : undefined));
+  const resourceUrl = useResourceUrl(resourceId);
+  const imageUrl = site.icon.source === 'text' ? undefined : (previewUrl ?? resourceUrl);
   const [failedUrl, setFailedUrl] = useState<string>();
   useEffect(() => setFailedUrl(undefined), [imageUrl]);
   const hasImage = Boolean(imageUrl && failedUrl !== imageUrl);
-  const graphic = site.icon.source === 'auto' ? brand?.graphic : undefined;
   const background =
     site.iconBackground.mode === 'color'
       ? site.iconBackground.color
-      : (brand?.background ?? (hasImage ? 'var(--icon-image-surface)' : 'var(--preferences-icon)'));
-  const contrastColor = readableTextColor(background);
-  const foreground =
-    site.iconBackground.mode === 'color'
-      ? contrastColor === '#ffffff'
-        ? contrastColor
-        : (brand?.contrastColor ?? contrastColor)
-      : (brand?.foreground ?? '#ffffff');
+      : hasImage
+        ? 'var(--icon-image-surface)'
+        : 'var(--preferences-icon)';
+  const foreground = readableTextColor(background);
   return (
     <IconFrame
       size={size}
@@ -65,7 +48,6 @@ export function SiteIcon({
       <IconArtwork
         identity={`${imageUrl ?? site.url}/${foreground}/${hasImage}/${site.icon.source}`}
         normalize={site.icon.source === 'auto' && site.icon.fit !== 'original'}
-        tile={!hasImage && brand?.tile}
       >
         {hasImage ? (
           <img
@@ -76,20 +58,18 @@ export function SiteIcon({
             onError={() => setFailedUrl(imageUrl)}
           />
         ) : (
-          ((foreground === '#ffffff' ? (brand?.darkGraphic ?? graphic) : graphic) ?? (
-            <span
-              className="icon-frame__letter"
-              style={
-                site.icon.source === 'text'
-                  ? ({ '--icon-text-length': Array.from(site.icon.text).length } as CSSProperties)
-                  : undefined
-              }
-            >
-              {site.icon.source === 'text'
-                ? site.icon.text
-                : (Array.from(site.title.trim())[0]?.toUpperCase() ?? '')}
-            </span>
-          ))
+          <span
+            className="icon-frame__letter"
+            style={
+              site.icon.source === 'text'
+                ? ({ '--icon-text-length': Array.from(site.icon.text).length } as CSSProperties)
+                : undefined
+            }
+          >
+            {site.icon.source === 'text'
+              ? site.icon.text
+              : (Array.from(site.title.trim())[0]?.toUpperCase() ?? '')}
+          </span>
         )}
       </IconArtwork>
     </IconFrame>

@@ -404,6 +404,10 @@ select:focus-visible {
   width: 100%;
   height: 100%;
 }
+.site-icon-frame:has(.icon-artwork[data-artwork-tile='true']) {
+  /* Full app tiles supply their own surface; a second white surface leaks at rounded edges. */
+  --icon-image-surface: transparent;
+}
 .icon-artwork {
   display: grid;
   width: 100%;
@@ -460,10 +464,6 @@ select:focus-visible {
 .brand-icon-glyph--bing {
   width: auto;
   height: 100%;
-}
-.brand-icon-glyph--cover {
-  object-fit: cover;
-  object-position: left;
 }
 .search-engine-fallback {
   display: grid;

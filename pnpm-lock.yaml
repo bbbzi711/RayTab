@@ -187,6 +187,9 @@ importers:
       cn:
         specifier: ^0.3.0
         version: 0.3.0
+      htmlparser2:
+        specifier: ^10.1.0
+        version: 10.1.0
       i18next:
         specifier: ^26.4.2
         version: 26.4.2(typescript@7.0.2)
