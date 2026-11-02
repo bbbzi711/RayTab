@@ -1,14 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import {
-  chromium,
-  test as base,
-  type BrowserContext,
-  type Page,
-  type Worker,
-} from '@playwright/test';
-
-const extensionPath = fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url));
+import { test as base, type BrowserContext, type Page, type Worker } from '@playwright/test';
+import { launchExtensionContext } from './browser';
 
 export const test = base.extend<{
   context: BrowserContext;
@@ -17,24 +8,7 @@ export const test = base.extend<{
   newTab: Page;
 }>({
   context: async ({ headless, viewport, locale }, use, testInfo) => {
-    const manifest: unknown = JSON.parse(await readFile(`${extensionPath}/manifest.json`, 'utf8'));
-    if (
-      !manifest ||
-      typeof manifest !== 'object' ||
-      !('manifest_version' in manifest) ||
-      manifest.manifest_version !== 3
-    ) {
-      throw new Error('先运行 pnpm run build，端到端测试需要 Chrome MV3 扩展构建。');
-    }
-
-    // An empty profile path makes Playwright create and remove an isolated temporary profile.
-    const context = await chromium.launchPersistentContext('', {
-      channel: 'chromium',
-      headless,
-      viewport,
-      locale,
-      args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
-    });
+    const context = await launchExtensionContext({ headless, viewport, locale });
     // A functional test must explicitly supply its external services. Never depend on
     // real website availability, favicon changes or the developer's network/proxy.
     await context.route(/^https?:\/\//, (route) => {

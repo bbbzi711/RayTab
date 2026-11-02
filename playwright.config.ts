@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
+  globalSetup: './e2e/global-setup.ts',
+  maxFailures: 1,
   retries: 0,
   workers: process.env.CI ? 1 : 2,
   timeout: 30_000,
