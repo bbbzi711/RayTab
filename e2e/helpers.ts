@@ -1,5 +1,5 @@
 import type { Page, Locator } from '@playwright/test';
-import type { RayState } from '../src/storage/model';
+import { z } from 'zod';
 import { expect } from './fixtures';
 
 export function deferred() {
@@ -14,6 +14,16 @@ export async function openSettings(page: Page, category: string) {
   const dialog = page.getByRole('dialog', { name: '设置', exact: true });
   await dialog.getByRole('button', { name: category, exact: true }).click();
   return dialog;
+}
+
+export async function openDesktopMenu(page: Page) {
+  const workspace = page.getByTestId('desktop');
+  const bounds = await workspace.boundingBox();
+  if (!bounds) throw new Error('The desktop must be visible.');
+  await workspace.click({
+    button: 'right',
+    position: { x: bounds.width - 12, y: bounds.height - 12 },
+  });
 }
 
 export async function failNextWrite(page: Page) {
@@ -33,25 +43,6 @@ export async function failNextWrite(page: Page) {
   });
 }
 
-export async function storedState(page: Page) {
-  return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('raytab-v11');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<RayState>((resolve, reject) => {
-        const request = db.transaction('state', 'readonly').objectStore('state').get('current');
-        request.onsuccess = () => resolve(request.result as RayState);
-        request.onerror = () => reject(request.error);
-      });
-    } finally {
-      db.close();
-    }
-  });
-}
-
 export async function settle(page: Page) {
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -62,32 +53,52 @@ export async function noHorizontalOverflow(element: Locator) {
   expect(await element.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
 }
 
-export async function savedIcon(page: Page, title: string) {
-  return page.evaluate(async (title) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('raytab-v11');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const state = await new Promise<RayState>((resolve, reject) => {
-        const request = db.transaction('state').objectStore('state').get('current');
-        request.onsuccess = () => resolve(request.result as RayState);
-        request.onerror = () => reject(request.error);
-      });
-      const site = state.spaces.normal.sites.find((item) => item.title === title);
-      if (!site || !('resourceId' in site.icon) || !site.icon.resourceId)
-        throw new Error(`Expected a saved image for ${title}`);
-      const resourceId = site.icon.resourceId;
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        const request = db.transaction('resources').objectStore('resources').get(resourceId);
-        request.onsuccess = () =>
-          request.result ? resolve(request.result) : reject(new Error('Missing saved icon'));
-        request.onerror = () => reject(request.error);
-      });
-      return { icon: site.icon, type: blob.type, text: await blob.text() };
-    } finally {
-      db.close();
-    }
-  }, title);
+/** Read the supported backup output, without depending on IndexedDB stores or records. */
+export async function exportNormalBackup(page: Page) {
+  const settings = await openSettings(page, '数据与备份');
+  await settings.getByRole('button', { name: '导出备份', exact: true }).click();
+  await settings.getByRole('combobox', { name: '导出范围', exact: true }).click();
+  await page.getByRole('option', { name: '普通空间', exact: true }).click();
+  const downloading = page.waitForEvent('download');
+  await settings.getByRole('button', { name: '导出所选备份', exact: true }).click();
+  const stream = await (await downloading).createReadStream();
+  if (!stream) throw new Error('The backup download must be readable.');
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const backup = parseNormalBackup(Buffer.concat(chunks).toString('utf8'));
+  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+  return backup;
+}
+
+export function parseNormalBackup(text: string) {
+  const document = z
+    .object({
+      format: z.literal('raytab-backup'),
+      spaces: z.object({
+        normal: z.object({
+          data: z.object({
+            sites: z.array(
+              z.object({
+                title: z.string(),
+                url: z.string(),
+                icon: z.object({ source: z.string(), resourceId: z.string().optional() }),
+                iconBackground: z.object({ mode: z.string() }),
+              }),
+            ),
+          }),
+          resources: z.array(z.object({ id: z.string(), type: z.string(), data: z.string() })),
+        }),
+      }),
+    })
+    .parse(JSON.parse(text));
+  return document.spaces.normal;
+}
+
+export async function readSiteImage(page: Page, title: string) {
+  const backup = await exportNormalBackup(page);
+  const site = backup.data.sites.find((item) => item.title === title);
+  const id = site && 'resourceId' in site.icon ? site.icon.resourceId : undefined;
+  const resource = backup.resources.find((item) => item.id === id);
+  if (!resource) throw new Error(`The backup must include the displayed image for ${title}`);
+  return { type: resource.type, text: Buffer.from(resource.data, 'base64').toString('utf8') };
 }

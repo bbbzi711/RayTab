@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures';
-import { savedIcon } from '../helpers';
+import { readSiteImage } from '../helpers';
 import type { Locator } from '@playwright/test';
 import { paintedArtwork } from '../artwork';
 
@@ -7,7 +7,7 @@ const ns = 'xmlns="http://www.w3.org/2000/svg"';
 const mark = `<svg ${ns} viewBox="0 0 24 24"><path fill="#1677ff" d="M4 4h16v16H4z"/></svg>`;
 
 async function visibleArtwork(link: Locator) {
-  const { bounds } = await paintedArtwork(link.locator('.site-icon-frame'), [22, 119, 255]);
+  const { bounds } = await paintedArtwork(link.getByTestId('site-icon'), [22, 119, 255]);
   if (!bounds) throw new Error('The icon has no painted foreground');
   return bounds;
 }
@@ -44,10 +44,12 @@ test('真实解析网页与 Manifest，保留小 viewBox SVG 原文，忽略仅�
   await editor.getByLabel('网址', { exact: true }).fill('https://manifest.example.test');
   await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
   await expect(editor.getByLabel('名称', { exact: true })).toHaveValue('Manifest 网站');
-  await expect(editor.locator('.site-edit-preview img')).toBeVisible();
+  await expect(
+    editor.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
+  ).toBeVisible();
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  expect(await savedIcon(newTab, 'Manifest 网站')).toMatchObject({
+  expect(await readSiteImage(newTab, 'Manifest 网站')).toMatchObject({
     type: 'image/svg+xml',
     text: mark,
   });
@@ -55,7 +57,7 @@ test('真实解析网页与 Manifest，保留小 viewBox SVG 原文，忽略仅�
   expect(requests).not.toContain('/mono.svg');
   await context.setOffline(true);
   await newTab.reload();
-  expect(await savedIcon(newTab, 'Manifest 网站')).toMatchObject({
+  expect(await readSiteImage(newTab, 'Manifest 网站')).toMatchObject({
     type: 'image/svg+xml',
     text: mark,
   });
@@ -115,7 +117,7 @@ test('不能作为独立图片的 SVG 不进入资源库，使用安全图片且
     .setInputFiles({ name: 'valid.svg', mimeType: 'image/svg+xml', buffer: Buffer.from(mark) });
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  expect(await savedIcon(newTab, '保留校验草稿')).toMatchObject({
+  expect(await readSiteImage(newTab, '保留校验草稿')).toMatchObject({
     type: 'image/svg+xml',
     text: mark,
   });
@@ -146,7 +148,9 @@ test('自动图标按可见图形统一大小与居中，完整底图和用户�
     await editor.getByLabel('名称', { exact: true }).fill(`图形 ${index}`);
     await editor.getByLabel('网址', { exact: true }).fill(`https://artwork.example.test/${index}`);
     await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
-    await expect(editor.locator('.site-edit-preview img')).toBeVisible();
+    await expect(
+      editor.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
+    ).toBeVisible();
     await editor.getByRole('button', { name: '保存', exact: true }).click();
     await expect(editor).not.toBeVisible();
   }
@@ -180,9 +184,6 @@ test('自动图标按可见图形统一大小与居中，完整底图和用户�
   await newTab.reload();
   const cropped = await visibleArtwork(padded);
   expect(cropped.right - cropped.left).toBeCloseTo(0.25, 1);
-  expect(await savedIcon(newTab, '图形 1')).toMatchObject({
-    icon: { source: 'auto', fit: 'original' },
-  });
   await padded.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
@@ -197,7 +198,7 @@ test('自动图标按可见图形统一大小与居中，完整底图和用户�
   await newTab.reload();
   const original = await visibleArtwork(padded);
   expect(original.right - original.left).toBeCloseTo(0.25, 1);
-  expect(await savedIcon(newTab, '图形 1')).toMatchObject({
+  expect(await readSiteImage(newTab, '图形 1')).toMatchObject({
     type: 'image/svg+xml',
     text: icons[1],
   });

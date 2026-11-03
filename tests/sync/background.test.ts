@@ -8,27 +8,16 @@ vi.mock('../../src/sync/core/engine', async (importOriginal) => ({
 
 describe('background synchronization', () => {
   const installed = vi.fn<(listener: () => void) => void>();
+  const startup = vi.fn<(listener: () => void) => void>();
   const alarm = vi.fn<(listener: (alarm: { name: string }) => void) => void>();
   const createAlarm = vi.fn().mockResolvedValue(undefined);
-  let local: Record<string, unknown>;
-  let remove: ReturnType<typeof vi.fn<(key: string) => Promise<void>>>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.mocked(synchronizeAutomatically).mockReset().mockResolvedValue(undefined);
-    local = {
-      'raytab-sync-lease': { owner: 'old-page', expiresAt: 1 },
-      'raytab-sync-config': { automatic: true },
-      'raytab-sync-baseline': { document: 'saved-document', version: 'saved-etag' },
-      'raytab-sync-status': { conflicts: ['saved-conflict'] },
-    };
-    remove = vi.fn(async (key: string) => {
-      delete local[key];
-    });
     vi.stubGlobal('defineBackground', (main: () => void) => ({ main }));
     vi.stubGlobal('browser', {
-      storage: { local: { remove } },
-      runtime: { onInstalled: { addListener: installed }, onStartup: { addListener: vi.fn() } },
+      runtime: { onInstalled: { addListener: installed }, onStartup: { addListener: startup } },
       commands: { onCommand: { addListener: vi.fn() } },
       alarms: { create: createAlarm, onAlarm: { addListener: alarm } },
     });
@@ -43,16 +32,12 @@ describe('background synchronization', () => {
     vi.unstubAllGlobals();
   });
 
-  it('removes only the obsolete lease when installed or upgraded', async () => {
-    installed.mock.calls[0][0]();
-    await Promise.resolve();
-    expect(remove).toHaveBeenCalledExactlyOnceWith('raytab-sync-lease');
-    expect(local).toEqual({
-      'raytab-sync-config': { automatic: true },
-      'raytab-sync-baseline': { document: 'saved-document', version: 'saved-etag' },
-      'raytab-sync-status': { conflicts: ['saved-conflict'] },
-    });
-    expect(createAlarm).toHaveBeenCalledWith('raytab-sync', { periodInMinutes: 15 });
+  it('schedules synchronization on installation and startup', () => {
+    for (const listener of [installed, startup]) {
+      createAlarm.mockClear();
+      listener.mock.calls[0][0]();
+      expect(createAlarm).toHaveBeenCalledWith('raytab-sync', { periodInMinutes: 15 });
+    }
   });
 
   it('uses the locked automatic sync entry only for the synchronization alarm', () => {
@@ -67,7 +52,6 @@ describe('background synchronization', () => {
     alarm.mock.calls[0][0]({ name: 'raytab-sync' });
     await Promise.resolve();
     expect(console.error).not.toHaveBeenCalled();
-    expect(local['raytab-sync-status']).toEqual({ conflicts: ['saved-conflict'] });
   });
 
   it('reports automatic sync failures without logging sensitive error details', async () => {
@@ -76,17 +60,5 @@ describe('background synchronization', () => {
     await Promise.resolve();
     expect(console.error).toHaveBeenCalled();
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain('sensitive-details');
-  });
-
-  it('reports upgrade cleanup failure while retaining current sync data', async () => {
-    remove.mockRejectedValueOnce(new Error('unavailable'));
-    installed.mock.calls[0][0]();
-    await Promise.resolve();
-    expect(console.error).toHaveBeenCalled();
-    expect(local['raytab-sync-baseline']).toEqual({
-      document: 'saved-document',
-      version: 'saved-etag',
-    });
-    expect(local['raytab-sync-status']).toEqual({ conflicts: ['saved-conflict'] });
   });
 });

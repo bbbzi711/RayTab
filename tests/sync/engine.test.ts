@@ -258,17 +258,23 @@ describe('sync engine', () => {
   });
 
   it('creates a missing remote file and records a successful baseline', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(new Response('', { status: 404 }))
-      .mockResolvedValueOnce(new Response('', { status: 200, headers: { etag: 'v1' } }));
+    let written: string | undefined;
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit = {}) => {
+      if (init.method === 'PUT') {
+        expect(new Headers(init.headers).get('If-None-Match')).toBe('*');
+        written = String(init.body);
+        return new Response('', { status: 200, headers: { etag: 'v1' } });
+      }
+      return new Response(written ?? '', { status: written ? 200 : 404 });
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     await synchronize('auto');
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'PUT' });
-    expect(fetchMock.mock.calls[1][1].headers['If-None-Match']).toBe('*');
+    expect(JSON.parse(written!)).toMatchObject({
+      format: 'raytab-backup',
+      spaces: { normal: expect.any(Object) },
+    });
     expect(local['raytab-sync-baseline']).toMatchObject({ version: 'v1' });
     await expect(loadSyncStatus()).resolves.toMatchObject({ conflicts: [], retryCount: 0 });
   });
@@ -628,7 +634,7 @@ describe('sync engine', () => {
         values: {},
       });
       expect(JSON.stringify(local['raytab-sync-status'])).not.toContain(connection.token);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
       expect(local['raytab-sync-baseline']).toBeUndefined();
       expect(await repository.read()).toEqual(before);
     },

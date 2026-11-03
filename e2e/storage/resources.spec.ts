@@ -1,4 +1,6 @@
-import { storedState, noHorizontalOverflow } from '../helpers';
+import { storedState } from './inspect';
+import { RAY_DATABASE_NAME } from '../../src/storage/connection';
+import { noHorizontalOverflow } from '../helpers';
 import type { Page } from '@playwright/test';
 import type { BackupDocument } from '../../src/features/backup/backup';
 import type { RayState } from '../../src/storage/model';
@@ -26,9 +28,9 @@ async function evidence(page: Page) {
 
 async function prepareResources(page: Page) {
   await page.evaluate(
-    async ({ image, wallpaper }) => {
+    async ({ image, wallpaper, databaseName }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('raytab-v11');
+        const request = indexedDB.open(databaseName);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
@@ -87,13 +89,13 @@ async function prepareResources(page: Page) {
         db.close();
       }
     },
-    { image: icon('#cc3344'), wallpaper: icon('#336699') },
+    { image: icon('#cc3344'), wallpaper: icon('#336699'), databaseName: RAY_DATABASE_NAME },
   );
   await page.reload();
   await expect(
     page.getByRole('link', { name: '共享图标一', exact: true }).locator('img'),
   ).toBeVisible();
-  await expect(page.locator('.page-background')).toHaveCSS('background-color', 'rgb(51, 102, 153)');
+  await expect(page.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(51, 102, 153)');
   await page.addInitScript(() => {
     const evidence: ResourceEvidence = { reads: {}, created: [], revoked: [] };
     Object.assign(window, { resourceEvidence: evidence });
@@ -122,7 +124,7 @@ async function prepareResources(page: Page) {
   await expect(
     page.getByRole('link', { name: '共享图标二', exact: true }).locator('img'),
   ).toBeVisible();
-  await expect(page.locator('.page-background')).toHaveCSS('background-color', 'rgb(51, 102, 153)');
+  await expect(page.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(51, 102, 153)');
 }
 
 for (const height of [480, 360]) {
@@ -193,7 +195,7 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   const original = await first.getAttribute('src');
   expect(await second.getAttribute('src')).toBe(original);
   const wallpaper = await newTab
-    .locator('.page-background-image')
+    .getByTestId('wallpaper-image')
     .evaluate((element: HTMLElement) => element.style.backgroundImage);
   const baseline = await evidence(newTab);
   expect(baseline.reads['shared-icon']).toBe(1);
@@ -207,7 +209,7 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   expect(await second.getAttribute('src')).toBe(original);
   expect(
     await newTab
-      .locator('.page-background-image')
+      .getByTestId('wallpaper-image')
       .evaluate((element: HTMLElement) => element.style.backgroundImage),
   ).toBe(wallpaper);
   expect(await evidence(newTab)).toEqual(baseline);
@@ -259,19 +261,13 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   expect(
     await first.evaluate(async (element: HTMLImageElement) => (await fetch(element.src)).text()),
   ).toBe(icon('#22aa66'));
-  await expect(newTab.locator('.page-background')).toHaveCSS(
-    'background-color',
-    'rgb(68, 136, 85)',
-  );
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(68, 136, 85)');
   await newTab.reload();
   await expect(first).toBeVisible();
   expect(
     await first.evaluate(async (element: HTMLImageElement) => (await fetch(element.src)).text()),
   ).toBe(icon('#22aa66'));
-  await expect(newTab.locator('.page-background')).toHaveCSS(
-    'background-color',
-    'rgb(68, 136, 85)',
-  );
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(68, 136, 85)');
 });
 
 test('私密空间锁定后释放共享缓存中的图片 URL', async ({ newTab }) => {

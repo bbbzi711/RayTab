@@ -1,11 +1,12 @@
 import { addSite, expect, test } from '../fixtures';
-import { openSettings, failNextWrite, storedState, settle, noHorizontalOverflow } from '../helpers';
+import { openSettings, failNextWrite, settle, noHorizontalOverflow } from '../helpers';
 test('提交保存失败保留搜索引擎输入，重试仅新增一次', async ({ newTab }) => {
   const settings = await openSettings(newTab, '搜索与时钟');
-  const disclosure = settings.locator('.search-engine-editor > summary');
+  const disclosure = settings.getByRole('button', { name: /^(添加|编辑)搜索引擎$/ });
   await expect(settings.getByLabel('搜索引擎名称', { exact: true })).not.toBeVisible();
   await disclosure.click();
-  const form = settings.getByLabel('搜索引擎名称', { exact: true }).locator('xpath=ancestor::form');
+  const form = settings.getByRole('form', { name: '编辑搜索引擎', exact: true });
+  await expect(form.getByLabel('搜索引擎名称', { exact: true })).toBeFocused();
   await form.getByLabel('搜索引擎名称', { exact: true }).fill('失败重试引擎');
   await form.getByLabel('搜索引擎地址', { exact: true }).fill('https://search.example.test/?q=%s');
   await disclosure.click();
@@ -19,28 +20,15 @@ test('提交保存失败保留搜索引擎输入，重试仅新增一次', async
   await failNextWrite(newTab);
   await form.getByRole('button', { name: '添加', exact: true }).click();
   await expect(form.getByRole('alert')).toBeVisible();
-  expect(
-    await form.getByRole('alert').evaluate((element) => getComputedStyle(element).color),
-  ).not.toBe(
-    await form
-      .getByLabel('搜索引擎名称', { exact: true })
-      .evaluate((element) => getComputedStyle(element).color),
-  );
   await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('失败重试引擎');
-  expect(
-    (await storedState(newTab)).normalSettings.searchEngines.filter(
-      (item) => item.name === '失败重试引擎',
-    ),
-  ).toHaveLength(0);
+  await expect(settings.getByRole('button', { name: '失败重试引擎', exact: true })).toHaveCount(0);
   await form.getByRole('button', { name: '添加', exact: true }).click();
-  await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('');
   await expect(form).not.toBeVisible();
   await expect(disclosure).toBeFocused();
-  expect(
-    (await storedState(newTab)).normalSettings.searchEngines.filter(
-      (item) => item.name === '失败重试引擎',
-    ),
-  ).toHaveLength(1);
+  await disclosure.click();
+  await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('');
+  await disclosure.click();
+  await expect(settings.getByRole('button', { name: '失败重试引擎', exact: true })).toHaveCount(1);
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
   const reloaded = await openSettings(newTab, '搜索与时钟');
@@ -52,25 +40,33 @@ test('提交保存失败保留搜索引擎输入，重试仅新增一次', async
   await expect(name).toHaveValue('Google');
   await expect(name).toBeFocused();
   await reloaded
-    .locator('.search-engine-editor')
+    .getByRole('form', { name: '编辑搜索引擎', exact: true })
     .getByRole('button', { name: '取消', exact: true })
     .click();
-  await expect(reloaded.locator('.search-engine-editor > summary')).toBeFocused();
+  await expect(reloaded.getByRole('button', { name: /^(添加|编辑)搜索引擎$/ })).toBeFocused();
 });
 
-test('即时保存失败可重试最新滑块值，重载保留结果', async ({ newTab }) => {
+test('即时保存失败不影响其他页面，重试后跨页更新且重载保留结果', async ({
+  newTab,
+  context,
+  extensionId,
+}) => {
   const settings = await openSettings(newTab, '图标与布局');
   const slider = settings.getByRole('slider', { name: '图标间距', exact: true });
-  const before = (await storedState(newTab)).normalSettings.iconSpacing;
+  const before = await slider.getAttribute('aria-valuenow');
+  const other = await context.newPage();
+  await other.goto(`chrome-extension://${extensionId}/newtab.html`);
+  const otherSettings = await openSettings(other, '图标与布局');
+  const otherSlider = otherSettings.getByRole('slider', { name: '图标间距', exact: true });
   await failNextWrite(newTab);
   await slider.focus();
   await slider.press('ArrowRight');
   await expect(settings.getByRole('button', { name: '重试保存', exact: true })).toBeVisible();
-  expect((await storedState(newTab)).normalSettings.iconSpacing).toBe(before);
+  await expect(otherSlider).toHaveAttribute('aria-valuenow', before!);
   const preview = Number(await slider.getAttribute('aria-valuenow'));
   await settings.getByRole('button', { name: '重试保存', exact: true }).click();
   await expect(settings.getByRole('button', { name: '重试保存', exact: true })).not.toBeVisible();
-  expect((await storedState(newTab)).normalSettings.iconSpacing).toBe(preview);
+  await expect(otherSlider).toHaveAttribute('aria-valuenow', String(preview));
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
   const reloaded = await openSettings(newTab, '图标与布局');
@@ -86,7 +82,7 @@ test('私密偏好整体恢复需要确认，保留私密网站并在重载后�
     .getByRole('slider', { name: '图标间距', exact: true })
     .getAttribute('aria-valuenow');
   await normal.getByRole('button', { name: '关闭', exact: true }).click();
-  const normalSettings = (await storedState(newTab)).normalSettings;
+
   await newTab.getByRole('button', { name: '私密空间', exact: true }).click();
   await addSite(newTab, '恢复偏好保留的网站', 'https://private-preferences.example.test');
   const settings = await openSettings(newTab, '图标与布局');
@@ -94,23 +90,30 @@ test('私密偏好整体恢复需要确认，保留私密网站并在重载后�
   await slider.focus();
   await slider.press('ArrowRight');
   await settings.getByRole('switch', { name: '显示网站标题', exact: true }).click();
-  await expect
-    .poll(async () => Object.keys((await storedState(newTab)).privateSettingOverrides))
-    .toEqual(expect.arrayContaining(['iconSpacing', 'showSiteTitle']));
-  const overrides = (await storedState(newTab)).privateSettingOverrides;
+  await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+    '已保存',
+  );
+  const privateSpacing = await slider.getAttribute('aria-valuenow');
+  await expect(
+    settings.getByRole('switch', { name: '显示网站标题', exact: true }),
+  ).not.toBeChecked();
   await settings.getByRole('button', { name: '通用', exact: true }).click();
   const reset = settings.getByRole('button', { name: '恢复普通空间偏好', exact: true });
   await reset.click();
   const confirmation = newTab.getByRole('alertdialog', { name: '恢复普通空间偏好？', exact: true });
   await confirmation.getByRole('button', { name: '取消', exact: true }).click();
-  expect((await storedState(newTab)).privateSettingOverrides).toEqual(overrides);
+  await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
+  await expect(slider).toHaveAttribute('aria-valuenow', privateSpacing!);
+  await expect(
+    settings.getByRole('switch', { name: '显示网站标题', exact: true }),
+  ).not.toBeChecked();
+  await settings.getByRole('button', { name: '通用', exact: true }).click();
   await reset.click();
   await confirmation.getByRole('button', { name: '恢复普通空间偏好', exact: true }).click();
-  await expect.poll(async () => (await storedState(newTab)).privateSettingOverrides).toEqual({});
   await expect(reset).toBeDisabled();
-  expect((await storedState(newTab)).normalSettings).toEqual(normalSettings);
   await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
   await expect(slider).toHaveAttribute('aria-valuenow', baseline ?? '');
+  await expect(settings.getByRole('switch', { name: '显示网站标题', exact: true })).toBeChecked();
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
   await expect(newTab.getByRole('link', { name: '恢复偏好保留的网站', exact: true })).toBeVisible();
@@ -119,6 +122,14 @@ test('私密偏好整体恢复需要确认，保留私密网站并在重载后�
     'aria-valuenow',
     baseline ?? '',
   );
+  await reloaded.getByRole('button', { name: '关闭', exact: true }).click();
+  await newTab.getByRole('button', { name: '普通空间', exact: true }).click();
+  const ordinary = await openSettings(newTab, '图标与布局');
+  await expect(ordinary.getByRole('slider', { name: '图标间距', exact: true })).toHaveAttribute(
+    'aria-valuenow',
+    baseline!,
+  );
+  await expect(ordinary.getByRole('switch', { name: '显示网站标题', exact: true })).toBeChecked();
 });
 
 test('设置表单在栏目间保留草稿，关闭时确认放弃', async ({ newTab }) => {

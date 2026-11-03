@@ -313,6 +313,7 @@ export default function SettingsPanel({
                 <div
                   className="settings-autosave"
                   role="status"
+                  aria-label={t('settings.autoSave')}
                   aria-live="polite"
                   title={t('settings.autoSaveHelp')}
                 >

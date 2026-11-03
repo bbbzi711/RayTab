@@ -10,6 +10,7 @@ export function IconFrame({
   interactive = false,
   className,
   style,
+  'data-testid': testId,
 }: {
   children: ReactNode;
   size: IconFrameSize;
@@ -17,9 +18,11 @@ export function IconFrame({
   interactive?: boolean;
   className?: string;
   style?: CSSProperties;
+  'data-testid'?: string;
 }) {
   return (
     <span
+      data-testid={testId}
       className={cn(
         'icon-frame',
         `icon-frame--${size}`,

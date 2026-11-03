@@ -477,8 +477,8 @@ describe('atomic icon data and its conversion boundary', () => {
     const release = new Promise<void>((resolve) => {
       resume = resolve;
     });
-    const original = cryptoModule.encryptJson;
-    vi.spyOn(cryptoModule, 'encryptJson').mockImplementationOnce(async (...args) => {
+    const original = crypto.subtle.encrypt.bind(crypto.subtle);
+    vi.spyOn(crypto.subtle, 'encrypt').mockImplementationOnce(async (...args) => {
       started();
       await release;
       return original(...args);

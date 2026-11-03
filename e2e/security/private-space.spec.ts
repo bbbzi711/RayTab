@@ -22,7 +22,7 @@ test('私密空间重载立即锁定并清除编辑草稿与普通缓存中的�
   await unlock.getByRole('button', { name: '解锁', exact: true }).click();
   await expect(unlock).not.toBeVisible();
   await addSite(newTab, '私密验收网站', 'https://private.e2e.example.test');
-  const search = newTab.getByRole('search').locator('input');
+  const search = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
   await search.fill('私密搜索未提交内容');
   await newTab.getByRole('button', { name: '普通空间', exact: true }).click();
   await expect(search).toHaveValue('');

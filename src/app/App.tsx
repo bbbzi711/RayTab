@@ -381,6 +381,7 @@ export default function App() {
             {/* 主工作区 */}
             <div
               data-sidebar-visible={isSidebarVisible || undefined}
+              data-testid="desktop"
               onClick={(event) => {
                 if (isSidebarPinnedOpen && event.currentTarget.contains(event.target as Node))
                   setIsSidebarPinnedOpen(false);
@@ -421,6 +422,7 @@ export default function App() {
 
                 {/* 导航卡片区域 */}
                 <div
+                  data-testid="site-navigation"
                   className={cn(
                     'desktop-navigation relative z-10 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
                     !navigationVisible

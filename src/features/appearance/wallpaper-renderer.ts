@@ -20,9 +20,11 @@ function layers() {
   if (background) return background;
   background = document.createElement('div');
   background.className = 'page-background';
+  background.dataset.testid = 'wallpaper';
   background.setAttribute('aria-hidden', 'true');
   imageLayer = document.createElement('div');
   imageLayer.className = 'page-background-image';
+  imageLayer.dataset.testid = 'wallpaper-image';
   overlayLayer = document.createElement('div');
   overlayLayer.className = 'page-background-overlay';
   background.append(imageLayer, overlayLayer);

@@ -442,6 +442,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       <div className="sync-connection-editor" hidden={!editing}>
         <h2>{t('settings.sections.connection')}</h2>
         <form
+          aria-label={t('settings.sections.connection')}
           className="settings-form"
           noValidate
           onSubmit={(event) => {
@@ -606,7 +607,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       </div>
       {connected && (
         <details className="settings-advanced">
-          <summary>{t('settings.advancedSync')}</summary>
+          <summary role="button">{t('settings.advancedSync')}</summary>
           <div className="settings-form-actions">
             <Button
               type="button"

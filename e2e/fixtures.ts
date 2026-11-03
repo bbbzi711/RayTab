@@ -9,13 +9,15 @@ export const test = base.extend<{
 }>({
   context: async ({ headless, viewport, locale }, use, testInfo) => {
     const context = await launchExtensionContext({ headless, viewport, locale });
+    const unexpectedRequests: string[] = [];
     // A functional test must explicitly supply its external services. Never depend on
     // real website availability, favicon changes or the developer's network/proxy.
     await context.route(/^https?:\/\//, (route) => {
       const host = new URL(route.request().url()).hostname;
-      return host === '127.0.0.1' || host === '[::1]'
-        ? route.continue()
-        : route.abort('blockedbyclient');
+      if (host === '127.0.0.1' || host === '[::1]') return route.continue();
+      const url = new URL(route.request().url());
+      unexpectedRequests.push(`${route.request().method()} ${url.origin}${url.pathname}`);
+      return route.abort('blockedbyclient');
     });
     // Keep the default remote wallpaper deterministic and avoid an external
     // service dependency in extension acceptance tests.
@@ -27,26 +29,61 @@ export const test = base.extend<{
     );
     const cspViolations: string[] = [];
     const pageErrors: string[] = [];
+    await context.exposeBinding('__reportExtensionCsp', (_source, violation: string) => {
+      cspViolations.push(violation);
+    });
+    await context.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) => {
+        if (location.protocol !== 'chrome-extension:') return;
+        const report = (
+          globalThis as typeof globalThis & {
+            __reportExtensionCsp: (violation: string) => Promise<void>;
+          }
+        ).__reportExtensionCsp;
+        void report(`${event.violatedDirective}: ${event.blockedURI}`);
+      });
+    });
+    const audits: Promise<void>[] = [];
     const watchCsp = (page: Page) => {
       page.on('pageerror', (error) => pageErrors.push(error.message));
-      page.on('console', (message) => {
-        if (message.type() === 'error' && /Content Security Policy/i.test(message.text()))
-          cspViolations.push(message.text());
-      });
+      audits.push(
+        (async () => {
+          const protocol = await context.newCDPSession(page);
+          protocol.on('Audits.issueAdded', ({ issue }) => {
+            const csp = issue.details.contentSecurityPolicyIssueDetails;
+            if (csp)
+              cspViolations.push(
+                `${csp.violatedDirective}: ${csp.contentSecurityPolicyViolationType}`,
+              );
+          });
+          await protocol.send('Audits.enable');
+        })().catch((error: unknown) => {
+          if (!page.isClosed()) throw error;
+        }),
+      );
     };
+    context.on('console', (message) => {
+      if (/Content Security Policy/i.test(message.text())) cspViolations.push(message.text());
+      else if (message.type() === 'error' && message.worker()) pageErrors.push(message.text());
+    });
     context.pages().forEach(watchCsp);
     context.on('page', watchCsp);
     await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
     try {
       await use(context);
+      await Promise.all(audits);
       base.expect(cspViolations, 'The production extension must satisfy its CSP.').toEqual([]);
       base.expect(pageErrors, 'User flows must not throw uncaught page errors.').toEqual([]);
+      base
+        .expect(unexpectedRequests, 'External services must be declared by the scenario.')
+        .toEqual([]);
     } finally {
       try {
         if (
           testInfo.status !== testInfo.expectedStatus ||
           cspViolations.length > 0 ||
-          pageErrors.length > 0
+          pageErrors.length > 0 ||
+          unexpectedRequests.length > 0
         ) {
           for (const [index, page] of context.pages().entries()) {
             if (page.isClosed() || !page.url().startsWith('chrome-extension://')) continue;
@@ -79,7 +116,7 @@ export const test = base.extend<{
   newTab: async ({ page, extensionId }, use) => {
     await page.goto(`chrome-extension://${extensionId}/newtab.html`);
     await page.getByRole('button', { name: '进入首页', exact: true }).click();
-    await base.expect(page.locator('.site-grid')).toBeVisible();
+    await base.expect(page.getByRole('button', { name: '添加网站', exact: true })).toBeVisible();
     await base.expect(page.getByRole('button', { name: '设置', exact: true })).toBeVisible();
     await use(page);
   },
@@ -88,6 +125,8 @@ export const test = base.extend<{
 export const expect = test.expect;
 
 export async function addSite(page: Page, title: string, url: string) {
+  const origin = new URL(url.includes('://') ? url : `https://${url}`).origin;
+  await page.route(`${origin}/**`, (route) => route.abort());
   await page.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = page.getByRole('dialog', { name: '添加网站', exact: true });
   await editor.getByLabel('名称', { exact: true }).fill(title);

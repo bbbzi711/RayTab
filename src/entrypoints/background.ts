@@ -4,9 +4,6 @@ export default defineBackground(() => {
   const ensureSyncAlarm = () => void browser.alarms.create('raytab-sync', { periodInMinutes: 15 });
   browser.runtime.onInstalled.addListener(() => {
     console.info('RayTab is ready.');
-    void browser.storage.local.remove('raytab-sync-lease').catch(() => {
-      console.error('RayTab could not remove the obsolete sync lease.');
-    });
     ensureSyncAlarm();
   });
   browser.runtime.onStartup.addListener(ensureSyncAlarm);

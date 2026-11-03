@@ -1,6 +1,6 @@
-import type { RayState } from '../../src/storage/model';
+import { seedLargeNavigation } from '../storage/inspect';
 import { addSite, expect, test } from '../fixtures';
-import { settle, noHorizontalOverflow } from '../helpers';
+import { settle, noHorizontalOverflow, openDesktopMenu } from '../helpers';
 test('键盘和右键均可编辑网站，取消保留原值，保存与重载保留修改', async ({ newTab }) => {
   await addSite(newTab, '菜单网站', 'https://menu.example.test/path?q=1#fragment');
   const site = newTab.getByRole('link', { name: '菜单网站', exact: true });
@@ -34,15 +34,15 @@ test('键盘和右键均可编辑网站，取消保留原值，保存与重载�
 });
 
 test('简洁模式桌面空白可打开设置，搜索输入保留原生右键行为', async ({ newTab }) => {
-  await newTab.mouse.click(1150, 680, { button: 'right' });
+  await openDesktopMenu(newTab);
   await newTab.getByRole('menuitem', { name: '进入简洁模式', exact: true }).click();
-  await newTab.mouse.click(1150, 680, { button: 'right' });
+  await openDesktopMenu(newTab);
   await expect(newTab.getByRole('menuitem', { name: '壁纸与主题', exact: true })).toBeVisible();
   await newTab.getByRole('menuitem', { name: '壁纸与主题', exact: true }).click();
   const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
   await expect(settings.getByRole('combobox', { name: '主题', exact: true })).toBeVisible();
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
-  const input = newTab.getByRole('search').locator('input');
+  const input = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
   const prevented = await input.evaluate((element) => {
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     element.dispatchEvent(event);
@@ -62,7 +62,7 @@ test('小窗口删除超长名称时确认文字完整换行，取消后保留�
   await settle(newTab);
   await expect(confirmation).toContainText(name);
   await noHorizontalOverflow(confirmation);
-  await noHorizontalOverflow(confirmation.locator('[data-slot="dialog-description"]'));
+  await noHorizontalOverflow(confirmation.getByText(name));
 
   await confirmation.getByRole('button', { name: '取消', exact: true }).click();
   await expect(site).toBeVisible();
@@ -98,11 +98,10 @@ test('长分组名称的存入位置列表在窄屏内完整换行且可用键�
 });
 
 test('Esc 只关闭最上层设置和菜单，保留底层整理选择', async ({ newTab }) => {
-  await newTab
-    .locator('.desktop-workspace')
-    .click({ button: 'right', position: { x: 1100, y: 750 } });
+  await addSite(newTab, '整理选择网站', 'https://selection.example.test');
+  await openDesktopMenu(newTab);
   await newTab.getByRole('menuitem', { name: '整理', exact: true }).click();
-  const selected = newTab.locator('.site-card-main').first();
+  const selected = newTab.getByRole('button', { name: '整理选择网站', exact: true });
   await selected.click();
   await expect(selected).toHaveAttribute('aria-pressed', 'true');
   await newTab.getByRole('button', { name: '设置', exact: true }).click();
@@ -118,85 +117,84 @@ test('Esc 只关闭最上层设置和菜单，保留底层整理选择', async (
   await expect(menu).not.toBeVisible();
   await expect(selected).toHaveAttribute('aria-pressed', 'true');
   await newTab.getByRole('button', { name: '完成', exact: true }).focus();
-  await newTab.mouse.move(1100, 750);
   await settle(newTab);
   await newTab.keyboard.press('Escape');
   await expect(newTab.getByRole('button', { name: '完成', exact: true })).not.toBeVisible();
 });
 
-test('千个网站与百个文件夹下搜索、打开文件夹和设置仍可操作', async ({ newTab }) => {
-  await newTab.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('raytab-v11');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      // This isolated database contains the state created by the extension fixture.
-      // Reload below also exercises the application's persisted-state validation.
-      const state = await new Promise<RayState>((resolve, reject) => {
-        const request = db.transaction('state').objectStore('state').get('current');
-        request.onsuccess = () => resolve(request.result as RayState);
-        request.onerror = () => reject(request.error);
-      });
-      const groupId = state.spaces.normal.groups[0].id;
-      const template = state.spaces.normal.sites[0];
-      state.spaces.normal.folders = Array.from({ length: 100 }, (_, index) => ({
-        id: `stress-folder-${index}`,
-        groupId,
-        name: `批量文件夹 ${index}`,
-        order: index,
-        createdAt: 0,
-        updatedAt: 0,
-        changeId: `stress-folder-change-${index}`,
-      }));
-      state.spaces.normal.sites = Array.from({ length: 1000 }, (_, index) => ({
-        ...template,
-        id: `stress-site-${index}`,
-        changeId: `stress-site-change-${index}`,
-        folderId: index < 500 ? null : `stress-folder-${index % 100}`,
-        title: `批量网站 ${index}`,
-        url: `https://example.test/stress/${index}`,
-        icon: { source: 'text', text: 'S' },
-        order: index,
-      }));
-      await new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction('state', 'readwrite');
-        transaction.objectStore('state').put(state, 'current');
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error);
-        transaction.onabort = () => reject(transaction.error);
-      });
-    } finally {
-      db.close();
-    }
+for (const viewport of [
+  { width: 1280, height: 800 },
+  { width: 320, height: 360 },
+]) {
+  test(`大量网站下独立滚动、末尾编辑、搜索和设置均可用（${viewport.width}px）`, async ({
+    newTab,
+  }) => {
+    await newTab.setViewportSize(viewport);
+    await seedLargeNavigation(newTab);
+    await newTab.reload();
+    await expect(newTab.getByRole('link', { name: '批量网站 0', exact: true })).toBeVisible();
+    const query = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
+    await query.fill('大量数据下的搜索草稿');
+    const clock = newTab.getByRole('region', { name: '时钟', exact: true });
+    const searchBefore = (await query.boundingBox())!;
+    const clockBefore = (await clock.boundingBox())!;
+    const navigation = newTab.getByTestId('site-navigation');
+    await navigation.hover();
+    await newTab.mouse.wheel(0, 100_000);
+    const last = newTab.getByRole('link', { name: '批量网站 499', exact: true });
+    // The add-site tile follows the last website. Center the website within the
+    // scroll region instead of requiring it to align with the absolute bottom.
+    const lastBounds = (await last.boundingBox())!;
+    const navigationBounds = (await navigation.boundingBox())!;
+    await newTab.mouse.wheel(
+      0,
+      lastBounds.y + lastBounds.height / 2 - navigationBounds.y - navigationBounds.height / 2,
+    );
+    await expect(last).toBeInViewport({ ratio: 1 });
+    expect(Math.abs((await query.boundingBox())!.y - searchBefore.y)).toBeLessThan(1);
+    expect(Math.abs((await clock.boundingBox())!.y - clockBefore.y)).toBeLessThan(1);
+    expect(await newTab.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
+    await expect(query).toBeInViewport({ ratio: 1 });
+    await expect(query).toHaveValue('大量数据下的搜索草稿');
+    await last.click({ button: 'right' });
+    await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
+    const editor = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+    await editor.getByLabel('名称', { exact: true }).fill('末尾网站已编辑');
+    await editor.getByRole('button', { name: '保存', exact: true }).click();
+    await expect(editor).not.toBeVisible();
+    await navigation.hover();
+    await newTab.mouse.wheel(0, -100_000);
+    await newTab.getByRole('button', { name: '批量文件夹 0', exact: true }).click();
+    const folder = newTab.getByRole('dialog', { name: '批量文件夹 0', exact: true });
+    await expect(folder.getByRole('link', { name: '批量网站 500', exact: true })).toBeVisible();
+    await expect(folder.getByRole('link', { name: '批量网站 900', exact: true })).toHaveAttribute(
+      'href',
+      'https://example.test/stress/900',
+    );
+    await folder.getByRole('button', { name: '关闭', exact: true }).click();
+    await newTab.getByRole('button', { name: '设置', exact: true }).click();
+    const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
+    await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
+    await settings.getByRole('switch', { name: '显示网站标题', exact: true }).click();
+    await expect(
+      settings.getByRole('switch', { name: '显示网站标题', exact: true }),
+    ).not.toBeChecked();
+    await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+      '已保存',
+    );
+    await settings.getByRole('button', { name: '关闭', exact: true }).click();
+    await expect(settings).not.toBeVisible();
+    await expect(query).toHaveValue('大量数据下的搜索草稿');
+    await newTab.reload();
+    await expect(newTab.getByRole('link', { name: '末尾网站已编辑', exact: true })).toHaveAttribute(
+      'href',
+      'https://example.test/stress/499',
+    );
+    await newTab.getByRole('button', { name: '设置', exact: true }).click();
+    await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
+    await expect(
+      settings.getByRole('switch', { name: '显示网站标题', exact: true }),
+    ).not.toBeChecked();
+    await settings.getByRole('button', { name: '关闭', exact: true }).click();
   });
-  await newTab.reload();
-  await expect(newTab.locator('.site-card')).toHaveCount(600);
-  const query = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
-  await query.fill('大量数据下的搜索草稿');
-  await expect(query).toHaveValue('大量数据下的搜索草稿');
-  await newTab.getByRole('button', { name: '批量文件夹 0', exact: true }).click();
-  const folder = newTab.getByRole('dialog', { name: '批量文件夹 0', exact: true });
-  await expect(folder.locator('.site-card')).toHaveCount(5);
-  await folder.getByRole('button', { name: '关闭', exact: true }).click();
-  await newTab.getByRole('button', { name: '设置', exact: true }).click();
-  const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
-  await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
-  await settings.getByRole('switch', { name: '显示网站标题', exact: true }).click();
-  await expect(
-    settings.getByRole('switch', { name: '显示网站标题', exact: true }),
-  ).not.toBeChecked();
-  await expect(settings.locator('.settings-autosave')).toHaveText('已保存');
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
-  await expect(settings).not.toBeVisible();
-  await expect(query).toHaveValue('大量数据下的搜索草稿');
-  await newTab.reload();
-  await expect(newTab.locator('.site-card')).toHaveCount(600);
-  await newTab.getByRole('button', { name: '设置', exact: true }).click();
-  await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
-  await expect(
-    settings.getByRole('switch', { name: '显示网站标题', exact: true }),
-  ).not.toBeChecked();
-  await settings.getByRole('button', { name: '关闭', exact: true }).click();
-});
+}

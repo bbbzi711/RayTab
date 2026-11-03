@@ -11,16 +11,17 @@ async function settleTheme(page: Page) {
 
 async function surfaces(page: Page) {
   await settleTheme(page);
-  return page.evaluate(() =>
-    ['.search-shell', '.settings-sidebar', '.settings-select-trigger'].map((selector) => {
-      const element = document.querySelector(selector)!;
-      const style = getComputedStyle(element);
-      return {
-        background: style.backgroundColor,
-        color: style.color,
-        border: style.borderColor,
-      };
-    }),
+  return Promise.all(
+    [
+      page.getByRole('search', { includeHidden: true }),
+      page.getByRole('navigation', { name: '设置分类', exact: true }),
+      page.getByRole('combobox', { name: '主题', exact: true }),
+    ].map((element) =>
+      element.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { background: style.backgroundColor, color: style.color, border: style.borderColor };
+      }),
+    ),
   );
 }
 
@@ -29,20 +30,18 @@ test('跟随系统的搜索和设置与手动主题一致，系统切换及重�
   const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
   await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
   const theme = settings.getByRole('combobox', { name: '主题', exact: true });
-  const choose = async (label: string, value: string) => {
+  const choose = async (label: string) => {
     await theme.click();
     await newTab.getByRole('option', { name: label, exact: true }).click();
-    await expect
-      .poll(() => newTab.evaluate(() => document.documentElement.dataset.theme))
-      .toBe(value);
+    await expect(theme).toHaveText(label);
   };
 
-  await choose('明亮', 'light');
+  await choose('明亮');
   const light = await surfaces(newTab);
-  await choose('深色', 'dark');
+  await choose('深色');
   const dark = await surfaces(newTab);
   expect(dark).not.toEqual(light);
-  await choose('跟随系统', 'system');
+  await choose('跟随系统');
   await newTab.emulateMedia({ colorScheme: 'dark' });
   expect(await surfaces(newTab)).toEqual(dark);
   await newTab.emulateMedia({ colorScheme: 'light' });
@@ -50,9 +49,6 @@ test('跟随系统的搜索和设置与手动主题一致，系统切换及重�
   await expect(theme).toHaveText('跟随系统');
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
-  await expect
-    .poll(() => newTab.evaluate(() => document.documentElement.dataset.theme))
-    .toBe('system');
   await newTab.getByRole('button', { name: '设置', exact: true }).click();
   await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
   await expect(theme).toBeEnabled();

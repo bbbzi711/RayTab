@@ -17,7 +17,7 @@ for (const viewport of [
     });
     const icon = newTab
       .getByRole('link', { name: '布局网站', exact: true, includeHidden: true })
-      .locator('.site-icon-frame');
+      .getByTestId('site-icon');
     const before = (await icon.boundingBox())!.width;
     const size = settings.getByRole('slider', { name: '图标大小', exact: true });
     const initial = Number(await size.getAttribute('aria-valuenow'));
@@ -26,7 +26,9 @@ for (const viewport of [
     await expect.poll(async () => (await icon.boundingBox())!.width).toBeGreaterThan(before);
     const saved = Number(await size.getAttribute('aria-valuenow'));
     expect(saved).toBeGreaterThan(initial);
-    await expect(settings.locator('.settings-autosave')).toHaveText('已保存');
+    await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+      '已保存',
+    );
     await settings.getByRole('button', { name: '关闭', exact: true }).click();
     await newTab.reload();
     const reopened = await openSettings(newTab, '图标与布局');

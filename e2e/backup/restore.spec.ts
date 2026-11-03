@@ -1,8 +1,12 @@
 import { readFile } from 'node:fs/promises';
 
 import { expect, test } from '../fixtures';
-import { openSettings, storedState } from '../helpers';
-test('图标资源随备份导出和确认替换恢复，切换网站图标移除上传引用', async ({ newTab }, testInfo) => {
+import { openSettings, exportNormalBackup, parseNormalBackup } from '../helpers';
+test('图标资源随备份导出和确认替换恢复，切换网站图标移除上传引用', async ({
+  newTab,
+  context,
+}, testInfo) => {
+  await context.route('https://backup-icon.example.test/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
   await editor.getByLabel('名称', { exact: true }).fill('备份图标网站');
@@ -34,9 +38,13 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   const backupPath = testInfo.outputPath('normal-backup.json');
   await download.saveAs(backupPath);
   const serialized = await readFile(backupPath, 'utf8');
-  expect(serialized).toContain('备份图标网站');
-  expect(serialized).toContain('"source": "resource"');
-  expect(serialized).toContain('"mode": "auto"');
+  const uploaded = parseNormalBackup(serialized).data.sites.find(
+    (item) => item.title === '备份图标网站',
+  );
+  expect(uploaded).toMatchObject({
+    icon: { source: 'resource', resourceId: expect.any(String) },
+    iconBackground: { mode: 'auto' },
+  });
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '删除', exact: true }).click();
@@ -68,8 +76,12 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await edit.getByRole('radio', { name: '网站图标', exact: true }).click();
   await edit.getByRole('button', { name: '保存', exact: true }).click();
   await expect(edit).not.toBeVisible();
-  expect(
-    (await storedState(newTab)).spaces.normal.sites.find((item) => item.title === '备份图标网站')
-      ?.icon.source,
-  ).toBe('auto');
+  await newTab.reload();
+  await site.click({ button: 'right' });
+  await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
+  await expect(edit.getByRole('radio', { name: '网站图标', exact: true })).toBeChecked();
+  await edit.getByRole('button', { name: '取消', exact: true }).click();
+  expect((await exportNormalBackup(newTab)).resources.map((resource) => resource.id)).not.toContain(
+    uploaded!.icon.resourceId,
+  );
 });

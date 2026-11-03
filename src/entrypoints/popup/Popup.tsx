@@ -230,7 +230,7 @@ export default function Popup() {
             <span className="popup-header-badge">{t('messages.personalSpace')}</span>
           </header>
           {saved ? (
-            <div className="popup-success">
+            <div className="popup-success" role="status">
               <div className="popup-success-icon">
                 <Check size={28} />
               </div>
@@ -278,7 +278,12 @@ export default function Popup() {
                   <div className="popup-preview-url">{url}</div>
                 </div>
               </div>
-              <form className="popup-form" onSubmit={submit} noValidate>
+              <form
+                aria-label={t('messages.quickAddToPersonalSpace')}
+                className="popup-form"
+                onSubmit={submit}
+                noValidate
+              >
                 <div className="popup-field">
                   <label htmlFor="title">{t('messages.name')}</label>
                   <Input

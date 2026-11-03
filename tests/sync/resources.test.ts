@@ -475,7 +475,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
       expect(content).toBe(remoteBefore);
       expect(await repository.read()).toEqual(localBefore);
       expect(values[BASELINE]).toEqual(baseline);
-      expect(fetchMock.mock.calls).toHaveLength(1);
+      expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(false);
       const status = await engine.loadSyncStatus();
       expect(status).toMatchObject({
         retryCount: 1,

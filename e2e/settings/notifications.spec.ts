@@ -39,11 +39,14 @@ for (const viewport of [
     await settings.getByLabel('服务器地址', { exact: true }).fill('https://dav.example.test/');
     await settings.getByRole('switch', { name: '自动双向同步', exact: true }).click();
     await settings.getByRole('button', { name: '保存连接', exact: true }).click();
-    const notification = newTab.locator('[data-sonner-toast]').filter({ hasText: '连接已保存' });
+    const notification = newTab
+      .getByRole('region', { name: /^Notifications/, includeHidden: true })
+      .getByRole('listitem', { includeHidden: true })
+      .filter({ hasText: '连接已保存' });
     await expect(notification).toHaveCount(1);
     await assertNotificationUsable(notification, newTab);
     await settings.getByRole('button', { name: '双向同步', exact: true }).click({ trial: true });
-    await settings.locator('summary', { hasText: '高级操作' }).click();
+    await settings.getByRole('button', { name: '高级操作：覆盖与恢复', exact: true }).click();
     await settings.getByRole('button', { name: '清除连接', exact: true }).click();
     const confirmation = newTab.getByRole('alertdialog');
     await expect(confirmation).toBeInViewport({ ratio: 1 });
@@ -69,7 +72,10 @@ test('Popup 失败通知在滚动后仍可读，表单和主操作保持可用',
   await popup.goto(`chrome-extension://${extensionId}/popup.html`);
   await popup.getByLabel('名称', { exact: true }).fill('失败后保留的草稿');
   await popup.getByRole('button', { name: '打开主页', exact: true }).click();
-  const notification = popup.locator('[data-sonner-toast]').last();
+  const notification = popup
+    .getByRole('region', { name: /^Notifications/, includeHidden: true })
+    .getByRole('listitem', { includeHidden: true })
+    .last();
   await notification.hover();
   await assertNotificationUsable(notification, popup);
   await popup.getByLabel('名称', { exact: true }).scrollIntoViewIfNeeded();

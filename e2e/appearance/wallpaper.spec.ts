@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { expect, test } from '../fixtures';
-import { storedState } from '../helpers';
+import { cacheInfo } from '../storage/inspect';
 import { paintedArtwork } from '../artwork';
 
 async function wallpaperSettings(page: Page) {
@@ -9,34 +9,6 @@ async function wallpaperSettings(page: Page) {
   const settings = page.getByRole('dialog', { name: '设置', exact: true });
   await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
   return settings;
-}
-
-async function cacheInfo(page: Page) {
-  return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('raytab-v11');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      return await new Promise<{ source: string; color: string; hasBlob: boolean } | undefined>(
-        (resolve, reject) => {
-          const request = db.transaction('wallpapers').objectStore('wallpapers').get('current');
-          request.onsuccess = () =>
-            resolve(
-              request.result && {
-                source: request.result.source,
-                color: request.result.color,
-                hasBlob: Boolean(request.result.blob),
-              },
-            );
-          request.onerror = () => reject(request.error);
-        },
-      );
-    } finally {
-      db.close();
-    }
-  });
 }
 
 test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换图失败保留旧壁纸', async ({
@@ -58,12 +30,17 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   await expect
     .poll(() => cacheInfo(newTab))
     .toEqual({ source: url, color: '#a4c9dc', hasBlob: true });
+  const overlay = Number(
+    await settings
+      .getByRole('slider', { name: '壁纸遮罩', exact: true })
+      .getAttribute('aria-valuenow'),
+  );
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.addInitScript(() => {
     const evidence = { beforeReact: false, fullyVisible: false };
     Object.assign(window, { wallpaperStartupEvidence: evidence });
     const observer = new MutationObserver(() => {
-      const image = document.querySelector<HTMLElement>('.page-background-image');
+      const image = document.querySelector<HTMLElement>('[data-testid="wallpaper-image"]');
       if (image?.style.backgroundImage && !document.getElementById('root')?.childElementCount) {
         evidence.beforeReact = true;
         evidence.fullyVisible =
@@ -85,11 +62,7 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
     beforeReact: true,
     fullyVisible: true,
   });
-  await expect(newTab.locator('.page-background')).toHaveCSS(
-    'background-color',
-    'rgb(164, 201, 220)',
-  );
-  const overlay = (await storedState(newTab)).normalSettings.overlay;
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(164, 201, 220)');
   const visibleColor: [number, number, number] = [164, 201, 220];
   visibleColor.forEach((channel, index) => {
     visibleColor[index] = Math.round(channel * (1 - overlay));
@@ -100,7 +73,7 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   );
   expect(requests).toBe(1);
   const previous = await newTab
-    .locator('.page-background-image')
+    .getByTestId('wallpaper-image')
     .evaluate((element: HTMLElement) => element.style.backgroundImage);
   await context.setOffline(false);
   await context.route('https://wallpaper-acceptance.example.test/failure.svg', (route) =>
@@ -116,7 +89,7 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   ).toBeVisible();
   expect(
     await newTab
-      .locator('.page-background-image')
+      .getByTestId('wallpaper-image')
       .evaluate((element: HTMLElement) => element.style.backgroundImage),
   ).toBe(previous);
   expect(await cacheInfo(newTab)).toEqual({ source: url, color: '#a4c9dc', hasBlob: true });
@@ -124,10 +97,7 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   await context.setOffline(true);
   await newTab.reload();
   await expect(newTab.getByRole('button', { name: '设置', exact: true })).toBeVisible();
-  await expect(newTab.locator('.page-background')).toHaveCSS(
-    'background-color',
-    'rgb(164, 201, 220)',
-  );
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(164, 201, 220)');
   expect(await cacheInfo(newTab)).toEqual({ source: url, color: '#a4c9dc', hasBlob: true });
 });
 
@@ -169,10 +139,7 @@ test('壁纸显示成功但缓存写入失败时明确通知，重试后才算�
   const settings = await wallpaperSettings(newTab);
   await settings.getByLabel('在线壁纸地址', { exact: true }).fill(url);
   await settings.getByRole('button', { name: '使用在线壁纸', exact: true }).click();
-  await expect(newTab.locator('.page-background')).toHaveCSS(
-    'background-color',
-    'rgb(164, 201, 220)',
-  );
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(164, 201, 220)');
   await expect(
     newTab.getByText('壁纸已显示，但离线缓存保存失败，重开时可能需要联网。', { exact: true }),
   ).toBeVisible();
@@ -227,17 +194,14 @@ test('上传壁纸只保存一份原图，私密壁纸不会写入普通启动�
     .getByLabel('在线壁纸地址', { exact: true })
     .fill('https://private-wallpaper.example.test/secret.svg');
   await privateSettings.getByRole('button', { name: '使用在线壁纸', exact: true }).click();
-  await expect(newTab.locator('.page-background')).toHaveCSS(
-    'background-color',
-    'rgb(231, 143, 134)',
-  );
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(231, 143, 134)');
   expect(await cacheInfo(newTab)).toEqual(normal);
   expect(await newTab.evaluate(() => localStorage.getItem('raytab-startup-meta'))).not.toContain(
     'private-wallpaper',
   );
   await privateSettings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.getByRole('button', { name: '普通空间', exact: true }).click();
-  await expect(newTab.locator('.page-background')).toHaveCSS(
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS(
     'background-color',
     `rgb(${normal!.color
       .match(/\w\w/g)!

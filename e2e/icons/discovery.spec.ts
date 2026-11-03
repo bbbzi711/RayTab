@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { expect, test } from '../fixtures';
-import { savedIcon } from '../helpers';
+import { readSiteImage } from '../helpers';
 import { artworkSource } from '../artwork';
 test('自动图标跳过低清和损坏候选，矢量与实色底板保存后保留', async ({ newTab }) => {
   const png = async (size: number) =>
@@ -59,7 +59,9 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
       .fill(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
     await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
     await expect(editor.getByLabel('名称', { exact: true })).toHaveValue('高清测试');
-    await expect(editor.locator('.site-edit-preview img')).toBeVisible();
+    await expect(
+      editor.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
+    ).toBeVisible();
     expect(requests).toEqual(
       expect.arrayContaining(['/', '/tiny.png', '/broken.png', '/touch.png']),
     );
@@ -73,11 +75,11 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
         await image.decode();
         return {
           width: image.naturalWidth,
-          background: getComputedStyle(image.closest('.site-icon-frame')!).backgroundColor,
+          background: getComputedStyle(image.closest('[data-testid="site-icon"]')!).backgroundColor,
         };
       }),
     ).toMatchObject({ width: 512, background: 'rgb(255, 255, 255)' });
-    expect(await savedIcon(newTab, '高清测试')).toMatchObject({ type: 'image/png' });
+    expect(await readSiteImage(newTab, '高清测试')).toMatchObject({ type: 'image/png' });
     const savedBytes = await site
       .locator('img')
       .evaluate(async (image: HTMLImageElement) =>
@@ -102,16 +104,18 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
       .fill(`http://127.0.0.1:${(server.address() as AddressInfo).port}/vector-page`);
     await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
     await expect(editor.getByLabel('名称', { exact: true })).toHaveValue('矢量测试');
-    await expect(editor.locator('.site-edit-preview img')).toBeVisible();
+    await expect(
+      editor.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
+    ).toBeVisible();
     await editor.getByRole('button', { name: '保存', exact: true }).click();
     await expect(editor).not.toBeVisible();
     await newTab.reload();
     const vector = newTab
       .getByRole('link', { name: '矢量测试', exact: true })
-      .locator('.site-icon-frame');
+      .getByTestId('site-icon');
     await expect(vector).toBeVisible();
     expect(await artworkSource(vector)).toMatchObject({ vector: true, local: true });
-    expect(await savedIcon(newTab, '矢量测试')).toMatchObject({ type: 'image/svg+xml' });
+    expect(await readSiteImage(newTab, '矢量测试')).toMatchObject({ type: 'image/svg+xml' });
     expect(requests).toContain('/mark.svg');
   } finally {
     server.closeAllConnections();
@@ -122,12 +126,7 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
 });
 
 test('私密空间直接读取 PWA 高清图标，不向公共服务发送域名', async ({ newTab, context }) => {
-  let publicRequests = 0;
   const directRequests: string[] = [];
-  await context.route(/^https:\/\/(?:api\.svgl\.app|favicon\.vemetric\.com)(?:\/|$)/, (route) => {
-    publicRequests++;
-    return route.abort();
-  });
   await context.route('https://private-icons-acceptance.com/**', (route) => {
     const pathname = new URL(route.request().url()).pathname;
     directRequests.push(pathname);
@@ -159,11 +158,12 @@ test('私密空间直接读取 PWA 高清图标，不向公共服务发送域名
     .fill('https://private-icons-acceptance.com/account?token=secret');
   await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
   await expect(editor.getByLabel('名称', { exact: true })).toHaveValue('本地 PWA 图标');
-  await expect(editor.locator('.site-edit-preview img')).toBeVisible();
+  await expect(
+    editor.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
+  ).toBeVisible();
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
   expect(directRequests).toEqual(
     expect.arrayContaining(['/account', '/app.webmanifest', '/mark.svg']),
   );
-  expect(publicRequests).toBe(0);
 });

@@ -35,6 +35,7 @@ export function SiteIcon({
   const foreground = readableTextColor(background);
   return (
     <IconFrame
+      data-testid="site-icon"
       size={size}
       image={hasImage}
       interactive={interactive}

@@ -304,6 +304,8 @@ export function SearchEngineSettings({
         onToggle={(event) => setEditorOpen(event.currentTarget.open)}
       >
         <summary
+          role="button"
+          aria-expanded={editorOpen}
           aria-disabled={busy}
           onClick={(event) => {
             if (busy) event.preventDefault();
@@ -318,6 +320,7 @@ export function SearchEngineSettings({
           <ChevronDown size={14} aria-hidden="true" />
         </summary>
         <form
+          aria-label={t('settings.editSearchEngine')}
           className="settings-form"
           noValidate
           onSubmit={form.handleSubmit(async (values) => {

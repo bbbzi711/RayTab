@@ -15,11 +15,13 @@ test('官网图标的底色独立保存，重新打开和离线重载不改变�
   await add.getByLabel('名称', { exact: true }).fill('Gemini 产品');
   await add.getByLabel('网址', { exact: true }).fill('https://gemini.google.com/app');
   await add.getByRole('button', { name: '获取网站图标', exact: true }).click();
-  await expect(add.locator('.site-edit-preview img')).toBeVisible();
+  await expect(
+    add.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
+  ).toBeVisible();
   await add.getByRole('button', { name: '保存', exact: true }).click();
   await expect(add).not.toBeVisible();
   const site = newTab.getByRole('link', { name: 'Gemini 产品', exact: true });
-  const original = (await paintedArtwork(site.locator('.site-icon-frame'))).dominant;
+  const original = (await paintedArtwork(site.getByTestId('site-icon'))).dominant;
   expect(original).toBeDefined();
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
@@ -32,7 +34,7 @@ test('官网图标的底色独立保存，重新打开和离线重载不改变�
   await expect(editor).not.toBeVisible();
   await context.setOffline(true);
   await newTab.reload();
-  expect((await paintedArtwork(site.locator('.site-icon-frame'))).dominant).toBe(original);
+  expect((await paintedArtwork(site.getByTestId('site-icon'))).dominant).toBe(original);
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   await expect(editor.getByRole('button', { name: '绿色', exact: true })).toHaveAttribute(

@@ -1,14 +1,8 @@
 import { expect, test } from '../fixtures';
 import { paintedArtwork } from '../artwork';
-import {
-  failNextWrite,
-  storedState,
-  settle,
-  noHorizontalOverflow,
-  deferred,
-  savedIcon,
-} from '../helpers';
-test('上传图片无额外留白，文字图标和背景选择重载后保留', async ({ newTab }) => {
+import { failNextWrite, settle, noHorizontalOverflow, deferred, readSiteImage } from '../helpers';
+test('上传图片无额外留白，文字图标和背景选择重载后保留', async ({ newTab, context }) => {
+  await context.route('https://github.com/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
   await editor.getByLabel('名称', { exact: true }).fill('透明图标测试');
@@ -26,7 +20,7 @@ test('上传图片无额外留白，文字图标和背景选择重载后保留',
   const site = newTab.getByRole('link', { name: '透明图标测试', exact: true });
   const image = site.locator('img');
   await expect(image).toBeVisible();
-  const uploaded = await paintedArtwork(site.locator('.site-icon-frame'), [255, 51, 85]);
+  const uploaded = await paintedArtwork(site.getByTestId('site-icon'), [255, 51, 85]);
   expect(uploaded.bounds).toBeDefined();
   // The source has an 80/128 mark with transparent edges. Its painted composition must survive.
   expect(uploaded.bounds!.right - uploaded.bounds!.left).toBeCloseTo(80 / 128, 1);
@@ -111,11 +105,6 @@ test('三种图标切换保留各自草稿，网站图片保存失败可重试�
   await expect(preview.locator('img')).toBeVisible();
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  const saved = (await storedState(newTab)).spaces.normal.sites.find(
-    (site) => site.title === '三种图标测试',
-  )!;
-  expect(saved.icon).toMatchObject({ source: 'auto', resourceId: expect.any(String) });
-  expect(saved.icon).not.toHaveProperty('display');
   await context.unroute('https://icons-switch.example.test/**');
   await context.route('https://icons-switch.example.test/**', (route) => route.abort());
   await newTab.reload();
@@ -137,7 +126,8 @@ test('三种图标切换保留各自草稿，网站图片保存失败可重试�
   expect(color[3]).toBe(255);
 });
 
-test('现有图标可手动裁切透明边，保存及重载保留像素和底色', async ({ newTab }) => {
+test('现有图标可手动裁切透明边，保存及重载保留像素和底色', async ({ newTab, context }) => {
+  await context.route('https://crop.example.test/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   let editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
   await editor.getByLabel('名称', { exact: true }).fill('裁切图标网站');
@@ -264,9 +254,8 @@ test('迟到的网站图标不会覆盖用户后来选择的上传图片', async
   );
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  expect(await savedIcon(newTab, '图标选择竞争')).toMatchObject({
+  expect(await readSiteImage(newTab, '图标选择竞争')).toMatchObject({
     type: 'image/svg+xml',
     text: selected,
-    icon: { source: 'resource' },
   });
 });

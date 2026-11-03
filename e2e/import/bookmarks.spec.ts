@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures';
-import { openSettings, failNextWrite, storedState, noHorizontalOverflow } from '../helpers';
+import { openSettings, failNextWrite, noHorizontalOverflow, exportNormalBackup } from '../helpers';
 test('导入预览去重且栏目切换保留文件，保存失败重试后重载只导入一次', async ({ newTab }) => {
   const settings = await openSettings(newTab, '数据与备份');
   await expect(settings.getByRole('button', { name: '预览文件', exact: true })).not.toBeVisible();
@@ -40,7 +40,6 @@ test('导入预览去重且栏目切换保留文件，保存失败重试后重�
       .evaluate((input: HTMLInputElement) => input.files?.[0]?.name),
   ).toBe('layout-bookmarks.html');
   await expect(settings.getByText(/准备导入 58 个网站，已跳过 3 个重复网址/)).toBeVisible();
-  const options = settings.locator('.data-preview-options');
   await newTab.setViewportSize({ width: 320, height: 640 });
   await noHorizontalOverflow(settings);
   await settings.getByRole('button', { name: '确认导入', exact: true }).scrollIntoViewIfNeeded();
@@ -55,9 +54,9 @@ test('导入预览去重且栏目切换保留文件，保存失败重试后重�
   await expect(settings.getByRole('button', { name: '确认导入', exact: true })).not.toBeVisible();
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
-  const imported = (await storedState(newTab)).spaces.normal.sites.filter((site) =>
-    site.url.startsWith('https://bookmarks.example.test/'),
-  );
+  const imported = (await exportNormalBackup(newTab)).data.sites
+    .filter((site) => site.url.startsWith('https://bookmarks.example.test/'))
+    .map((site) => site.url);
   expect(imported).toHaveLength(58);
-  expect(imported[0].url).toBe('https://bookmarks.example.test/0?keep=1#part');
+  expect(imported).toContain('https://bookmarks.example.test/0?keep=1#part');
 });

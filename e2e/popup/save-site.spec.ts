@@ -1,6 +1,6 @@
-import { deferred, savedIcon } from '../helpers';
-import type { BrowserContext, Page } from '@playwright/test';
-import type { RayState } from '../../src/storage/model';
+import { deferred, readSiteImage } from '../helpers';
+import type { BrowserContext } from '@playwright/test';
+import { savedNavigation } from '../storage/inspect';
 import { expect, test } from '../fixtures';
 
 const mark =
@@ -15,44 +15,6 @@ async function openPopup(context: BrowserContext, extensionId: string) {
   return popup;
 }
 
-async function savedNavigation(page: Page, title: string) {
-  return page.evaluate(async (title) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('raytab-v11');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    try {
-      const tx = db.transaction(['state', 'resources'], 'readonly');
-      const [state, resources] = await Promise.all([
-        new Promise<RayState>((resolve, reject) => {
-          const request = tx.objectStore('state').get('current');
-          request.onsuccess = () => resolve(request.result as RayState);
-          request.onerror = () => reject(request.error);
-        }),
-        new Promise<IDBValidKey[]>((resolve, reject) => {
-          const request = tx.objectStore('resources').getAllKeys();
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        }),
-      ]);
-      const sites = state.spaces.normal.sites.filter((site) => site.title === title);
-      return {
-        sites,
-        resourceCount: resources.length,
-        referencedImagesExist: sites.every(
-          (site) =>
-            !('resourceId' in site.icon) ||
-            !site.icon.resourceId ||
-            resources.includes(site.icon.resourceId),
-        ),
-      };
-    } finally {
-      db.close();
-    }
-  }, title);
-}
-
 test('Popup 获取未知网站图标，重复提交只保存一份，离线重载使用本地图片', async ({
   newTab,
   context,
@@ -61,7 +23,6 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
   const domain = 'popup-icons-acceptance.com';
   const url = `https://${domain}/account?token=keep#profile`;
   const requests: string[] = [];
-  const providerRequests: string[] = [];
   const iconRequested = deferred();
   const releaseIcon = deferred();
   await context.route(`https://${domain}/**`, async (route) => {
@@ -73,13 +34,6 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
     }
     return route.fulfill({ contentType: 'text/html', body: documentWithIcon });
   });
-  await context.route('https://favicon.vemetric.com/**', (route) => {
-    providerRequests.push(route.request().url());
-    return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ source: 'default', width: 0, height: 0, format: 'png' }),
-    });
-  });
   const popup = await openPopup(context, extensionId);
   await popup.getByLabel('名称', { exact: true }).fill('Popup 本地图标');
   await popup.getByLabel('网址', { exact: true }).fill(url);
@@ -87,12 +41,14 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
   try {
     await iconRequested.promise;
     await expect(popup.getByLabel('网址', { exact: true })).toBeDisabled();
-    await popup.locator('form').dispatchEvent('submit');
+    await popup
+      .getByRole('form', { name: '快速添加到普通空间', exact: true })
+      .dispatchEvent('submit');
     expect((await savedNavigation(newTab, 'Popup 本地图标')).sites).toHaveLength(0);
   } finally {
     releaseIcon.resolve();
   }
-  await expect(popup.locator('.popup-success')).toBeVisible();
+  await expect(popup.getByRole('status')).toBeVisible();
   const saved = await savedNavigation(newTab, 'Popup 本地图标');
   expect(saved.sites).toHaveLength(1);
   expect(saved.sites[0]).toMatchObject({
@@ -101,7 +57,6 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
   });
   expect(saved.resourceCount).toBe(1);
   expect(saved.referencedImagesExist).toBe(true);
-  expect(providerRequests).toEqual([]);
   const requestCount = requests.length;
   await context.setOffline(true);
   await newTab.reload();
@@ -113,12 +68,11 @@ test('Popup 获取未知网站图标，重复提交只保存一份，离线重�
       return { local: image.src.startsWith('blob:'), decoded: image.naturalWidth > 0 };
     }),
   ).toEqual({ local: true, decoded: true });
-  expect(await savedIcon(newTab, 'Popup 本地图标')).toMatchObject({
+  expect(await readSiteImage(newTab, 'Popup 本地图标')).toMatchObject({
     type: 'image/svg+xml',
     text: mark,
   });
   expect(requests).toHaveLength(requestCount);
-  expect(providerRequests).toHaveLength(0);
 });
 
 test('Popup 获取失败保留表单，可以重试或明确选择文字占位后添加', async ({
@@ -127,7 +81,6 @@ test('Popup 获取失败保留表单，可以重试或明确选择文字占位�
   extensionId,
 }) => {
   let available = false;
-  let publicRequests = 0;
   const url = 'https://popup-retry.example.test/path?q=keep#fragment';
   await context.route('https://popup-retry.example.test/**', (route) =>
     available
@@ -137,10 +90,6 @@ test('Popup 获取失败保留表单，可以重试或明确选择文字占位�
         })
       : route.abort(),
   );
-  await context.route('https://favicon.vemetric.com/**', (route) => {
-    publicRequests++;
-    return route.abort();
-  });
   const popup = await openPopup(context, extensionId);
   await popup.getByLabel('名称', { exact: true }).fill('Popup 重试网站');
   await popup.getByLabel('网址', { exact: true }).fill(url);
@@ -154,7 +103,7 @@ test('Popup 获取失败保留表单，可以重试或明确选择文字占位�
 
   available = true;
   await popup.getByRole('button', { name: '添加网站', exact: true }).click();
-  await expect(popup.locator('.popup-success')).toBeVisible();
+  await expect(popup.getByRole('status')).toBeVisible();
   expect((await savedNavigation(newTab, 'Popup 重试网站')).sites).toHaveLength(1);
 
   await popup.getByRole('button', { name: '继续添加', exact: true }).click();
@@ -165,12 +114,11 @@ test('Popup 获取失败保留表单，可以重试或明确选择文字占位�
   await expect(popup.getByRole('alert')).toContainText('未能获取网站图标');
   expect((await savedNavigation(newTab, 'Popup 文字占位')).sites).toHaveLength(0);
   await popup.getByRole('button', { name: '以文字占位图标添加', exact: true }).click();
-  await expect(popup.locator('.popup-success')).toBeVisible();
+  await expect(popup.getByRole('status')).toBeVisible();
   const fallback = await savedNavigation(newTab, 'Popup 文字占位');
   expect(fallback.sites).toHaveLength(1);
   expect(fallback.sites[0].icon).toEqual({ source: 'auto' });
   expect(fallback.resourceCount).toBe(1);
-  expect(publicRequests).toBe(0);
   await newTab.reload();
   await expect(newTab.getByRole('link', { name: 'Popup 文字占位', exact: true })).toHaveAttribute(
     'href',
@@ -218,7 +166,7 @@ test('Popup 状态写入失败回滚图标资源，离线重试使用草稿且�
   const requestCount = requests;
   await context.setOffline(true);
   await popup.getByRole('button', { name: '添加网站', exact: true }).click();
-  await expect(popup.locator('.popup-success')).toBeVisible();
+  await expect(popup.getByRole('status')).toBeVisible();
   const saved = await savedNavigation(newTab, 'Popup 保存重试');
   expect(saved.sites).toHaveLength(1);
   expect(saved.resourceCount).toBe(1);
@@ -256,8 +204,12 @@ test('Popup 收到 pagehide 后，晚到的图标结果不会新增网站或资�
   } finally {
     releaseIcon.resolve();
   }
-  await expect(popup.locator('.popup-form button[type="submit"]')).toBeEnabled();
-  await expect(popup.locator('.popup-success')).toHaveCount(0);
+  await expect(
+    popup
+      .getByRole('form', { name: '快速添加到普通空间', exact: true })
+      .getByRole('button', { name: /^(添加网站|正在获取图标…)$/ }),
+  ).toBeEnabled();
+  await expect(popup.getByRole('status')).toHaveCount(0);
   const saved = await savedNavigation(newTab, 'Popup 已关闭请求');
   expect(saved.sites).toHaveLength(0);
   expect(saved.resourceCount).toBe(0);
