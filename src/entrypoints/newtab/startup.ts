@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { displayWallpaper } from '@/features/appearance/wallpaper-renderer';
 
 const wallpaperSchema = z.object({

@@ -1,5 +1,5 @@
 import { AppError } from '@/lib/errors';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 export const spaceIdSchema = z.enum(['normal', 'private']);
 export type SpaceId = z.infer<typeof spaceIdSchema>;

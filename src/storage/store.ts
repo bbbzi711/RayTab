@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { serializeError, type StoredError } from '@/lib/errors';
 import { repository } from './repository';
 import { applyCommand, type Command } from './operations';

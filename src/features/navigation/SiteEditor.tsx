@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { RadioGroup, Select } from 'radix-ui';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';

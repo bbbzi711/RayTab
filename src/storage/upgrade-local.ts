@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { AppError } from '@/lib/errors';
 import { defaultSettings, groupSchema, rayStateSchema, siteSchema, spaceDataSchema } from './model';
 

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { normalizeUrl, siteSchema } from '@/storage/model';
 
 export const destinationSchema = siteSchema.pick({ groupId: true, folderId: true });

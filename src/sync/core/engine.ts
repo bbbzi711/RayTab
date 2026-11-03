@@ -1,5 +1,5 @@
 import { AppError, serializeError, type StoredError } from '@/lib/errors';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import {
   backupSchema,
   createBackup,

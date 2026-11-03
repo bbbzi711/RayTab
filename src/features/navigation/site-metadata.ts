@@ -1,7 +1,7 @@
 import { normalizeUrl } from '@/storage/model';
 import { imageDimensions, validateImageFile } from '@/lib/images';
 import { validateSvgImage } from '@/lib/svg';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import { Parser } from 'htmlparser2';
 
 export type SiteMetadata = {

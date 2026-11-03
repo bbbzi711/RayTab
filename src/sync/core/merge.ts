@@ -1,6 +1,6 @@
 import { folderSchema, siteSchema, type SpaceData } from '@/storage/model';
 import { reconcileMergedContainers, type MergeLocation } from '@/storage/merge-containers';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 export const syncConflictSchema = z.object({
   key: z.string().min(1),

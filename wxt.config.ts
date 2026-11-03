@@ -12,7 +12,6 @@ export default defineConfig({
       'storage',
       'alarms',
       'activeTab',
-      'favicon',
       ...(manifestVersion === 2 ? ['https://*/*', 'http://*/*'] : []),
     ],
     ...(manifestVersion === 3

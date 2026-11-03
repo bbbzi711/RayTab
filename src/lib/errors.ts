@@ -1,4 +1,4 @@
-import { ZodError } from 'zod';
+import { ZodError } from '@/lib/zod';
 import i18n from '@/locales';
 
 export type ErrorValues = Record<string, string | number>;

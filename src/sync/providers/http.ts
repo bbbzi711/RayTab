@@ -1,5 +1,5 @@
 import { SyncProviderError } from './types';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 export const gitFileResponseSchema = z.object({
   type: z.string(),

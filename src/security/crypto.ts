@@ -1,5 +1,5 @@
 import { AppError } from '@/lib/errors';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 const ITERATIONS = 310_000;
 const encoder = new TextEncoder();

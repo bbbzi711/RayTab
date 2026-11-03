@@ -1,5 +1,5 @@
 import { AppError } from '@/lib/errors';
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 import {
   hasRetiredAppearanceSettings,
   hasRetiredIconDisplay,
