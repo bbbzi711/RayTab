@@ -25,7 +25,9 @@
       "connectionSaveRollbackFailed": "The sync configuration could not be saved, and the previous session password could not be restored. Save the connection settings again before syncing.",
       "unauthorized": "Authentication was rejected (HTTP {{status}}, {{method}}). Check the account, password or token. WebDAV services may require a separate app password.",
       "forbidden": "The server forbids this operation (HTTP {{status}}, {{method}}). Check the target file or folder permissions, app authorization and service restrictions.",
-      "webdavUrlRequired": "The WebDAV server URL is invalid. Edit the connection and paste the HTTP or HTTPS URL provided by your cloud service. For Nutstore, use https://dav.jianguoyun.com/dav/."
+      "webdavUrlRequired": "The WebDAV server URL is invalid. Edit the connection and paste the HTTPS URL provided by your cloud service. For Nutstore, use https://dav.jianguoyun.com/dav/.",
+      "httpsRequired": "Sync requires an HTTPS URL. Edit the connection and try again.",
+      "redirectBlocked": "The sync service requested a redirect. The request was stopped to protect credentials and backups. Edit the connection using the final HTTPS URL provided by the service."
     },
     "remoteStatus": "The remote service returned {{status}}",
     "missingBackupResource": "Required backup resource {{id}} is missing",

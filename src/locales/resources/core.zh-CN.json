@@ -25,7 +25,9 @@
       "connectionSaveRollbackFailed": "同步配置保存失败，且未能恢复原会话密码。请重新保存连接配置后再同步。",
       "unauthorized": "认证被拒绝（HTTP {{status}}，{{method}}）。请核对账号、密码或令牌；WebDAV 服务可能要求单独的应用密码。",
       "forbidden": "服务器禁止此操作（HTTP {{status}}，{{method}}）。请检查目标文件或文件夹权限、应用授权及服务限制。",
-      "webdavUrlRequired": "WebDAV 服务器地址无效。请编辑连接并粘贴云盘提供的 http 或 https 地址；坚果云请使用 https://dav.jianguoyun.com/dav/。"
+      "webdavUrlRequired": "WebDAV 服务器地址无效。请编辑连接并粘贴云盘提供的 HTTPS 地址；坚果云请使用 https://dav.jianguoyun.com/dav/。",
+      "httpsRequired": "同步仅支持 HTTPS 地址，请编辑连接后重试。",
+      "redirectBlocked": "同步服务要求跳转，已停止请求以保护凭据和备份。请编辑连接，填写服务提供的最终 HTTPS 地址。"
     },
     "remoteStatus": "远端服务返回 {{status}}",
     "missingBackupResource": "备份需要的资源 {{id}} 不存在",

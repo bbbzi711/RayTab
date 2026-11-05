@@ -1,4 +1,5 @@
 import { AppError } from '@/lib/errors';
+import { Parser } from 'htmlparser2';
 
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 const ELEMENTS = new Set(
@@ -19,11 +20,27 @@ function hasExternalStyle(value: string) {
 /** Keep vector artwork only when it is a standalone image, without code or remote resources. */
 export async function validateSvgImage(image: Blob) {
   const text = await image.text();
-  const document = new DOMParser().parseFromString(text, 'image/svg+xml');
-  const root = document.documentElement;
   const invalid = () => {
     throw new AppError('messages.thisImageCannotBeRead');
   };
+  // Chromium can compile event attributes while parsing an inert SVG document.
+  // Reject them as data before creating DOM nodes, including duplicate attributes.
+  // Reject entity declarations too, so XML expansion cannot introduce new markup.
+  new Parser(
+    {
+      onattribute(name) {
+        if (name.split(':').at(-1)?.toLowerCase().startsWith('on')) invalid();
+      },
+      onprocessinginstruction(name) {
+        if (name !== '?xml') invalid();
+      },
+    },
+    { xmlMode: true },
+  ).end(text);
+  // Keep native XML well-formedness and namespace validation. The preflight does
+  // not sanitize or rewrite artwork; accepted images retain their original bytes.
+  const document = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const root = document.documentElement;
   if (
     document.doctype ||
     document.createTreeWalker(document, NodeFilter.SHOW_PROCESSING_INSTRUCTION).nextNode() ||

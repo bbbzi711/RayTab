@@ -19,6 +19,8 @@ const draft = {
 
 describe('WebDAV server address validation', () => {
   it.each([
+    'http://127.0.0.1:8080/RayTab/backup',
+    'http://dav.example.test/',
     'file:///backup.json',
     'https://dav.jianguoyun.com/tab',
     'https://user:password@dav.example.test/',
@@ -38,7 +40,7 @@ describe('WebDAV server address validation', () => {
     'https://dav.example.test',
     'https://dav.example.test/RayTab/',
     'https://dav.jianguoyun.com/dav/raytab.json',
-    'http://127.0.0.1:8080/RayTab/backup',
+    'https://127.0.0.1:8080/RayTab/backup',
     'https://dav.example.test/RayTab/backup.json?version=latest',
   ])('accepts server URLs and existing file URLs (%s)', (url) => {
     expect(createSyncDraftSchema(false).parse({ ...draft, url })).toEqual({ ...draft, url });

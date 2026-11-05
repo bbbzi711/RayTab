@@ -1,5 +1,6 @@
-import { createServer } from 'node:http';
+import { createServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
+import { fixtureTls } from './tls-fixture';
 
 export const username = 'webdav-fixture-user';
 export const appPassword = 'webdav-fixture-app-password';
@@ -15,7 +16,7 @@ export async function webDavFixture(failure?: 401 | 403) {
   let content: string | undefined;
   let version = 0;
   const authorization = `Basic ${Buffer.from(`${username}:${appPassword}`).toString('base64')}`;
-  const server = createServer(async (request, response) => {
+  const server = createServer(fixtureTls, async (request, response) => {
     const method = request.method ?? '';
     const path = request.url ?? '';
     response.setHeader('Access-Control-Allow-Origin', '*');
@@ -85,7 +86,7 @@ export async function webDavFixture(failure?: 401 | 403) {
     send(405);
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const origin = `https://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
     origin,
     url: `${origin}/dav/raytab.json`,

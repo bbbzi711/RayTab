@@ -1,4 +1,5 @@
-import { createServer } from 'node:http';
+import { fixtureTls } from './tls-fixture';
+import { createServer } from 'node:https';
 
 import type { AddressInfo } from 'node:net';
 
@@ -16,7 +17,7 @@ test('原生互斥拒绝配置变更，释放后真实后台可以继续同步',
   let holdRead = false;
   let pendingRead: (() => void) | undefined;
   let readCount = 0;
-  const server = createServer(async (request, response) => {
+  const server = createServer(fixtureTls, async (request, response) => {
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('ETag', String(version));
     if (request.method === 'GET') {
@@ -43,7 +44,7 @@ test('原生互斥拒绝配置变更，释放后真实后台可以继续同步',
     response.end();
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/raytab.json`;
+  const url = `https://127.0.0.1:${(server.address() as AddressInfo).port}/raytab.json`;
   try {
     const settings = await openSettings(newTab, '同步');
     await settings.getByRole('button', { name: '配置同步', exact: true }).click();

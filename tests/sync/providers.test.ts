@@ -7,6 +7,50 @@ import { serializeError, storedErrorMessage } from '../../src/lib/errors';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('sync provider concurrency guards', () => {
+  it.each(['webdav', 'github', 'gitee'] as const)(
+    '%s refuses redirected reads and writes without exposing server locations or credentials',
+    async (type) => {
+      const token = 'fixture-secret';
+      const provider =
+        type === 'webdav'
+          ? createWebDavProvider({
+              type,
+              url: 'https://dav.test/backup.json',
+              username: 'user',
+              password: token,
+            })
+          : type === 'github'
+            ? createGitHubProvider({
+                type,
+                owner: 'user',
+                repo: 'repo',
+                path: 'backup.json',
+                token,
+              })
+            : createGiteeProvider({
+                type,
+                owner: 'user',
+                repo: 'repo',
+                path: 'backup.json',
+                token,
+              });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(
+          new Response(token, {
+            status: 307,
+            headers: { Location: `https://other.test/?secret=${token}` },
+          }),
+        ),
+      );
+      for (const operation of [() => provider.read(), () => provider.write('{}', null)]) {
+        await expect(operation()).rejects.toMatchObject({
+          code: 'invalid',
+          translationKey: 'errors.sync.redirectBlocked',
+        });
+      }
+    },
+  );
   it.each([
     ['https://dav.jianguoyun.com/dav/', 'https://dav.jianguoyun.com/dav/raytab.json'],
     ['https://dav.jianguoyun.com/dav', 'https://dav.jianguoyun.com/dav/raytab.json'],
@@ -29,6 +73,8 @@ describe('sync provider concurrency guards', () => {
   it.each([
     'https://dav.jianguoyun.com/tab',
     'file:///raytab.json',
+    'http://dav.test/raytab.json',
+    'http://127.0.0.1:8080/raytab.json',
     'https://user:password@dav.test/raytab.json',
     'invalid-url',
   ])('rejects an invalid WebDAV URL before any network request (%s)', (url) => {

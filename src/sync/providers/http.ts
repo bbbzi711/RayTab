@@ -21,12 +21,18 @@ export async function parseResponseJson<T>(response: Response, schema: z.ZodType
 }
 
 export async function request(url: string, init: RequestInit) {
+  if (new URL(url).protocol !== 'https:')
+    throw new SyncProviderError('errors.sync.httpsRequired', 'invalid');
   let response: Response;
   try {
-    response = await fetch(url, init);
+    // A manual redirect returns an opaque redirect in browsers. Never forward
+    // authentication headers or request bodies to a server-selected destination.
+    response = await fetch(url, { ...init, redirect: 'manual' });
   } catch {
     throw new SyncProviderError('messages.theConnectionFailedCheckTheAddressAndNetwork', 'network');
   }
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400))
+    throw new SyncProviderError('errors.sync.redirectBlocked', 'invalid');
   if (response.status === 401 || response.status === 403)
     throw new SyncProviderError(
       response.status === 401 ? 'errors.sync.unauthorized' : 'errors.sync.forbidden',

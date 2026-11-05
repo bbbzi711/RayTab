@@ -132,7 +132,7 @@
   "removeProtectionTitle": "取消私密空间密码保护？",
   "removeProtectionHelp": "私密内容会在本机以未加密方式保存，请确认当前设备可以信任。",
   "removeProtection": "取消密码保护",
-  "syncInvalidUrl": "请输入不含账号密码的 http 或 https WebDAV 服务器地址；坚果云请粘贴 https://dav.jianguoyun.com/dav/。",
+  "syncInvalidUrl": "请输入不含账号密码的 HTTPS WebDAV 服务器地址；坚果云请粘贴 https://dav.jianguoyun.com/dav/。",
   "required": "请填写此项。",
   "provider": "服务",
   "serverAddress": "服务器地址",
@@ -271,6 +271,9 @@
   "loading": "正在加载设置…",
   "protectedPrivateAutomaticSync": "受密码保护的私密空间需要解锁后手动同步。关闭“包含私密空间”即可使用定时同步。",
   "syncRecovered": "原分组已删除，{{sites}} 个网站和 {{folders}} 个文件夹已保留到“{{group}}”分组，请检查位置。",
-  "webdavServerHelp": "直接粘贴云盘提供的 WebDAV 服务器地址，RayTab 会在该目录下自动使用 raytab.json，无需填写文件名。也可填写已有备份文件的完整地址。",
-  "webdavNutstoreHelp": "坚果云服务器地址：https://dav.jianguoyun.com/dav/；账号和应用密码请从“第三方应用管理”复制。"
+  "webdavServerHelp": "粘贴云盘提供的 HTTPS WebDAV 地址，RayTab 会在目录下使用 raytab.json，也支持已有备份文件的完整地址。同步请求不跟随重定向；如遇跳转，请填写最终 HTTPS 地址。",
+  "webdavNutstoreHelp": "坚果云服务器地址：https://dav.jianguoyun.com/dav/；账号和应用密码请从“第三方应用管理”复制。",
+  "syncDataDisclosure": "保存连接后，可将所选空间的网站、设置和已保存图片同步到你指定的服务；启用自动同步后会在后台定时同步。普通空间备份可读，私密空间按密码设置加密。",
+  "syncCredentialDisclosure": "账号、应用密码或令牌保存在当前浏览器本地，未额外加密，用于重启后继续同步；它们不进入备份或同步文件。连接只使用 HTTPS。断开同步会删除本机连接凭据，不删除云端文件。",
+  "privacyPolicy": "隐私说明"
 }

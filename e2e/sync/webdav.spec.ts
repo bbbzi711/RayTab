@@ -50,7 +50,13 @@ for (const addressType of ['nutstore', 'nutstore-no-slash', 'directory', 'file']
       if (addressType.startsWith('nutstore'))
         await context.route('https://dav.jianguoyun.com/**', async (route) => {
           const requestUrl = new URL(route.request().url());
-          const response = await route.fetch({ url: remote.origin + requestUrl.pathname });
+          const response = await context.request.fetch(remote.origin + requestUrl.pathname, {
+            method: route.request().method(),
+            headers: route.request().headers(),
+            data: route.request().postDataBuffer() ?? undefined,
+            ignoreHTTPSErrors: true,
+            maxRedirects: 0,
+          });
           await route.fulfill({ response });
         });
       const serverAddress =
@@ -71,7 +77,11 @@ for (const addressType of ['nutstore', 'nutstore-no-slash', 'directory', 'file']
       await account.fill(username);
       await password.fill(appPassword);
       await settings.getByRole('switch', { name: '自动双向同步', exact: true }).click();
-      for (const invalidAddress of ['file:///backup.json', 'https://dav.jianguoyun.com/tab']) {
+      for (const invalidAddress of [
+        'http://127.0.0.1/dav/',
+        'file:///backup.json',
+        'https://dav.jianguoyun.com/tab',
+      ]) {
         await address.fill(invalidAddress);
         await settings.getByRole('button', { name: '保存连接', exact: true }).click();
         await expect(address).toHaveAttribute('aria-invalid', 'true');

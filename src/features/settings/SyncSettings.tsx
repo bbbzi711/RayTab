@@ -547,6 +547,18 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 <p>{t('settings.webdavNutstoreHelp')}</p>
               </div>
             )}
+            <div className="settings-help">
+              <p>{t('settings.syncDataDisclosure')}</p>
+              <p>{t('settings.syncCredentialDisclosure')}</p>
+              <a
+                href="https://github.com/bbbzi711/RayTab/blob/main/PRIVACY.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-4"
+              >
+                {t('settings.privacyPolicy')}
+              </a>
+            </div>
             <div className="sync-connection-options">
               <Controller
                 control={form.control}

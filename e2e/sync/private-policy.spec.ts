@@ -1,4 +1,5 @@
-import { createServer } from 'node:http';
+import { fixtureTls } from './tls-fixture';
+import { createServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { z } from 'zod';
 import { expect, test } from '../fixtures';
@@ -10,13 +11,13 @@ test('受保护私密空间只允许手动同步，旧自动配置由后台暂�
   background,
 }) => {
   let requests = 0;
-  const server = createServer((_request, response) => {
+  const server = createServer(fixtureTls, (_request, response) => {
     requests++;
     response.writeHead(404);
     response.end();
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/raytab.json`;
+  const url = `https://127.0.0.1:${(server.address() as AddressInfo).port}/raytab.json`;
   const vaultPassword = 'private-policy-vault';
   const syncPassword = 'private-policy-sync-secret';
   try {

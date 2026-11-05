@@ -10,7 +10,7 @@ export function resolveWebDavFileUrl(value: string) {
   }
   const nutstore = url.hostname === 'dav.jianguoyun.com';
   if (
-    !['https:', 'http:'].includes(url.protocol) ||
+    url.protocol !== 'https:' ||
     url.username ||
     url.password ||
     (nutstore && url.pathname !== '/dav' && !url.pathname.startsWith('/dav/'))

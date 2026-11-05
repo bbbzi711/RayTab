@@ -4,7 +4,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
-  manifest: ({ manifestVersion }) => ({
+  manifest: ({ manifestVersion, browser }) => ({
     default_locale: 'zh_CN',
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',
@@ -22,16 +22,20 @@ export default defineConfig({
       : {
           optional_permissions: ['bookmarks'],
         }),
-    browser_specific_settings: {
-      gecko: {
-        id: 'raytab@raytab.app',
-        strict_min_version: '140.0',
-        data_collection_permissions: {
-          required: ['none'],
-          optional: ['authenticationInfo', 'bookmarksInfo', 'websiteActivity'],
-        },
-      },
-    },
+    ...(browser === 'firefox'
+      ? {
+          browser_specific_settings: {
+            gecko: {
+              id: 'raytab@raytab.app',
+              strict_min_version: '140.0',
+              data_collection_permissions: {
+                required: ['none'],
+                optional: ['authenticationInfo', 'bookmarksInfo', 'websiteActivity'],
+              },
+            },
+          },
+        }
+      : {}),
     commands: {
       'open-raytab': {
         suggested_key: { default: 'Ctrl+Shift+Y', mac: 'Command+Shift+Y' },
