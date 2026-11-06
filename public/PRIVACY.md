@@ -1,13 +1,13 @@
 # 隐私说明
 
-适用版本：0.2.0。更新日期：2026-11-05。
+适用版本：0.2.0。更新日期：2026-11-06。
 
-适用于 RayTab 的 Chrome、Microsoft Edge 及 Firefox 扩展构建。
+本说明适用于 Microsoft Edge 加载项 RayTab，也适用于其 Chrome 和 Firefox 扩展构建。各版本均使用所在浏览器的本地存储及默认搜索 API，数据处理规则相同。
 
 RayTab 将网站、分组、文件夹、设置、本地图标和壁纸保存在当前浏览器中。卸载扩展或清除浏览器数据可能删除这些内容，请自行保存备份。
 
 - RayTab 不提供账号、广告、统计或遥测。
-- 搜索词仅在提交时发送给所选搜索引擎，RayTab 不保存搜索历史。首次默认必应；用户切换后保存选择，不读取或修改浏览器地址栏默认搜索引擎。自定义引擎请求用户填写的搜索地址。
+- 搜索词仅在提交时发送给所选搜索引擎，RayTab 不保存搜索历史。首次使用“浏览器默认”，由浏览器搜索 API 将提交内容交给当前默认搜索服务；RayTab 不读取该引擎的名称或地址，也不修改地址栏默认引擎。用户主动切换后保存选择，重开或重启不会重置；已有用户的已保存选择保持不变。自定义引擎请求用户填写的搜索地址。
 - 访问网站时，目标网站的隐私政策适用。
 - 本地图标、壁纸、加密和备份在本机处理，导出的备份可能包含网址和图片。
 - 只有用户主动配置同步后，RayTab 才会把所选空间的备份发送到用户指定的 WebDAV、GitHub 或 Gitee。普通空间内容可读；设置同步密码的私密空间内容以加密信封保存。连接账号、应用密码或访问令牌持久保存在当前浏览器本地，未额外加密，用于重启后继续自动同步；不写入备份或同步文件，也不作为同步错误详情记录。私密同步加密密码仅在当前浏览器会话保留。
@@ -29,7 +29,7 @@ RayTab 对从 Google API 获得的信息的使用遵守 Chrome Web Store User Da
 
 RayTab for Chrome, Microsoft Edge and Firefox stores sites, folders, settings and images locally. It has no RayTab account, ads, analytics or telemetry and does not read browser history. Clicking the toolbar action reads the active page URL and title for saving; bookmark access is requested only for an explicit import.
 
-Search text is sent only on submission to the selected provider (initially Bing); the selection persists and does not change the address-bar provider. Icon discovery contacts the entered website and its declared resources/CDNs without cookies or referrers. Private-space discovery is explicit. Saved icons work offline and are included in backups. Unsplash supplies default and curated images; bing.biturl.top is the third-party daily-wallpaper endpoint. Custom online images contact the configured URL and redirect destinations. These services can see the requested URL and connection information such as IP address. Local images, gradients and solid colors do not require image requests.
+Search text is sent only on submission. On first use, Browser default delegates to the current browser search provider through its search API without reading the provider name/URL or changing address-bar settings. Explicit provider choices persist across reloads and restarts; existing saved choices are retained. Icon discovery contacts the entered website and its declared resources/CDNs without cookies or referrers. Private-space discovery is explicit. Saved icons work offline and are included in backups. Unsplash supplies default and curated images; bing.biturl.top is the third-party daily-wallpaper endpoint. Custom online images contact the configured URL and redirect destinations. These services can see the requested URL and connection information such as IP address. Local images, gradients and solid colors do not require image requests.
 
 Optional HTTPS sync sends selected sites, settings and saved images to the configured WebDAV server, api.github.com or gitee.com. Authenticated sync requests never follow redirects. Connection usernames, app passwords and tokens persist locally without additional encryption to allow automatic sync after restart; they are excluded from exported/synced backups and sync error details. Normal-space backups remain readable. Password-protected private data uses PBKDF2-SHA256 and AES-GCM; protected private sync is manual after unlocking. The private sync password is session-only.
 

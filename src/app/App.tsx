@@ -6,10 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
-import type { SettingsTarget } from '@/features/settings/settings-target';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { NavigationMenuItems, type NavigationAction } from '@/features/navigation/NavigationMenu';
-import { WidgetSettingsMenu } from '@/features/navigation/WidgetSettingsMenu';
 import { useShallow } from 'zustand/react/shallow';
 import { LayoutGrid, LockKeyhole, PanelLeft, Settings, ShieldCheck, Sun } from 'lucide-react';
 import { Background } from '@/features/appearance/Background';
@@ -43,7 +41,6 @@ export default function App() {
     defaultValues: { password: '' },
   });
   const navigationRef = useRef<NavigationHandle>(null);
-  const [settingsTarget, setSettingsTarget] = useState<SettingsTarget>();
   const error = useRayTabStore((store) => store.error);
   const spaceId = useRayTabStore((store) => store.state?.local.activeSpace);
   const homeMode = useRayTabStore((store) => store.state?.local.homeMode);
@@ -59,10 +56,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigationVisible = homeMode === 'navigation';
   const [unlockOpen, setUnlockOpen] = useState(false);
-  const openSettings = (target?: SettingsTarget) => {
-    setSettingsTarget(target);
-    setSettingsOpen(true);
-  };
+  const openSettings = () => setSettingsOpen(true);
   useEffect(() => {
     void i18n.changeLanguage(settings?.language ?? 'zh-CN');
   }, [settings?.language]);
@@ -204,26 +198,16 @@ export default function App() {
       },
     },
     {
-      id: 'icons',
-      label: t('navigation.iconSettings'),
-      separator: true,
-      run: () => openSettings('icons'),
-    },
-    {
-      id: 'appearance',
-      label: t('navigation.appearanceSettings'),
-      run: () => openSettings('appearance'),
-    },
-    {
       id: 'mode',
       label: t(homeMode === 'focus' ? 'messages.openNavigation' : 'messages.enterFocusMode'),
+      separator: true,
       run: () =>
         dispatch({
           type: 'set-home-mode',
           mode: homeMode === 'focus' ? 'navigation' : 'focus',
         }).catch((reason) => toast.error(errorMessage(reason))),
     },
-    { id: 'settings', label: t('navigation.allSettings'), run: () => openSettings() },
+    { id: 'settings', label: t('messages.settings'), run: openSettings },
   ];
   return (
     <TooltipProvider delayDuration={200}>
@@ -399,23 +383,19 @@ export default function App() {
                     settings.showDate ||
                     settings.showLunar ||
                     settings.showGreeting) && (
-                    <WidgetSettingsMenu onSettings={() => openSettings('widgets')}>
-                      <Clock
-                        language={settings.language}
-                        hour12={settings.hour12}
-                        showClock={settings.showClock}
-                        showDate={settings.showDate}
-                        showLunar={settings.showLunar}
-                        showGreeting={settings.showGreeting}
-                        compact={navigationVisible}
-                      />
-                    </WidgetSettingsMenu>
+                    <Clock
+                      language={settings.language}
+                      hour12={settings.hour12}
+                      showClock={settings.showClock}
+                      showDate={settings.showDate}
+                      showLunar={settings.showLunar}
+                      showGreeting={settings.showGreeting}
+                      compact={navigationVisible}
+                    />
                   )}
                   {settings.showSearch && (
                     <div className="desktop-search relative z-20 w-full flex justify-center mt-[29px]">
-                      <WidgetSettingsMenu onSettings={() => openSettings('widgets')}>
-                        <SearchBar key={spaceId} spaceId={spaceId} />
-                      </WidgetSettingsMenu>
+                      <SearchBar key={spaceId} spaceId={spaceId} />
                     </div>
                   )}
                 </div>
@@ -465,7 +445,6 @@ export default function App() {
                   spaceId={spaceId}
                   open={settingsOpen}
                   onClose={() => setSettingsOpen(false)}
-                  target={settingsTarget}
                 />
               </Suspense>
             )}

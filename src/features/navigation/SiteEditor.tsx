@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
   type FocusEvent,
+  type FormEvent,
 } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -142,6 +143,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
   const { errors, isDirty, isSubmitting } = form.formState;
   // Only binary drafts live outside RHF; each source has its own resource selection.
   const [images, setImages] = useState<Partial<Record<ImageSource, ImageDraft>>>({});
+  const imageDrafts = useRef(images);
   const [previewUrls, setPreviewUrls] = useState<Partial<Record<ImageSource, string>>>({});
   const [cropImage, setCropImage] = useState<{
     source: ImageSource;
@@ -149,17 +151,20 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     blob: Blob;
   }>();
   const [fetching, setFetching] = useState(false);
+  const [preparingSave, setPreparingSave] = useState(false);
+  const submitting = useRef(false);
+  const [iconOptionsOpen, setIconOptionsOpen] = useState(false);
   const [openingCrop, setOpeningCrop] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const iconSection = useRef<HTMLDivElement>(null);
-  const focusIconSource = () =>
-    iconSection.current
-      ?.querySelector<HTMLButtonElement>('[role="radio"][data-state="checked"]')
-      ?.focus();
+  const pendingFocus = useRef<'url' | 'title' | 'location' | 'textIcon' | 'iconSource' | undefined>(
+    undefined,
+  );
   const imageInput = useRef<HTMLInputElement>(null);
   const active = useRef(true);
   const fetchGeneration = useRef(0);
   const automaticAttempt = useRef<string | undefined>(undefined);
+  const websiteIconUrl = useRef(site?.icon.source === 'auto' ? site.url : undefined);
   const iconEdited = useRef(false);
   const textEdited = useRef(site?.icon.source === 'text');
   useEffect(() => {
@@ -193,7 +198,11 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     validateImageFile(blob);
     invalidateFetch();
     const selection = crypto.randomUUID();
-    setImages((current) => ({ ...current, [source]: { id: selection, blob, original } }));
+    imageDrafts.current = {
+      ...imageDrafts.current,
+      [source]: { id: selection, blob, original },
+    };
+    setImages(imageDrafts.current);
     form.setValue(resourceField(source), selection, { shouldDirty: true });
     if (source === 'auto') form.setValue('websiteFit', fit, { shouldDirty: true });
     form.setValue('iconType', source, { shouldDirty: true });
@@ -201,7 +210,38 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     form.clearErrors('websiteResourceId');
     form.clearErrors('root');
   };
-  const busy = isSubmitting;
+  const busy = isSubmitting || preparingSave;
+  useEffect(() => {
+    if (busy || !pendingFocus.current) return;
+    const field = pendingFocus.current;
+    pendingFocus.current = undefined;
+    if (field === 'iconSource')
+      iconSection.current
+        ?.querySelector<HTMLButtonElement>('[role="radio"][data-state="checked"]')
+        ?.focus();
+    else form.setFocus(field);
+  }, [busy, iconOptionsOpen, form]);
+  const sameIconHost = (requestedUrl: string) => {
+    try {
+      return (
+        websiteIconUrl.current &&
+        new URL(normalizeUrl(requestedUrl)).hostname ===
+          new URL(normalizeUrl(websiteIconUrl.current)).hostname
+      );
+    } catch {
+      return false;
+    }
+  };
+  const shouldAutoFetch = () => {
+    const requestedUrl = form.getValues('url');
+    return (
+      spaceId === 'normal' &&
+      form.getValues('iconType') === 'auto' &&
+      Boolean(requestedUrl.trim()) &&
+      automaticAttempt.current !== requestedUrl &&
+      (!form.getValues('websiteResourceId') ? !iconEdited.current : !sameIconHost(requestedUrl))
+    );
+  };
   const requestClose = async () => {
     if (busy) return;
     if (
@@ -222,7 +262,10 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     const generation = ++fetchGeneration.current;
     if (!automatic) iconEdited.current = true;
     if (!(await form.trigger('url'))) {
-      if (active.current && generation === fetchGeneration.current) form.setFocus('url');
+      if (active.current && generation === fetchGeneration.current) {
+        if (submitting.current) pendingFocus.current = 'url';
+        else form.setFocus('url');
+      }
       return;
     }
     if (
@@ -230,7 +273,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
       generation !== fetchGeneration.current ||
       form.getValues('url') !== requestedUrl ||
       form.getValues('iconType') !== 'auto' ||
-      (automatic && (iconEdited.current || Boolean(form.getValues('websiteResourceId'))))
+      (automatic && !shouldAutoFetch())
     )
       return;
     automaticAttempt.current = requestedUrl;
@@ -246,7 +289,12 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
       )
         return;
       const currentResourceId = form.getValues('websiteResourceId');
-      if (icon && icon.type !== 'image/svg+xml' && currentResourceId) {
+      if (
+        icon &&
+        icon.type !== 'image/svg+xml' &&
+        currentResourceId &&
+        sameIconHost(requestedUrl)
+      ) {
         const currentImage =
           images.auto?.id === currentResourceId
             ? images.auto.blob
@@ -273,11 +321,12 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
         }
       }
       if (!form.getValues('title').trim()) {
-        form.setValue('title', metadata.title, { shouldDirty: true });
+        form.setValue('title', metadata.title, { shouldDirty: true, shouldValidate: true });
         if (!textEdited.current)
           form.setValue('textIcon', iconTextFromName(metadata.title), { shouldDirty: true });
       }
       if (icon) {
+        websiteIconUrl.current = requestedUrl;
         setImageSelection('auto', icon);
         if (!automatic) toast.success(t('navigation.metadataUpdated'));
       } else form.setError('websiteResourceId', { message: 'navigation.iconFetchFailed' });
@@ -317,7 +366,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
     async (data) => {
       try {
         const icon = data.icon;
-        const image = icon.source === 'text' ? undefined : images[icon.source];
+        const image = icon.source === 'text' ? undefined : imageDrafts.current[icon.source];
         const prepared =
           image && icon.source !== 'text' && image.id === icon.resourceId
             ? await prepareImage(image.blob, 'icon')
@@ -350,13 +399,42 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
       }
     },
     (invalid) => {
-      if (invalid.url) form.setFocus('url');
-      else if (invalid.title) form.setFocus('title');
-      else if (invalid.location) form.setFocus('location');
-      else if (invalid.textIcon) form.setFocus('textIcon');
-      else focusIconSource();
+      if (invalid.url) pendingFocus.current = 'url';
+      else if (invalid.title) pendingFocus.current = 'title';
+      else if (invalid.location) pendingFocus.current = 'location';
+      else {
+        setIconOptionsOpen(true);
+        pendingFocus.current = invalid.textIcon ? 'textIcon' : 'iconSource';
+      }
     },
   );
+  const saveSite = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting.current || fetching || openingCrop) return;
+    submitting.current = true;
+    setPreparingSave(true);
+    try {
+      if (shouldAutoFetch()) await autoFetch(true);
+      // A retained image belongs to its original website. Do not silently save
+      // that brand under a new host when fetching its replacement failed.
+      if (
+        active.current &&
+        form.getValues('iconType') === 'auto' &&
+        form.getValues('websiteResourceId') &&
+        !sameIconHost(form.getValues('url')) &&
+        (await form.trigger('url'))
+      ) {
+        form.setError('websiteResourceId', { message: 'navigation.changedSiteIconFailed' });
+        setIconOptionsOpen(true);
+        pendingFocus.current = 'iconSource';
+        return;
+      }
+      if (active.current) await submit();
+    } finally {
+      submitting.current = false;
+      if (active.current) setPreparingSave(false);
+    }
+  };
   const orderedGroups = [...space.groups].sort((a, b) => a.order - b.order);
   const previewBase = {
     title: values.title?.trim() || t('messages.addSite'),
@@ -397,7 +475,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
           form.setFocus('url');
         }}
       >
-        <form className="site-edit-form" onSubmit={submit} noValidate>
+        <form className="site-edit-form" onSubmit={(event) => void saveSite(event)} noValidate>
           <DialogHeader className="site-edit-heading">
             <DialogTitle>{t(site ? 'messages.editSite' : 'messages.addSite')}</DialogTitle>
           </DialogHeader>
@@ -424,16 +502,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                             )
                           )
                             return;
-                          const currentUrl = form.getValues('url');
-                          if (
-                            spaceId === 'normal' &&
-                            form.getValues('iconType') === 'auto' &&
-                            !form.getValues('websiteResourceId') &&
-                            !iconEdited.current &&
-                            currentUrl.trim() &&
-                            automaticAttempt.current !== currentUrl
-                          )
-                            void autoFetch(true);
+                          if (!submitting.current && shouldAutoFetch()) void autoFetch(true);
                         },
                       })}
                       aria-invalid={Boolean(errors.url)}
@@ -596,286 +665,301 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                         />
                       )}
                     </div>
-                    <span className="site-edit-preview-label">{t('navigation.iconPreview')}</span>
                   </aside>
-                  <div className="site-edit-icon-details">
-                    <label id={`${id}-source`}>{t('navigation.iconSource')}</label>
-                    <Controller
-                      control={form.control}
-                      name="iconType"
-                      render={({ field }) => (
-                        <RadioGroup.Root
-                          className="site-edit-icon-options"
-                          value={field.value}
-                          disabled={busy}
-                          aria-labelledby={`${id}-source`}
-                          onValueChange={(source) => {
-                            invalidateFetch();
-                            iconEdited.current = true;
-                            field.onChange(source);
-                          }}
-                        >
-                          <RadioGroup.Item
-                            value="auto"
-                            className="site-edit-icon-choice"
-                            aria-label={t('navigation.websiteIcon')}
-                          >
-                            <Globe2 size={15} aria-hidden="true" />
-                            <span>{t('navigation.websiteIcon')}</span>
-                          </RadioGroup.Item>
-                          <RadioGroup.Item
-                            value="text"
-                            className="site-edit-icon-choice"
-                            aria-label={t('navigation.textIcon')}
-                          >
-                            <Type size={15} aria-hidden="true" />
-                            <span>{t('navigation.textIcon')}</span>
-                          </RadioGroup.Item>
-                          <RadioGroup.Item
-                            value="resource"
-                            className="site-edit-icon-choice"
-                            aria-label={t('navigation.upload')}
-                          >
-                            <Upload size={15} aria-hidden="true" />
-                            <span>{t('navigation.upload')}</span>
-                          </RadioGroup.Item>
-                        </RadioGroup.Root>
+                  <div className="site-edit-icon-summary">
+                    <button
+                      type="button"
+                      className="site-edit-icon-toggle"
+                      aria-expanded={iconOptionsOpen}
+                      aria-controls={`${id}-icon-options`}
+                      onClick={() => setIconOptionsOpen((open) => !open)}
+                    >
+                      <span>{t('navigation.iconSection')}</span>
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </button>
+                    <p className="site-edit-help" role="status">
+                      {t(
+                        fetching
+                          ? 'navigation.fetchingIcon'
+                          : selectedSource === 'auto'
+                            ? selectedResourceId
+                              ? images.auto?.id === selectedResourceId
+                                ? 'navigation.draftIconHelp'
+                                : 'navigation.savedIconHelp'
+                              : spaceId === 'normal'
+                                ? 'navigation.websiteIconHelp'
+                                : 'navigation.privateIconHelp'
+                            : selectedSource === 'text'
+                              ? 'navigation.textIconHelp'
+                              : 'navigation.uploadIconHelp',
                       )}
-                    />
-                    {selectedImageSource && (
-                      <div className="site-edit-source-panel">
-                        <p className="site-edit-help" role="status">
-                          {t(
-                            fetching
-                              ? 'navigation.fetchingIcon'
-                              : selectedImageSource === 'auto'
-                                ? selectedResourceId
-                                  ? images.auto?.id === selectedResourceId
-                                    ? 'navigation.draftIconHelp'
-                                    : 'navigation.savedIconHelp'
-                                  : spaceId === 'normal'
-                                    ? 'navigation.websiteIconHelp'
-                                    : 'navigation.privateIconHelp'
-                                : 'navigation.uploadIconHelp',
-                          )}
-                        </p>
-                        <div className="site-edit-image-actions">
-                          {selectedImageSource === 'auto' && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="site-edit-fetch"
-                              aria-label={t('navigation.fetchIcon')}
-                              onClick={() => void autoFetch()}
-                              disabled={busy || fetching}
-                            >
-                              {fetching ? (
-                                <LoaderCircle className="spin" size={14} />
-                              ) : (
-                                <Globe2 size={14} />
-                              )}
-                              {t(
-                                selectedResourceId
-                                  ? 'navigation.refreshIcon'
-                                  : 'navigation.getIcon',
-                              )}
-                            </Button>
-                          )}
-                          {selectedImageSource === 'resource' && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              disabled={busy}
-                              onClick={() => imageInput.current?.click()}
-                            >
-                              <Upload size={14} />
-                              {t(
-                                selectedResourceId
-                                  ? 'navigation.replaceImage'
-                                  : 'navigation.chooseImage',
-                              )}
-                            </Button>
-                          )}
-                          {selectedResourceId && (
+                    </p>
+                  </div>
+                </div>
+                <div
+                  id={`${id}-icon-options`}
+                  className="site-edit-icon-details"
+                  hidden={!iconOptionsOpen}
+                >
+                  <label id={`${id}-source`}>{t('navigation.iconSource')}</label>
+                  <Controller
+                    control={form.control}
+                    name="iconType"
+                    render={({ field }) => (
+                      <RadioGroup.Root
+                        className="site-edit-icon-options"
+                        value={field.value}
+                        disabled={busy}
+                        aria-labelledby={`${id}-source`}
+                        onValueChange={(source) => {
+                          invalidateFetch();
+                          iconEdited.current = true;
+                          field.onChange(source);
+                        }}
+                      >
+                        <RadioGroup.Item
+                          value="auto"
+                          className="site-edit-icon-choice"
+                          aria-label={t('navigation.websiteIcon')}
+                        >
+                          <Globe2 size={15} aria-hidden="true" />
+                          <span>{t('navigation.websiteIcon')}</span>
+                        </RadioGroup.Item>
+                        <RadioGroup.Item
+                          value="text"
+                          className="site-edit-icon-choice"
+                          aria-label={t('navigation.textIcon')}
+                        >
+                          <Type size={15} aria-hidden="true" />
+                          <span>{t('navigation.textIcon')}</span>
+                        </RadioGroup.Item>
+                        <RadioGroup.Item
+                          value="resource"
+                          className="site-edit-icon-choice"
+                          aria-label={t('navigation.upload')}
+                        >
+                          <Upload size={15} aria-hidden="true" />
+                          <span>{t('navigation.upload')}</span>
+                        </RadioGroup.Item>
+                      </RadioGroup.Root>
+                    )}
+                  />
+                  {selectedImageSource && (
+                    <div className="site-edit-source-panel">
+                      <div className="site-edit-image-actions">
+                        {selectedImageSource === 'auto' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="site-edit-fetch"
+                            aria-label={t('navigation.fetchIcon')}
+                            onClick={() => void autoFetch()}
+                            disabled={busy || fetching}
+                          >
+                            {fetching ? (
+                              <LoaderCircle className="spin" size={14} />
+                            ) : (
+                              <Globe2 size={14} />
+                            )}
+                            {t(
+                              selectedResourceId ? 'navigation.refreshIcon' : 'navigation.getIcon',
+                            )}
+                          </Button>
+                        )}
+                        {selectedImageSource === 'resource' && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => imageInput.current?.click()}
+                          >
+                            <Upload size={14} />
+                            {t(
+                              selectedResourceId
+                                ? 'navigation.replaceImage'
+                                : 'navigation.chooseImage',
+                            )}
+                          </Button>
+                        )}
+                        {selectedResourceId && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={busy || openingCrop}
+                            onClick={() => void openCrop()}
+                          >
+                            {openingCrop ? (
+                              <LoaderCircle className="spin" size={14} />
+                            ) : (
+                              <Crop size={14} />
+                            )}
+                            {t('navigation.cropIcon')}
+                          </Button>
+                        )}
+                        {images[selectedImageSource] &&
+                          images[selectedImageSource]!.blob !==
+                            images[selectedImageSource]!.original && (
                             <Button
                               type="button"
                               variant="ghost"
-                              disabled={busy || openingCrop}
-                              onClick={() => void openCrop()}
+                              disabled={busy}
+                              onClick={() => {
+                                const image = images[selectedImageSource]!;
+                                setImageSelection(selectedImageSource, image.original);
+                              }}
                             >
-                              {openingCrop ? (
-                                <LoaderCircle className="spin" size={14} />
-                              ) : (
-                                <Crop size={14} />
-                              )}
-                              {t('navigation.cropIcon')}
+                              {t('navigation.originalImage')}
                             </Button>
                           )}
-                          {images[selectedImageSource] &&
-                            images[selectedImageSource]!.blob !==
-                              images[selectedImageSource]!.original && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => {
-                                  const image = images[selectedImageSource]!;
-                                  setImageSelection(selectedImageSource, image.original);
-                                }}
-                              >
-                                {t('navigation.originalImage')}
-                              </Button>
-                            )}
-                        </div>
-                        {errors.websiteResourceId && selectedImageSource === 'auto' && (
-                          <p className="form-error" role="alert">
-                            {errors.websiteResourceId.message?.startsWith('navigation.')
-                              ? t(errors.websiteResourceId.message)
-                              : errors.websiteResourceId.message}
-                          </p>
-                        )}
                       </div>
-                    )}
-                    <input
-                      ref={imageInput}
-                      type="file"
-                      hidden
-                      disabled={busy}
-                      accept="image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.ico,.svg"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) {
-                          try {
-                            iconEdited.current = true;
-                            setImageSelection('resource', file);
-                          } catch (reason) {
-                            form.setError('uploadResourceId', { message: errorMessage(reason) });
-                          }
+                    </div>
+                  )}
+                  <input
+                    ref={imageInput}
+                    type="file"
+                    hidden
+                    disabled={busy}
+                    accept="image/png,image/jpeg,image/webp,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,.ico,.svg"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        try {
+                          iconEdited.current = true;
+                          setImageSelection('resource', file);
+                        } catch (reason) {
+                          form.setError('uploadResourceId', { message: errorMessage(reason) });
                         }
-                        event.target.value = '';
-                      }}
-                    />
-                    {errors.uploadResourceId && selectedSource === 'resource' && (
-                      <p className="form-error" role="alert">
-                        {errors.uploadResourceId.message === 'navigation.uploadRequired'
-                          ? t('navigation.uploadRequired')
-                          : errors.uploadResourceId.message}
-                      </p>
-                    )}
-                    {selectedSource === 'text' && (
-                      <div className="site-edit-text-row">
-                        <label htmlFor={`${id}-text`}>{t('navigation.iconText')}</label>
-                        <div className="site-edit-text-input">
-                          <Type size={14} aria-hidden="true" />
-                          <Input
-                            id={`${id}-text`}
-                            {...form.register('textIcon', {
-                              onChange: () => {
-                                iconEdited.current = true;
-                                textEdited.current = true;
-                              },
-                            })}
-                            aria-invalid={Boolean(errors.textIcon)}
-                            aria-describedby={errors.textIcon ? `${id}-text-error` : undefined}
-                            disabled={busy}
-                          />
-                        </div>
-                        {errors.textIcon && (
-                          <p id={`${id}-text-error`} className="form-error" role="alert">
-                            {t(errors.textIcon.message!)}
-                          </p>
-                        )}
+                      }
+                      event.target.value = '';
+                    }}
+                  />
+                  {errors.uploadResourceId && selectedSource === 'resource' && (
+                    <p className="form-error" role="alert">
+                      {errors.uploadResourceId.message === 'navigation.uploadRequired'
+                        ? t('navigation.uploadRequired')
+                        : errors.uploadResourceId.message}
+                    </p>
+                  )}
+                  {selectedSource === 'text' && (
+                    <div className="site-edit-text-row">
+                      <label htmlFor={`${id}-text`}>{t('navigation.iconText')}</label>
+                      <div className="site-edit-text-input">
+                        <Type size={14} aria-hidden="true" />
+                        <Input
+                          id={`${id}-text`}
+                          {...form.register('textIcon', {
+                            onChange: () => {
+                              iconEdited.current = true;
+                              textEdited.current = true;
+                            },
+                          })}
+                          aria-invalid={Boolean(errors.textIcon)}
+                          aria-describedby={errors.textIcon ? `${id}-text-error` : undefined}
+                          disabled={busy}
+                        />
                       </div>
-                    )}
-                    <div className="site-edit-field">
-                      <label id={`${id}-color`}>{t('navigation.iconColor')}</label>
-                      <Controller
-                        control={form.control}
-                        name="iconBackground"
-                        render={({ field }) => (
-                          <div
-                            className="site-edit-palette"
-                            role="group"
-                            aria-labelledby={`${id}-color`}
-                          >
-                            <button
-                              type="button"
-                              className="site-edit-auto-color"
-                              aria-label={t('navigation.automaticBackground')}
-                              title={t('navigation.automaticBackground')}
-                              aria-pressed={field.value.mode === 'auto'}
-                              disabled={busy}
-                              onClick={() => field.onChange({ mode: 'auto' })}
-                            >
-                              <Sparkles size={14} aria-hidden="true" />
-                            </button>
-                            {BACKGROUND_COLORS.map(({ color, label }) => (
-                              <button
-                                key={color}
-                                type="button"
-                                className="site-edit-color"
-                                style={{ '--icon-color': color } as CSSProperties}
-                                aria-label={t(label)}
-                                title={t(label)}
-                                aria-pressed={
-                                  field.value.mode === 'color' && field.value.color === color
-                                }
-                                disabled={busy}
-                                onClick={() => field.onChange({ mode: 'color', color })}
-                              >
-                                {field.value.mode === 'color' && field.value.color === color && (
-                                  <Check size={14} aria-hidden="true" />
-                                )}
-                              </button>
-                            ))}
-                            <label
-                              className="site-edit-custom-color"
-                              title={t('navigation.customBackground')}
-                              data-state={
-                                field.value.mode === 'color' &&
-                                !BACKGROUND_COLORS.map(({ color }) => color).includes(
-                                  field.value.color,
-                                )
-                                  ? 'checked'
-                                  : 'unchecked'
-                              }
-                            >
-                              <input
-                                type="color"
-                                aria-label={t('navigation.customColor')}
-                                value={
-                                  field.value.mode === 'color'
-                                    ? field.value.color
-                                    : BACKGROUND_COLORS[2].color
-                                }
-                                disabled={busy}
-                                onChange={(event) =>
-                                  field.onChange({ mode: 'color', color: event.target.value })
-                                }
-                              />
-                              <span
-                                className="site-edit-picker-preview"
-                                aria-hidden="true"
-                                style={
-                                  {
-                                    '--picker-colors': `conic-gradient(${BACKGROUND_COLORS.slice(2)
-                                      .map(({ color }) => color)
-                                      .join(',')})`,
-                                  } as CSSProperties
-                                }
-                              />
-                            </label>
-                          </div>
-                        )}
-                      />
-                      {errors.iconBackground && (
-                        <p className="form-error" role="alert">
-                          {t('navigation.invalidIcon')}
+                      {errors.textIcon && (
+                        <p id={`${id}-text-error`} className="form-error" role="alert">
+                          {t(errors.textIcon.message!)}
                         </p>
                       )}
                     </div>
+                  )}
+                  <div className="site-edit-field">
+                    <label id={`${id}-color`}>{t('navigation.iconColor')}</label>
+                    <Controller
+                      control={form.control}
+                      name="iconBackground"
+                      render={({ field }) => (
+                        <div
+                          className="site-edit-palette"
+                          role="group"
+                          aria-labelledby={`${id}-color`}
+                        >
+                          <button
+                            type="button"
+                            className="site-edit-auto-color"
+                            aria-label={t('navigation.automaticBackground')}
+                            title={t('navigation.automaticBackground')}
+                            aria-pressed={field.value.mode === 'auto'}
+                            disabled={busy}
+                            onClick={() => field.onChange({ mode: 'auto' })}
+                          >
+                            <Sparkles size={14} aria-hidden="true" />
+                          </button>
+                          {BACKGROUND_COLORS.map(({ color, label }) => (
+                            <button
+                              key={color}
+                              type="button"
+                              className="site-edit-color"
+                              style={{ '--icon-color': color } as CSSProperties}
+                              aria-label={t(label)}
+                              title={t(label)}
+                              aria-pressed={
+                                field.value.mode === 'color' && field.value.color === color
+                              }
+                              disabled={busy}
+                              onClick={() => field.onChange({ mode: 'color', color })}
+                            >
+                              {field.value.mode === 'color' && field.value.color === color && (
+                                <Check size={14} aria-hidden="true" />
+                              )}
+                            </button>
+                          ))}
+                          <label
+                            className="site-edit-custom-color"
+                            title={t('navigation.customBackground')}
+                            data-state={
+                              field.value.mode === 'color' &&
+                              !BACKGROUND_COLORS.map(({ color }) => color).includes(
+                                field.value.color,
+                              )
+                                ? 'checked'
+                                : 'unchecked'
+                            }
+                          >
+                            <input
+                              type="color"
+                              aria-label={t('navigation.customColor')}
+                              value={
+                                field.value.mode === 'color'
+                                  ? field.value.color
+                                  : BACKGROUND_COLORS[2].color
+                              }
+                              disabled={busy}
+                              onChange={(event) =>
+                                field.onChange({ mode: 'color', color: event.target.value })
+                              }
+                            />
+                            <span
+                              className="site-edit-picker-preview"
+                              aria-hidden="true"
+                              style={
+                                {
+                                  '--picker-colors': `conic-gradient(${BACKGROUND_COLORS.slice(2)
+                                    .map(({ color }) => color)
+                                    .join(',')})`,
+                                } as CSSProperties
+                              }
+                            />
+                          </label>
+                        </div>
+                      )}
+                    />
+                    {errors.iconBackground && (
+                      <p className="form-error" role="alert">
+                        {t('navigation.invalidIcon')}
+                      </p>
+                    )}
                   </div>
                 </div>
+                {errors.websiteResourceId && selectedImageSource === 'auto' && (
+                  <p className="form-error" role="alert">
+                    {errors.websiteResourceId.message?.startsWith('navigation.')
+                      ? t(errors.websiteResourceId.message)
+                      : errors.websiteResourceId.message}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -899,7 +983,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
               className="site-edit-save"
               disabled={busy || fetching || openingCrop}
             >
-              {isSubmitting && <LoaderCircle className="spin" size={15} />}
+              {busy && <LoaderCircle className="spin" size={15} />}
               {t('messages.save')}
             </Button>
           </DialogFooter>

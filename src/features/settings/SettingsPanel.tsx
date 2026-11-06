@@ -1,5 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Cloud, Database, Grid2X2, Palette, SlidersHorizontal, Clock3 } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  Cloud,
+  Database,
+  Grid2X2,
+  Palette,
+  SlidersHorizontal,
+  Clock3,
+  Eye,
+  PanelRightClose,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -30,7 +39,6 @@ import {
   Toggle,
   type DraftReporter,
 } from './SettingsControls';
-import type { SettingsTarget } from './settings-target';
 import './settings.css';
 
 const DataSettings = lazy(() =>
@@ -48,17 +56,16 @@ const tabs = [
   ['sync', Cloud],
   ['data', Database],
 ] as const;
+type SettingsTab = (typeof tabs)[number][0];
 
 export default function SettingsPanel({
   spaceId,
   open,
   onClose,
-  target = 'general',
 }: {
   spaceId: SpaceId;
   open: boolean;
   onClose: () => void;
-  target?: SettingsTarget;
 }) {
   const { t } = useTranslation();
   const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
@@ -71,28 +78,35 @@ export default function SettingsPanel({
   const overrides = useRayTabStore((store) => store.state?.privateSettingOverrides)!;
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const privateLocked = useRayTabStore((store) => store.state?.privateSecurity.locked);
-  const [activeTab, setActiveTab] = useState<SettingsTarget>(target);
-  const [visited, setVisited] = useState<Set<SettingsTarget>>(() => new Set([target]));
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [visited, setVisited] = useState<Set<SettingsTab>>(() => new Set(['general']));
   const [drafts, setDrafts] = useState<Record<string, { dirty: boolean; busy: boolean }>>({});
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string>();
   const [failedPatch, setFailedPatch] = useState<Partial<SpaceSettings>>({});
   const [hasSaved, setHasSaved] = useState(false);
+  const [homePreview, setHomePreview] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const [confirm, confirmation] = useConfirm();
   const content = useRef<HTMLDivElement>(null);
   const category = useRef<HTMLButtonElement>(null);
   const language = useRef<HTMLButtonElement>(null);
+  const currentTab = useRef<SettingsTab>('general');
+  const scrollPositions = useRef<Partial<Record<SettingsTab, number>>>({});
+  const hasDraft = Object.values(drafts).some((draft) => draft.dirty);
+  const busy = saving || Object.values(drafts).some((draft) => draft.busy);
+  const canPreviewHome = activeTab === 'icons' || activeTab === 'appearance';
 
-  const changeTab = useCallback((tab: SettingsTarget) => {
+  const changeTab = useCallback((tab: SettingsTab) => {
+    if (content.current) scrollPositions.current[currentTab.current] = content.current.scrollTop;
+    currentTab.current = tab;
     setActiveTab(tab);
     setVisited((current) => new Set([...current, tab]));
-    content.current?.scrollTo({ top: 0 });
+    if (tab !== 'icons' && tab !== 'appearance') setHomePreview(false);
   }, []);
-  useEffect(() => {
-    changeTab(target);
-    if (target === 'general') language.current?.focus();
-  }, [target, changeTab]);
+  useLayoutEffect(() => {
+    content.current?.scrollTo({ top: scrollPositions.current[activeTab] ?? 0 });
+  }, [activeTab]);
   useEffect(() => {
     if (!open) return;
     const revealCategory = () =>
@@ -183,12 +197,12 @@ export default function SettingsPanel({
     }
   };
   const requestClose = async () => {
-    if (saving || Object.values(drafts).some((draft) => draft.busy)) {
+    if (busy) {
       toast.info(t('settings.waitForSave'));
       return;
     }
     const unsavedPreview = useRayTabStore.getState().settingsPreview;
-    if (Object.values(drafts).some((draft) => draft.dirty) || unsavedPreview?.spaceId === spaceId) {
+    if (hasDraft || unsavedPreview?.spaceId === spaceId) {
       if (
         !(await confirm({
           title: t('settings.discardTitle'),
@@ -262,15 +276,12 @@ export default function SettingsPanel({
     >
       <DialogContent
         variant="settings"
-        className="settings-workspace"
+        className={`settings-workspace${homePreview ? ' settings-workspace--preview' : ''}`}
+        overlayClassName={homePreview ? 'settings-preview-overlay' : undefined}
         closeLabel={t('settings.close')}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          if (target === 'general') language.current?.focus();
-          else {
-            category.current?.focus({ preventScroll: true });
-            category.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
-          }
+          language.current?.focus();
         }}
       >
         <div className="settings-layout">
@@ -308,24 +319,29 @@ export default function SettingsPanel({
           <div className="settings-main">
             <DialogHeader className="settings-workspace-header">
               <DialogTitle className="sr-only">{t('settings.title')}</DialogTitle>
+              <p className="settings-current-space">
+                {t(spaceId === 'normal' ? 'messages.personalSpace' : 'messages.privateSpace')}
+              </p>
               <div className="settings-header-line">
                 <h2 className="settings-category-title">{t('settings.tabs.' + activeTab)}</h2>
                 <div
                   className="settings-autosave"
                   role="status"
-                  aria-label={t('settings.autoSave')}
+                  aria-label={t('settings.saveStatus')}
                   aria-live="polite"
                   title={t('settings.autoSaveHelp')}
                 >
                   <span>
                     {t(
-                      saving
+                      busy
                         ? 'settings.saving'
                         : failure || Object.keys(failedPatch).length
                           ? 'settings.unsaved'
-                          : hasSaved
-                            ? 'settings.saved'
-                            : 'settings.autoSave',
+                          : hasDraft
+                            ? 'settings.pendingChanges'
+                            : hasSaved
+                              ? 'settings.saved'
+                              : 'settings.autoSave',
                     )}
                   </span>
                   {Object.keys(failedPatch).length > 0 && (
@@ -341,9 +357,24 @@ export default function SettingsPanel({
                   )}
                 </div>
               </div>
-              <p className="settings-category-description">
-                {t('settings.categoryDescriptions.' + activeTab)}
-              </p>
+              <div className="settings-category-meta">
+                <p className="settings-category-description">
+                  {t('settings.categoryDescriptions.' + activeTab)}
+                </p>
+                {canPreviewHome && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="settings-preview-toggle"
+                    aria-pressed={homePreview}
+                    onClick={() => setHomePreview((value) => !value)}
+                  >
+                    {homePreview ? <PanelRightClose size={14} /> : <Eye size={14} />}
+                    {t(homePreview ? 'settings.returnToSettings' : 'settings.previewHome')}
+                  </Button>
+                )}
+              </div>
               <DialogDescription className="sr-only">
                 {t(
                   spaceId === 'normal'
@@ -577,7 +608,7 @@ export default function SettingsPanel({
                   </Suspense>
                 </div>
               )}
-              {Object.values(drafts).some((draft) => draft.dirty) && (
+              {hasDraft && (
                 <p className="settings-draft-note" role="status">
                   {t('settings.draftHelp')}
                 </p>

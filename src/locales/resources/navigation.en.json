@@ -36,19 +36,14 @@
     "metadataUpdated": "Site details updated",
     "noImage": "No image is available. Upload an icon.",
     "desktopMenu": "Desktop actions",
-    "appearanceSettings": "Wallpaper and theme",
-    "iconSettings": "Icons and layout",
-    "allSettings": "All settings",
-    "widgetSettings": "Search and clock settings",
     "organizeContents": "Organize contents",
     "selectedSites_one": "{{count}} site selected",
     "selectedSites_other": "{{count}} sites selected",
     "siteCount_one": "{{count}} site",
     "siteCount_other": "{{count}} sites",
-    "newGroup": "New group",
     "name": "Name",
     "location": "Destination",
-    "iconSection": "Icon settings",
+    "iconSection": "Icon and appearance",
     "upload": "Upload image",
     "iconPreview": "Icon preview",
     "chooseImage": "Choose image",
@@ -68,6 +63,8 @@
       "red": "Red",
       "pink": "Pink",
       "purple": "Purple"
-    }
+    },
+    "textIconHelp": "Use text and a background color as the icon.",
+    "changedSiteIconFailed": "The URL has changed, but the new site icon could not be fetched. Retry, choose a text icon, or upload an image before saving."
   }
 }

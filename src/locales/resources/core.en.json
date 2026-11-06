@@ -12,7 +12,8 @@
       "missingSiteFolder": "A site references a missing folder",
       "missingActiveGroup": "The current group does not exist",
       "duplicateSearchEngineId": "Duplicate search engine ID",
-      "missingSearchEngine": "The current search engine does not exist"
+      "missingSearchEngine": "The current search engine does not exist",
+      "reservedSearchEngine": "Browser default search cannot be replaced by a custom engine"
     },
     "backup": {
       "missingResource": "Required backup resource {{id}} is missing"

@@ -175,10 +175,7 @@ export function SiteCard(props: SiteCardProps) {
 
 export function FolderPreview({ sites }: { sites: Site[] }) {
   return (
-    <div
-      className="relative flex items-center justify-center pointer-events-none"
-      style={{ width: 'var(--site-icon-size, 48px)', height: 'var(--site-icon-size, 48px)' }}
-    >
+    <div className="folder-preview relative flex items-center justify-center pointer-events-none">
       <div
         className="folder-icon-frame absolute inset-0 flex flex-wrap content-start justify-center gap-[6%] p-[6%] overflow-hidden"
         style={{ borderRadius: 'var(--site-icon-radius, 24%)' }}

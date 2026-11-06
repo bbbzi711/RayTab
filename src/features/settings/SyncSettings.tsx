@@ -24,6 +24,7 @@ import { useRayTabStore } from '@/storage/store';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
 import {
   FormError,
+  FormSaveHint,
   SettingsSelect,
   SettingsSection,
   Toggle,
@@ -605,6 +606,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 </div>
               )}
             </div>
+            <FormSaveHint dirty={isDirty} />
             <div className="settings-form-actions">
               <Button
                 type="submit"

@@ -4,7 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from 'sonner';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
-import type { SpaceId } from '@/storage/model';
+import { BROWSER_SEARCH_ENGINE, type SpaceId } from '@/storage/model';
+import { searchWithBrowser } from './browser-search';
 import { errorMessage } from '@/lib/errors';
 import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -22,6 +23,7 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
   const dispatch = useRayTabStore((store) => store.dispatch);
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const focusSearchOnClose = useRef(false);
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -38,19 +40,32 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
     window.addEventListener('keydown', focusSearch);
     return () => window.removeEventListener('keydown', focusSearch);
   }, []);
+  const useBrowserEngine = settings.searchEngine === BROWSER_SEARCH_ENGINE;
   const engine =
     settings.searchEngines.find((item) => item.id === settings.searchEngine) ??
     settings.searchEngines[0];
-  const search = (event: FormEvent) => {
+  const search = async (event: FormEvent) => {
     event.preventDefault();
     if (!query.trim()) return;
+    if (useBrowserEngine) {
+      try {
+        await searchWithBrowser(query.trim(), settings.openInNewTab);
+      } catch (reason) {
+        toast.error(errorMessage(reason));
+      }
+      return;
+    }
     const url = engine.url.replace('%s', encodeURIComponent(query.trim()));
     if (settings.openInNewTab) window.open(url, '_blank', 'noopener,noreferrer');
     else window.location.assign(url);
   };
   return (
     <form className="search-shell" onSubmit={search} role="search">
-      <DropdownMenu>
+      <DropdownMenu
+        onOpenChange={(open) => {
+          if (open) focusSearchOnClose.current = false;
+        }}
+      >
         <Tooltip content={t('messages.switchSearchEngine')} side="bottom">
           <DropdownMenuTrigger asChild>
             <button
@@ -58,12 +73,27 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               className="search-engine-trigger"
               aria-label={t('messages.switchSearchEngine')}
             >
-              {getSearchEngineIcon(engine.id, engine.name)}
+              {getSearchEngineIcon(
+                useBrowserEngine ? BROWSER_SEARCH_ENGINE : engine.id,
+                engine.name,
+              )}
               <ChevronDown size={13} aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
         </Tooltip>
-        <DropdownMenuContent align="start" className="min-w-48">
+        <DropdownMenuContent
+          align="start"
+          // Align to the search shell, whose trigger is inset 11px horizontally and 6px vertically.
+          alignOffset={-11}
+          sideOffset={12}
+          className="search-engine-menu"
+          onCloseAutoFocus={(event) => {
+            if (!focusSearchOnClose.current) return;
+            event.preventDefault();
+            focusSearchOnClose.current = false;
+            inputRef.current?.focus();
+          }}
+        >
           <DropdownMenuRadioGroup
             value={settings.searchEngine}
             onValueChange={(value) => {
@@ -72,8 +102,23 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               );
             }}
           >
+            <DropdownMenuRadioItem
+              value={BROWSER_SEARCH_ENGINE}
+              onSelect={() => {
+                focusSearchOnClose.current = true;
+              }}
+            >
+              {getSearchEngineIcon(BROWSER_SEARCH_ENGINE, '')}
+              <span>{t('messages.browserSearchEngine')}</span>
+            </DropdownMenuRadioItem>
             {settings.searchEngines.map((item) => (
-              <DropdownMenuRadioItem key={item.id} value={item.id}>
+              <DropdownMenuRadioItem
+                key={item.id}
+                value={item.id}
+                onSelect={() => {
+                  focusSearchOnClose.current = true;
+                }}
+              >
                 {getSearchEngineIcon(item.id, item.name)}
                 <span>{item.name}</span>
               </DropdownMenuRadioItem>

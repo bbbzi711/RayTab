@@ -93,7 +93,7 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
               <Button
                 type="button"
                 variant="outline"
-                className="cursor-pointer rounded-xl px-4"
+                className="cursor-pointer px-4"
                 onClick={() => respond(false)}
               >
                 {state.cancelText ?? t('messages.cancel')}
@@ -103,7 +103,7 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
               <Button
                 type="button"
                 variant={state.variant ?? 'default'}
-                className="cursor-pointer rounded-xl px-4"
+                className="cursor-pointer px-4"
                 onClick={() => respond(true)}
               >
                 {state.confirmText ?? t('messages.confirm')}

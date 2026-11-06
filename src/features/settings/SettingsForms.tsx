@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, Settings2, Trash2 } from 'lucide-react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { searchEngineSchema, type SpaceSettings } from '@/storage/model';
+import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
 import { useRayTabStore } from '@/storage/store';
 import { errorMessage } from '@/lib/errors';
 import { prepareImage } from '@/lib/images';
 import {
   FormError,
+  FormSaveHint,
   SettingsFilePicker,
   useDraftStatus,
   type DraftReporter,
@@ -88,6 +90,7 @@ export function WallpaperForm({
       </label>
       <FormError error={errors.url} />
       <FormError error={errors.root} />
+      <FormSaveHint dirty={isDirty} />
       <Button type="submit" variant="outline" size="sm" disabled={isSubmitting}>
         {t(isSubmitting ? 'settings.saving' : 'settings.useWallpaper')}
       </Button>
@@ -147,6 +150,7 @@ export function LocalWallpaperForm({
       />
       <FormError error={errors.file && { message: t('settings.chooseWallpaperFile') }} />
       <FormError error={errors.root} />
+      <FormSaveHint dirty={Boolean(file?.length)} />
       <Button type="submit" variant="outline" size="sm" disabled={isSubmitting}>
         {t(isSubmitting ? 'settings.saving' : 'settings.useLocalWallpaper')}
       </Button>
@@ -211,184 +215,192 @@ export function SearchEngineSettings({
     if (!id) editor.current?.querySelector('summary')?.focus();
   };
   return (
-    <div className="search-engine-settings">
-      <div className="search-engine-list">
-        {settings.searchEngines.map((engine) => (
-          <div className="search-engine-row" key={engine.id}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="search-engine-choice"
-              aria-label={engine.name}
-              aria-pressed={settings.searchEngine === engine.id}
-              disabled={busy}
-              onClick={() =>
-                void save({ searchEngine: engine.id }).catch((reason: unknown) =>
-                  toast.error(errorMessage(reason)),
-                )
-              }
-            >
-              <span className="search-engine-copy">
-                <span className="search-engine-name">{engine.name}</span>
-                <span className="search-engine-address" title={engine.url}>
-                  {new URL(engine.url).hostname}
+    <details className="search-engine-disclosure">
+      <summary role="button">
+        <Settings2 size={15} aria-hidden="true" />
+        <span>{t('settings.manageSearchEngines')}</span>
+        <ChevronDown size={14} aria-hidden="true" />
+      </summary>
+      <div className="search-engine-settings">
+        <p className="settings-help">{t('settings.chooseEngineOnHome')}</p>
+        <div className="search-engine-list">
+          {settings.searchEngines.map((engine) => (
+            <div className="search-engine-row" key={engine.id}>
+              <div className="search-engine-info">
+                {getSearchEngineIcon(engine.id, engine.name)}
+                <span className="search-engine-copy">
+                  <span className="search-engine-name" title={engine.name}>
+                    {engine.name}
+                  </span>
+                  <span className="search-engine-address" title={engine.url}>
+                    {new URL(engine.url).hostname}
+                  </span>
                 </span>
-              </span>
-              {settings.searchEngine === engine.id && <Check size={15} aria-hidden="true" />}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="search-engine-action"
-              disabled={busy}
-              aria-label={t('settings.editNamed', { name: engine.name })}
-              title={t('settings.editNamed', { name: engine.name })}
-              onClick={() => void edit(engine.id)}
-            >
-              <Pencil size={14} aria-hidden="true" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="search-engine-action search-engine-delete"
-              disabled={busy || settings.searchEngines.length === 1}
-              aria-label={t('settings.deleteNamed', { name: engine.name })}
-              title={t('settings.deleteNamed', { name: engine.name })}
-              onClick={() => {
-                if (busy) return;
-                removal.setValue('id', engine.id);
-                void removal.handleSubmit(async ({ id }) => {
-                  if (
-                    editingId === id &&
-                    isDirty &&
-                    !(await confirm({
-                      title: t('settings.discardTitle'),
-                      description: t('settings.discardDescription'),
-                      confirmText: t('settings.discard'),
-                      cancelText: t('settings.keepEditing'),
-                      variant: 'destructive',
-                    }))
-                  )
-                    return;
-                  const engines = settings.searchEngines.filter((item) => item.id !== id);
-                  try {
-                    await save({
-                      searchEngines: engines,
-                      searchEngine:
-                        settings.searchEngine === id ? engines[0].id : settings.searchEngine,
-                    });
-                    if (editingId === id) {
-                      setEditingId(undefined);
-                      form.reset({ name: '', url: '' });
-                      setEditorOpen(false);
-                    }
-                    removal.reset({ id: '' });
-                  } catch (reason) {
-                    toast.error(errorMessage(reason));
-                  }
-                })();
-              }}
-            >
-              <Trash2 size={14} aria-hidden="true" />
-            </Button>
-          </div>
-        ))}
-      </div>
-      <details
-        className="search-engine-editor"
-        ref={editor}
-        open={editorOpen}
-        onToggle={(event) => setEditorOpen(event.currentTarget.open)}
-      >
-        <summary
-          role="button"
-          aria-expanded={editorOpen}
-          aria-disabled={busy}
-          onClick={(event) => {
-            if (busy) event.preventDefault();
-          }}
-        >
-          {editingId ? (
-            <Pencil size={14} aria-hidden="true" />
-          ) : (
-            <Plus size={15} aria-hidden="true" />
-          )}
-          <span>{t(editingId ? 'settings.editSearchEngine' : 'settings.addSearchEngine')}</span>
-          <ChevronDown size={14} aria-hidden="true" />
-        </summary>
-        <form
-          aria-label={t('settings.editSearchEngine')}
-          className="settings-form"
-          noValidate
-          onSubmit={form.handleSubmit(async (values) => {
-            try {
-              const engine = { ...values, id: editingId ?? crypto.randomUUID() };
-              await save({
-                searchEngines: editingId
-                  ? settings.searchEngines.map((item) => (item.id === editingId ? engine : item))
-                  : [...settings.searchEngines, engine],
-                searchEngine: editingId ? settings.searchEngine : engine.id,
-              });
-              setEditingId(undefined);
-              form.reset({ name: '', url: '' });
-              setEditorOpen(false);
-              editor.current?.querySelector('summary')?.focus();
-              toast.success(t('settings.saved'));
-            } catch (reason) {
-              form.setError('root', { message: errorMessage(reason) });
-            }
-          })}
-        >
-          <label>
-            {t('settings.engineName')}
-            <Input
-              {...form.register('name')}
-              maxLength={80}
-              aria-invalid={Boolean(errors.name)}
-              disabled={busy}
-            />
-          </label>
-          <FormError error={errors.name} />
-          <label>
-            {t('settings.engineUrl')}
-            <Input
-              {...form.register('url')}
-              placeholder="https://example.com/search?q=%s"
-              aria-invalid={Boolean(errors.url)}
-              disabled={busy}
-            />
-          </label>
-          <FormError error={errors.url} />
-          <FormError error={errors.root} />
-          <p className="settings-help">{t('settings.engineHelp')}</p>
-          <div className="settings-form-actions">
-            <Button
-              type="submit"
-              variant="outline"
-              size="sm"
-              disabled={busy || (!editingId && settings.searchEngines.length >= 20)}
-            >
-              {t(editingId ? 'settings.save' : 'settings.add')}
-            </Button>
-            {(editingId || isDirty) && (
+              </div>
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="icon-sm"
+                className="search-engine-action"
                 disabled={busy}
-                onClick={() => void edit()}
+                aria-label={t('settings.editNamed', { name: engine.name })}
+                title={t('settings.editNamed', { name: engine.name })}
+                onClick={() => void edit(engine.id)}
               >
-                {t('settings.cancel')}
+                <Pencil size={14} aria-hidden="true" />
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="search-engine-action search-engine-delete"
+                disabled={busy || settings.searchEngines.length === 1}
+                aria-label={t('settings.deleteNamed', { name: engine.name })}
+                title={t('settings.deleteNamed', { name: engine.name })}
+                onClick={() => {
+                  if (busy) return;
+                  removal.setValue('id', engine.id);
+                  void removal.handleSubmit(async ({ id }) => {
+                    const engines = settings.searchEngines.filter((item) => item.id !== id);
+                    if (!engines.length) return;
+                    if (
+                      !(await confirm({
+                        title: t('settings.deleteEngineTitle', { name: engine.name }),
+                        description: [
+                          t('settings.deleteEngineDescription'),
+                          settings.searchEngine === id
+                            ? t('settings.deleteActiveEngineDescription', {
+                                name: engines[0].name,
+                              })
+                            : '',
+                          editingId === id && isDirty
+                            ? t('settings.deleteEngineDraftDescription')
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' '),
+                        confirmText: t('messages.delete'),
+                        cancelText: t('settings.cancel'),
+                        variant: 'destructive',
+                      }))
+                    )
+                      return;
+                    try {
+                      await save({
+                        searchEngines: engines,
+                        ...(settings.searchEngine === id ? { searchEngine: engines[0].id } : {}),
+                      });
+                      if (editingId === id) {
+                        setEditingId(undefined);
+                        form.reset({ name: '', url: '' });
+                        setEditorOpen(false);
+                      }
+                      removal.reset({ id: '' });
+                      toast.success(t('messages.deleted'));
+                    } catch (reason) {
+                      toast.error(errorMessage(reason));
+                    }
+                  })();
+                }}
+              >
+                <Trash2 size={14} aria-hidden="true" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <details
+          className="search-engine-disclosure"
+          ref={editor}
+          open={editorOpen}
+          onToggle={(event) => setEditorOpen(event.currentTarget.open)}
+        >
+          <summary
+            role="button"
+            aria-expanded={editorOpen}
+            aria-disabled={busy}
+            onClick={(event) => {
+              if (busy) event.preventDefault();
+            }}
+          >
+            {editingId ? (
+              <Pencil size={14} aria-hidden="true" />
+            ) : (
+              <Plus size={15} aria-hidden="true" />
             )}
-          </div>
-        </form>
-      </details>
-      {confirmation}
-    </div>
+            <span>{t(editingId ? 'settings.editSearchEngine' : 'settings.addSearchEngine')}</span>
+            <ChevronDown size={14} aria-hidden="true" />
+          </summary>
+          <form
+            aria-label={t('settings.editSearchEngine')}
+            className="settings-form"
+            noValidate
+            onSubmit={form.handleSubmit(async (values) => {
+              try {
+                const engine = { ...values, id: editingId ?? crypto.randomUUID() };
+                await save({
+                  searchEngines: editingId
+                    ? settings.searchEngines.map((item) => (item.id === editingId ? engine : item))
+                    : [...settings.searchEngines, engine],
+                });
+                setEditingId(undefined);
+                form.reset({ name: '', url: '' });
+                setEditorOpen(false);
+                editor.current?.querySelector('summary')?.focus();
+                toast.success(t('settings.saved'));
+              } catch (reason) {
+                form.setError('root', { message: errorMessage(reason) });
+              }
+            })}
+          >
+            <label>
+              {t('settings.engineName')}
+              <Input
+                {...form.register('name')}
+                maxLength={80}
+                aria-invalid={Boolean(errors.name)}
+                disabled={busy}
+              />
+            </label>
+            <FormError error={errors.name} />
+            <label>
+              {t('settings.engineUrl')}
+              <Input
+                {...form.register('url')}
+                placeholder="https://example.com/search?q=%s"
+                aria-invalid={Boolean(errors.url)}
+                disabled={busy}
+              />
+            </label>
+            <FormError error={errors.url} />
+            <FormError error={errors.root} />
+            <p className="settings-help">{t('settings.engineHelp')}</p>
+            <FormSaveHint dirty={isDirty} />
+            <div className="settings-form-actions">
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={busy || (!editingId && settings.searchEngines.length >= 20)}
+              >
+                {t(editingId ? 'settings.save' : 'settings.add')}
+              </Button>
+              {(editingId || isDirty) && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void edit()}
+                >
+                  {t('settings.cancel')}
+                </Button>
+              )}
+            </div>
+          </form>
+        </details>
+        {confirmation}
+      </div>
+    </details>
   );
 }
 
@@ -502,6 +514,7 @@ export function PasswordForm({
         </>
       )}
       <FormError error={errors.root} />
+      <FormSaveHint dirty={isDirty} />
       <Button
         type="submit"
         variant={mode === 'remove' ? 'destructive' : 'outline'}

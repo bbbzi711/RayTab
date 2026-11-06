@@ -25,6 +25,7 @@ import {
   Plus,
   ListTree,
   CheckSquare,
+  Square,
   House,
   Layers,
   MoreHorizontal,
@@ -48,7 +49,7 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { type Site, type Folder, type Group } from '@/storage/model';
 import { resolveHomeTextColors } from '@/features/appearance/text-colors';
 import { cn } from '@/lib/utils';
-import { SiteCard, SiteCardView, FolderCard, FolderCardView } from './NavigationCards';
+import { SiteCard, SiteCardView, FolderCard, FolderCardView, SiteTitle } from './NavigationCards';
 import { SiteEditor } from './SiteEditor';
 import { NameDialog, MoveDialog } from './NavigationDialogs';
 import { navigationDropCommand, type NavigationDrag } from './navigation-drop';
@@ -141,7 +142,13 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     [space.folders, selectedFolderId],
   );
 
-  const [manageMode, setManageMode] = useState(false);
+  const managementLocation = JSON.stringify([spaceId, activeGroup.id, selectedFolderId]);
+  const [managedLocation, setManagedLocation] = useState<string | null>(null);
+  const manageMode = managedLocation === managementLocation;
+  const setManageMode = useCallback(
+    (enabled: boolean) => setManagedLocation(enabled ? managementLocation : null),
+    [managementLocation],
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<Site | undefined>();
@@ -165,7 +172,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
       addFolder: () => setNameTarget({ type: 'folder' }),
       organize: () => setManageMode(true),
     }),
-    [],
+    [setManageMode],
   );
 
   const [activeDrag, setActiveDrag] = useState<NavigationDrag | null>(null);
@@ -239,7 +246,8 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [activeGroupId, selectedFolderId, spaceId]);
+    setManagedLocation((current) => (current === managementLocation ? current : null));
+  }, [managementLocation]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -259,7 +267,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedFolderId, editorOpen, nameTarget, moveTarget, manageMode]);
+  }, [selectedFolderId, editorOpen, nameTarget, moveTarget, manageMode, setManageMode]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
@@ -293,13 +301,22 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
   };
 
   const handleMoveSave = async (groupId: string, folderId: string | null) => {
-    if (!moveTarget) return;
+    if (!moveTarget) return false;
     if (moveTarget.type === 'site' && moveTarget.item) {
+      const site = space.sites.find((item) => item.id === moveTarget.item!.id);
+      if (site?.groupId === groupId && site.folderId === folderId) return false;
       await dispatch({ type: 'move-site', spaceId, id: moveTarget.item.id, groupId, folderId });
     } else if (moveTarget.type === 'folder' && moveTarget.item) {
+      if (space.folders.find((item) => item.id === moveTarget.item!.id)?.groupId === groupId)
+        return false;
       await dispatch({ type: 'move-folder', spaceId, id: moveTarget.item.id, groupId });
     } else if (moveTarget.type === 'sites' && moveTarget.ids) {
-      await dispatch({ type: 'move-sites', spaceId, ids: moveTarget.ids, groupId, folderId });
+      const ids = moveTarget.ids.filter((id) => {
+        const site = space.sites.find((item) => item.id === id);
+        return site?.groupId !== groupId || site.folderId !== folderId;
+      });
+      if (!ids.length) return false;
+      await dispatch({ type: 'move-sites', spaceId, ids, groupId, folderId });
       setSelectedIds(new Set());
       setManageMode(false);
     } else if (moveTarget.type === 'group' && moveTarget.item) {
@@ -310,6 +327,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
         destinationGroupId: groupId,
       });
     }
+    return true;
   };
 
   const openEditor = (site?: Site) => {
@@ -369,7 +387,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
             folderId: folder.id,
           })
         )
-          setManageMode(true);
+          setManagedLocation(JSON.stringify([spaceId, folder.groupId, folder.id]));
       },
     },
     {
@@ -394,7 +412,6 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     },
   ];
   const groupActions = (group: Group, index: number): NavigationAction[] => [
-    { id: 'new', label: t('navigation.newGroup'), run: () => setNameTarget({ type: 'group' }) },
     {
       id: 'rename',
       label: t('messages.rename'),
@@ -448,13 +465,14 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
           type="button"
           variant="ghost"
           className="manage-toolbar-action"
+          aria-pressed={allSelected}
           aria-label={
             allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')
           }
           title={allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')}
           onClick={handleToggleAll}
         >
-          <CheckSquare className="mr-2" size={16} />
+          {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
           {allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')}
         </Button>
         <Button
@@ -656,7 +674,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
                   <span className="add-site-icon">
                     <Plus size={22} />
                   </span>
-                  <span className="text-xs font-medium leading-tight">{t('messages.addSite')}</span>
+                  {settings.showSiteTitle && <SiteTitle title={t('messages.addSite')} />}
                 </button>
               )}
             </SortableContext>
@@ -750,9 +768,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
                     <span className="add-site-icon">
                       <Plus size={22} />
                     </span>
-                    <span className="text-xs font-medium leading-tight">
-                      {t('messages.addSite')}
-                    </span>
+                    {settings.showSiteTitle && <SiteTitle title={t('messages.addSite')} />}
                   </button>
                 )}
               </SortableContext>
@@ -788,6 +804,13 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
             groups={space.groups}
             folders={space.folders}
             initialGroupId={activeGroupId}
+            initialFolderId={
+              moveTarget.type === 'site'
+                ? space.sites.find((site) => site.id === moveTarget.item?.id)?.folderId
+                : moveTarget.type === 'sites'
+                  ? selectedFolderId
+                  : null
+            }
             excludeGroupId={moveTarget.type === 'group' ? moveTarget.item!.id : undefined}
             allowFolders={moveTarget.type !== 'group' && moveTarget.type !== 'folder'}
             destructive={moveTarget.type === 'group'}

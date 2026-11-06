@@ -79,12 +79,6 @@ body {
   top: 0;
   right: 0;
 }
-.widget-settings-wrap {
-  position: relative;
-  width: 100%;
-  max-width: 600px;
-  margin-inline: auto;
-}
 .group:hover > .group-more-trigger,
 .group:focus-within > .group-more-trigger {
   opacity: 1;

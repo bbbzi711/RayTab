@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cn } from 'cn';
-import { CheckIcon, ChevronRightIcon, CircleIcon } from 'lucide-react';
+import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
 import './menu.css';
 
@@ -162,7 +162,7 @@ function ContextMenuRadioItem({
     >
       <span className="menu-indicator">
         <ContextMenuPrimitive.ItemIndicator>
-          <CircleIcon className="menu-radio-mark" />
+          <CheckIcon />
         </ContextMenuPrimitive.ItemIndicator>
       </span>
       {children}

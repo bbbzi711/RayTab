@@ -45,24 +45,27 @@
   --color-card-foreground: var(--foreground);
   --color-popover: var(--background);
   --color-popover-foreground: var(--foreground);
-  --color-primary: #0f172a;
-  --color-primary-foreground: #fff;
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0f172a;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
-  --color-accent: rgba(0, 0, 0, 0.04);
-  --color-accent-foreground: #0f172a;
+  --color-primary: var(--preferences-primary);
+  --color-primary-foreground: var(--preferences-accent-foreground);
+  --color-secondary: var(--preferences-field);
+  --color-secondary-foreground: var(--preferences-text);
+  --color-muted: var(--preferences-field);
+  --color-muted-foreground: var(--preferences-muted);
+  --color-accent: var(--preferences-selection);
+  --color-accent-foreground: var(--preferences-text);
   --color-destructive: #ef4444;
-  --color-border: rgba(0, 0, 0, 0.1);
-  --color-input: rgba(0, 0, 0, 0.1);
-  --color-ring: #0ea5e9;
+  --color-border: var(--preferences-line);
+  --color-input: var(--preferences-line);
+  --color-ring: var(--preferences-accent);
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
 }
 :root {
+  --radius-control: 10px;
+  --radius-panel: 18px;
+  --radius-item: 8px;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC',
     'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
@@ -70,17 +73,17 @@
   background: #090d16;
   --background: #ffffff;
   --foreground: #0f172a;
-  --surface-popover: rgba(255, 255, 255, 0.96);
+  --surface-popover: color-mix(in srgb, var(--preferences-surface) 88%, transparent);
   --surface-control: rgba(255, 255, 255, 0.82);
   --surface-control-hover: rgba(255, 255, 255, 0.94);
   --surface-border: rgba(255, 255, 255, 0.58);
-  --surface-divider: rgba(15, 23, 42, 0.08);
-  --surface-text: #0f172a;
-  --surface-muted: #64748b;
+  --surface-divider: color-mix(in srgb, var(--preferences-text) 12%, transparent);
+  --surface-text: var(--preferences-text);
+  --surface-muted: var(--preferences-muted);
   --icon-image-surface: #ffffff;
   --icon-folder-surface: #e2e8f0;
   --icon-folder-mark: #64748b;
-  --surface-focus: #3b82f6;
+  --surface-focus: var(--preferences-accent);
   --elevation-popover: 0 16px 40px -8px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.06);
   --elevation-icon: 0 4px 12px -2px rgba(15, 23, 42, 0.16), 0 1px 3px rgba(15, 23, 42, 0.06);
   --elevation-icon-hover: 0 8px 20px -3px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.08);
@@ -88,14 +91,14 @@
   --motion-standard: 200ms;
   --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
   --dialog-center-offset: 0px;
-  --dialog-surface: #ffffff;
-  --dialog-text: #0f172a;
-  --dialog-muted: #64748b;
-  --dialog-border: #e2e8f0;
-  --dialog-inner-border: #f1f5f9;
-  --dialog-subtle-surface: #f8fafc;
-  --dialog-control-surface: #ffffff;
-  --dialog-hover: #f1f5f9;
+  --dialog-surface: var(--preferences-surface);
+  --dialog-text: var(--preferences-text);
+  --dialog-muted: var(--preferences-muted);
+  --dialog-border: var(--preferences-line);
+  --dialog-inner-border: var(--preferences-line);
+  --dialog-subtle-surface: var(--preferences-canvas);
+  --dialog-control-surface: var(--preferences-surface);
+  --dialog-hover: var(--preferences-field);
   --dialog-control-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   --dialog-shadow: 0 20px 50px -10px rgba(15, 23, 42, 0.16), 0 6px 16px rgba(15, 23, 42, 0.06);
   --preferences-accent: #2563eb;
@@ -117,13 +120,13 @@
   --toolbar-muted: rgba(255, 255, 255, 0.7);
   --toolbar-hover: rgba(255, 255, 255, 0.14);
   --toolbar-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.32);
-  --search-surface: rgba(255, 255, 255, 0.62);
-  --search-surface-hover: rgba(255, 255, 255, 0.76);
-  --search-surface-focus: rgba(255, 255, 255, 0.88);
-  --search-border: rgba(255, 255, 255, 0.48);
-  --search-border-focus: rgba(255, 255, 255, 0.76);
-  --search-text: #172033;
-  --search-action-hover: rgba(15, 23, 42, 0.07);
+  --search-surface: color-mix(in srgb, var(--preferences-surface) 72%, transparent);
+  --search-surface-hover: color-mix(in srgb, var(--preferences-surface) 80%, transparent);
+  --search-surface-focus: color-mix(in srgb, var(--preferences-surface) 88%, transparent);
+  --search-border: var(--surface-divider);
+  --search-border-focus: var(--preferences-accent);
+  --search-text: var(--preferences-text);
+  --search-action-hover: var(--preferences-selection);
   --search-shadow: 0 8px 24px -2px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.04);
   --search-shadow-focus:
     0 12px 32px -2px rgba(15, 23, 42, 0.15), 0 0 0 3px rgba(255, 255, 255, 0.32);
@@ -131,9 +134,9 @@
   --segmented-thumb: var(--preferences-surface);
   --segmented-thumb-text: var(--preferences-accent);
   --segmented-thumb-shadow: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --toast-surface: rgba(255, 255, 255, 0.96);
-  --toast-text: #0f172a;
-  --toast-border: rgba(15, 23, 42, 0.08);
+  --toast-surface: var(--surface-popover);
+  --toast-text: var(--preferences-text);
+  --toast-border: var(--surface-divider);
   --toast-shadow: 0 14px 36px -4px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.06);
   --toast-success-surface: rgba(240, 253, 244, 0.96);
   --toast-success-text: #15803d;
@@ -157,22 +160,10 @@
   --icon-folder-mark: #94a3b8;
   --background: #0b0f17;
   --foreground: #f8fafc;
-  --surface-popover: rgba(15, 23, 42, 0.95);
   --surface-control: rgba(255, 255, 255, 0.09);
   --surface-control-hover: rgba(255, 255, 255, 0.14);
   --surface-border: rgba(255, 255, 255, 0.12);
-  --surface-divider: rgba(255, 255, 255, 0.08);
-  --surface-text: #f8fafc;
-  --surface-muted: #94a3b8;
   --elevation-popover: 0 20px 50px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.25);
-  --dialog-surface: #181b22;
-  --dialog-text: #f1f5f9;
-  --dialog-muted: #94a3b8;
-  --dialog-border: #262b38;
-  --dialog-inner-border: #202430;
-  --dialog-subtle-surface: #11141b;
-  --dialog-control-surface: #1e2330;
-  --dialog-hover: #262d3d;
   --dialog-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
   --dialog-shadow: 0 28px 80px rgba(0, 0, 0, 0.56), 0 8px 24px rgba(0, 0, 0, 0.3);
   --preferences-accent: #60a5fa;
@@ -194,22 +185,9 @@
   --toolbar-muted: rgba(248, 250, 252, 0.65);
   --toolbar-hover: rgba(255, 255, 255, 0.12);
   --toolbar-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.52);
-  --search-surface: rgba(15, 23, 42, 0.56);
-  --search-surface-hover: rgba(15, 23, 42, 0.68);
-  --search-surface-focus: rgba(15, 23, 42, 0.76);
-  --search-border: rgba(255, 255, 255, 0.22);
-  --search-border-focus: rgba(255, 255, 255, 0.42);
-  --search-text: #f8fafc;
-  --search-action-hover: rgba(255, 255, 255, 0.1);
   --search-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --search-shadow-focus: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.12);
-  --segmented-track: rgba(0, 0, 0, 0.32);
-  --segmented-thumb: #262d3d;
-  --segmented-thumb-text: #60a5fa;
   --segmented-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --toast-surface: rgba(24, 27, 34, 0.95);
-  --toast-text: #f8fafc;
-  --toast-border: rgba(255, 255, 255, 0.12);
   --toast-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
   --toast-success-surface: rgba(13, 40, 24, 0.95);
   --toast-success-text: #86efac;
@@ -229,22 +207,10 @@
     --icon-folder-mark: #94a3b8;
     --background: #0b0f17;
     --foreground: #f8fafc;
-    --surface-popover: rgba(15, 23, 42, 0.95);
     --surface-control: rgba(255, 255, 255, 0.09);
     --surface-control-hover: rgba(255, 255, 255, 0.14);
     --surface-border: rgba(255, 255, 255, 0.12);
-    --surface-divider: rgba(255, 255, 255, 0.08);
-    --surface-text: #f8fafc;
-    --surface-muted: #94a3b8;
     --elevation-popover: 0 20px 50px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.25);
-    --dialog-surface: #181b22;
-    --dialog-text: #f1f5f9;
-    --dialog-muted: #94a3b8;
-    --dialog-border: #262b38;
-    --dialog-inner-border: #202430;
-    --dialog-subtle-surface: #11141b;
-    --dialog-control-surface: #1e2330;
-    --dialog-hover: #262d3d;
     --dialog-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
     --dialog-shadow: 0 28px 80px rgba(0, 0, 0, 0.56), 0 8px 24px rgba(0, 0, 0, 0.3);
     --preferences-accent: #60a5fa;
@@ -266,22 +232,9 @@
     --toolbar-muted: rgba(248, 250, 252, 0.65);
     --toolbar-hover: rgba(255, 255, 255, 0.12);
     --toolbar-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.52);
-    --search-surface: rgba(15, 23, 42, 0.56);
-    --search-surface-hover: rgba(15, 23, 42, 0.68);
-    --search-surface-focus: rgba(15, 23, 42, 0.76);
-    --search-border: rgba(255, 255, 255, 0.22);
-    --search-border-focus: rgba(255, 255, 255, 0.42);
-    --search-text: #f8fafc;
-    --search-action-hover: rgba(255, 255, 255, 0.1);
     --search-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     --search-shadow-focus: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.12);
-    --segmented-track: rgba(0, 0, 0, 0.32);
-    --segmented-thumb: #262d3d;
-    --segmented-thumb-text: #60a5fa;
     --segmented-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
-    --toast-surface: rgba(24, 27, 34, 0.95);
-    --toast-text: #f8fafc;
-    --toast-border: rgba(255, 255, 255, 0.12);
     --toast-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
     --toast-success-surface: rgba(13, 40, 24, 0.95);
     --toast-success-text: #86efac;
@@ -385,7 +338,8 @@ select:focus-visible {
     transform var(--motion-standard) var(--ease-standard),
     box-shadow var(--motion-standard) var(--ease-standard);
 }
-.icon-frame--site {
+.icon-frame--site,
+.folder-preview {
   width: var(--site-icon-size, 48px);
   height: var(--site-icon-size, 48px);
   border-radius: var(--site-icon-radius, 24%);
@@ -486,7 +440,7 @@ select:focus-visible {
   margin: 0 auto;
   padding: 0 10px;
   border: 1px solid var(--search-border);
-  border-radius: 16px;
+  border-radius: var(--radius-panel);
   background: var(--search-surface);
   color: var(--search-text);
   box-shadow: var(--search-shadow);
@@ -520,7 +474,7 @@ select:focus-visible {
 }
 .search-engine-trigger {
   gap: 5px;
-  padding: 0 8px;
+  padding: 0 6px;
 }
 .search-engine-trigger:hover,
 .search-action:hover {
@@ -680,7 +634,7 @@ select:focus-visible {
   overflow-x: hidden;
   overflow-y: auto;
   border: 1px solid var(--dialog-border);
-  border-radius: 24px;
+  border-radius: var(--radius-panel);
   padding: 28px 30px;
   background: var(--dialog-surface);
   box-shadow: var(--dialog-shadow);
@@ -729,7 +683,7 @@ select:focus-visible {
   width: min(620px, calc(100vw - 96px));
   overflow: hidden;
   border: 1px solid var(--dialog-border);
-  border-radius: 24px;
+  border-radius: var(--radius-panel);
   background: var(--dialog-surface);
   color: var(--dialog-text);
   box-shadow: var(--dialog-shadow);
@@ -761,6 +715,10 @@ select:focus-visible {
   background: var(--dialog-hover);
   color: var(--dialog-text);
 }
+[data-slot='button'] {
+  border-radius: var(--radius-control);
+  font-size: 13px;
+}
 :is(.ray-dialog, .ray-workspace) [data-slot='button'][data-variant='outline'] {
   border-color: var(--dialog-border);
   background: var(--dialog-control-surface);
@@ -768,8 +726,8 @@ select:focus-visible {
   box-shadow: none;
 }
 :is(.ray-dialog, .ray-workspace) [data-slot='button'][data-variant='default'] {
-  background: var(--dialog-text);
-  color: var(--dialog-surface);
+  background: var(--preferences-primary);
+  color: var(--preferences-accent-foreground);
 }
 :is(.ray-dialog, .ray-workspace) [data-slot='button'][data-variant='default']:hover {
   opacity: 0.88;
@@ -863,14 +821,16 @@ select:focus-visible {
   color: var(--color-destructive);
 }
 
-.manage-toolbar-action--primary[data-slot='button'] {
+.manage-toolbar-action--primary[data-slot='button'][data-variant='default'] {
   padding-inline: 18px;
   background: var(--preferences-primary);
   color: var(--preferences-accent-foreground);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
 }
 
-.manage-toolbar-action--primary[data-slot='button']:enabled:hover {
+.manage-toolbar-action--primary[data-slot='button'][data-variant='default']:enabled:hover {
+  background: var(--preferences-primary);
+  color: var(--preferences-accent-foreground);
   opacity: 0.92;
   transform: translateY(-0.5px);
 }
@@ -931,7 +891,6 @@ select:focus-visible {
     opacity var(--motion-standard) var(--ease-standard);
 }
 .add-site-card {
-  border: 1px solid transparent;
   background: transparent;
   color: rgba(255, 255, 255, 0.62);
 }
@@ -945,7 +904,6 @@ select:focus-visible {
   height: var(--site-icon-size, 48px);
   align-items: center;
   justify-content: center;
-  margin-bottom: 6px;
   border: 1px dashed rgba(255, 255, 255, 0.38);
   border-radius: var(--site-icon-radius, 24%);
   background: rgba(255, 255, 255, 0.04);
@@ -970,16 +928,12 @@ select:focus-visible {
   outline-color: var(--color-ring, #0ea5e9);
 }
 .site-card--managing {
-  border-color: rgba(255, 255, 255, 0.34) !important;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--home-cards-color, #fff) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--home-cards-color, #fff) 18%, transparent);
 }
 .site-card--selected {
-  border-color: rgba(147, 197, 253, 0.92) !important;
-  background: rgba(37, 99, 235, 0.28) !important;
-  box-shadow:
-    inset 0 0 0 2px rgba(191, 219, 254, 0.72),
-    0 12px 30px rgba(15, 23, 42, 0.2);
+  background: color-mix(in srgb, var(--preferences-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 2px var(--preferences-accent);
 }
 .site-card-main {
   display: flex;
@@ -1003,18 +957,19 @@ select:focus-visible {
 }
 .site-card-selection {
   position: absolute;
-  bottom: 6px;
-  left: 6px;
+  top: 4px;
+  right: 4px;
   z-index: 9;
   display: flex;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.56);
+  border: 1px solid color-mix(in srgb, var(--dialog-text) 55%, var(--dialog-surface));
   border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.5);
-  color: #fff;
+  background: var(--dialog-surface);
+  color: var(--dialog-text);
+  box-shadow: var(--dialog-control-shadow);
   pointer-events: none;
   transition:
     background var(--motion-fast) var(--ease-standard),
@@ -1022,9 +977,9 @@ select:focus-visible {
     transform var(--motion-fast) var(--ease-standard);
 }
 .site-card-selection.is-selected {
-  border-color: #fff;
-  background: #2563eb;
-  transform: scale(1.04);
+  border-color: var(--preferences-primary);
+  background: var(--preferences-primary);
+  color: var(--preferences-accent-foreground);
 }
 @media (max-width: 720px) {
   .ray-workspace:not(.ray-settings) {
@@ -1091,6 +1046,7 @@ select:focus-visible {
     padding: 6px;
   }
   .icon-frame--site,
+  .folder-preview,
   .add-site-icon {
     width: min(var(--site-icon-size, 48px), 100%);
     height: auto;

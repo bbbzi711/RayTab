@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createBackup } from '../../src/features/backup/backup';
+import { createBackup, parseBackup, restoreBackup } from '../../src/features/backup/backup';
 import { Clock } from '../../src/widgets/clock/Clock';
 import { createInitialState, effectiveSettings, rayStateSchema } from '../../src/storage/model';
 import { applyCommand } from '../../src/storage/operations';
@@ -9,6 +9,31 @@ import { createRepository } from '../../src/storage/database';
 afterEach(() => vi.useRealTimers());
 
 describe('home preferences', () => {
+  it('persists browser and explicit search choices across reload and backup restore', async () => {
+    const name = crypto.randomUUID();
+    let repo = createRepository(name);
+    try {
+      expect((await repo.read()).normalSettings.searchEngine).toBe('browser');
+      for (const searchEngine of ['google', 'browser']) {
+        await repo.update((state) =>
+          applyCommand(state, { type: 'settings', spaceId: 'normal', patch: { searchEngine } }),
+        );
+        await repo.close();
+        repo = createRepository(name);
+        const saved = await repo.read();
+        expect(saved.normalSettings.searchEngine).toBe(searchEngine);
+        expect(effectiveSettings(saved, 'private').searchEngine).toBe(searchEngine);
+        const backup = await parseBackup(
+          JSON.stringify(await createBackup(saved, new Map(), 'normal')),
+        );
+        const restored = await restoreBackup(createInitialState(), backup, 'replace');
+        expect(restored.state.normalSettings.searchEngine).toBe(searchEngine);
+      }
+    } finally {
+      await repo.close();
+    }
+  });
+
   it('shows time, date and greeting independently according to their switches', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 8, 29, 9, 30));
@@ -63,6 +88,11 @@ describe('home preferences', () => {
 
   it('allows a private engine list with a different default and resets the pair together', () => {
     const state = createInitialState();
+    applyCommand(state, {
+      type: 'settings',
+      spaceId: 'normal',
+      patch: { searchEngine: 'bing' },
+    });
     applyCommand(state, {
       type: 'settings',
       spaceId: 'private',

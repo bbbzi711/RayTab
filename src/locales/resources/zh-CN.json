@@ -129,6 +129,8 @@
     "chooseAValidImageFilePngJpegWebpIcoOrSvg": "请选择有效的图片文件（PNG、JPEG、WebP、ICO 或 SVG）",
     "enterTheBackupEncryptionPassword": "请填写备份加密密码",
     "thisBrowserDoesNotSupportWebLocksSafeSyncIsUnavailable": "当前浏览器不支持 Web Locks，无法安全同步",
-    "protectedPrivateAutomaticSyncUnavailable": "受密码保护的私密空间需要解锁后手动同步。关闭“包含私密空间”即可使用定时同步。"
+    "protectedPrivateAutomaticSyncUnavailable": "受密码保护的私密空间需要解锁后手动同步。关闭“包含私密空间”即可使用定时同步。",
+    "browserSearchEngine": "浏览器默认",
+    "browserSearchUnavailable": "当前环境无法使用浏览器默认搜索，请选择其他搜索引擎。"
   }
 }

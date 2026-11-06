@@ -180,13 +180,14 @@ export interface MoveDialogProps {
   groups: Group[];
   folders: Folder[];
   initialGroupId: string;
+  initialFolderId?: string | null;
   allowFolders?: boolean;
   excludeGroupId?: string;
   title: string;
   description?: string;
   confirmLabel?: string;
   destructive?: boolean;
-  onMove: (groupId: string, folderId: string | null) => Promise<void>;
+  onMove: (groupId: string, folderId: string | null) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -194,6 +195,7 @@ export function MoveDialog({
   groups,
   folders,
   initialGroupId,
+  initialFolderId = null,
   allowFolders = true,
   excludeGroupId,
   title,
@@ -220,31 +222,25 @@ export function MoveDialog({
       'navigation.chooseLocation',
     ),
   });
-  const { control, handleSubmit, setError, formState } = useForm<z.infer<typeof schema>>({
+  const initialLocation = {
+    groupId:
+      validGroups.find((group) => group.id === initialGroupId)?.id ?? validGroups[0]?.id ?? '',
+    folderId: allowFolders ? initialFolderId : null,
+  };
+  const { control, handleSubmit, setError, watch, formState } = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     defaultValues: {
-      location: {
-        groupId:
-          validGroups.find((group) => group.id === initialGroupId)?.id ?? validGroups[0]?.id ?? '',
-        folderId: null,
-      },
+      location: initialLocation,
     },
   });
   const { isSubmitting, errors } = formState;
-  const [confirm, confirmDialog] = useConfirm();
-  const requestClose = async () => {
+  const location = watch('location');
+  const unchanged =
+    !destructive &&
+    location.groupId === initialLocation.groupId &&
+    location.folderId === initialLocation.folderId;
+  const requestClose = () => {
     if (isSubmitting) return;
-    if (
-      formState.isDirty &&
-      !(await confirm({
-        title: t('messages.discardUnsavedChanges'),
-        description: t('messages.yourChangesWillNotBeSaved'),
-        confirmText: t('messages.discardChanges'),
-        cancelText: t('messages.keepEditing'),
-        variant: 'destructive',
-      }))
-    )
-      return;
     onClose();
   };
   return (
@@ -257,8 +253,8 @@ export function MoveDialog({
         <form
           onSubmit={handleSubmit(async ({ location }) => {
             try {
-              await onMove(location.groupId, location.folderId);
-              toast.success(t(destructive ? 'messages.deleted' : 'navigation.moved'));
+              const moved = await onMove(location.groupId, location.folderId);
+              if (moved) toast.success(t(destructive ? 'messages.deleted' : 'navigation.moved'));
               onClose();
             } catch (reason) {
               setError('root', { message: errorMessage(reason) });
@@ -311,13 +307,12 @@ export function MoveDialog({
             <Button
               type="submit"
               variant={destructive ? 'destructive' : 'default'}
-              disabled={isSubmitting || !validGroups.length}
+              disabled={isSubmitting || !validGroups.length || unchanged}
             >
               {confirmLabel ?? t('messages.save')}
             </Button>
           </DialogFooter>
         </form>
-        {confirmDialog}
       </DialogContent>
     </Dialog>
   );

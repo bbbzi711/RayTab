@@ -40,7 +40,7 @@
   "retry": "Retry save",
   "waitForSave": "An operation is in progress. Wait for it to finish before closing.",
   "discardTitle": "Discard unsaved changes?",
-  "discardDescription": "Your form drafts and unsaved previews will be cleared.",
+  "discardDescription": "Unsaved form input and previews will be discarded. Saved settings will be kept.",
   "discard": "Discard changes",
   "keepEditing": "Keep editing",
   "followNormal": "Use normal space preferences",
@@ -279,5 +279,16 @@
   "webdavNutstoreHelp": "Nutstore server URL: https://dav.jianguoyun.com/dav/. Copy the account and generated app password from third-party app management.",
   "syncDataDisclosure": "After saving a connection, selected sites, settings and saved images can sync to your chosen service. Automatic sync runs periodically in the background when enabled. Normal-space backups are readable; private-space encryption depends on password settings.",
   "syncCredentialDisclosure": "Accounts, app passwords or tokens are stored locally in this browser without additional encryption so sync can resume after a restart. They are excluded from backups and sync files. Connections use HTTPS only. Disconnecting removes local connection credentials, not remote files.",
-  "privacyPolicy": "Privacy policy"
+  "privacyPolicy": "Privacy policy",
+  "manageSearchEngines": "Manage search engines",
+  "chooseEngineOnHome": "Choose a search engine in the home page search box. Your choice is saved.",
+  "saveStatus": "Save status",
+  "pendingChanges": "Unsaved changes",
+  "pendingSaveHelp": "Save to apply",
+  "deleteEngineTitle": "Delete “{{name}}”?",
+  "deleteEngineDescription": "This search engine will be removed from the list.",
+  "deleteActiveEngineDescription": "Search will use {{name}} after deletion.",
+  "deleteEngineDraftDescription": "Unsaved changes to this engine will also be discarded.",
+  "previewHome": "Preview home",
+  "returnToSettings": "Back to settings"
 }

@@ -14,11 +14,11 @@
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--surface-divider);
-  border-radius: 12px;
+  border-radius: var(--radius-panel);
   background: var(--surface-popover);
   color: var(--surface-text);
   box-shadow: var(--elevation-popover);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px) saturate(135%);
   font-size: 13px;
   line-height: 20px;
   transform-origin: var(
@@ -38,11 +38,11 @@
 .menu-item {
   position: relative;
   display: flex;
-  min-height: 34px;
+  min-height: 36px;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  border-radius: 7px;
+  border-radius: var(--radius-item);
   outline: none;
   color: inherit;
   cursor: pointer;
@@ -62,9 +62,15 @@
   opacity: 0.45;
 }
 
-.menu-item[data-inset],
-.menu-item--checkable {
+.menu-item[data-inset] {
   padding-left: 32px;
+}
+.menu-item--checkable {
+  padding-right: 32px;
+}
+.menu-item--checkable[data-state='checked'] {
+  background: var(--preferences-selection);
+  color: var(--preferences-accent);
 }
 
 .menu-item[data-variant='destructive'] {
@@ -75,28 +81,34 @@
   background: color-mix(in srgb, var(--menu-destructive) 12%, transparent);
 }
 
-.menu-item svg {
+.menu-item > svg,
+.menu-indicator svg {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
   pointer-events: none;
 }
 
+.search-engine-menu {
+  min-width: min(192px, calc(100vw - 16px));
+}
+
+.search-engine-menu .menu-item > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .menu-indicator {
   position: absolute;
-  left: 10px;
+  right: 10px;
   display: flex;
   width: 14px;
   height: 14px;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-}
-
-.menu-indicator .menu-radio-mark {
-  width: 7px;
-  height: 7px;
-  fill: currentColor;
 }
 
 .menu-label {

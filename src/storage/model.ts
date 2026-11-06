@@ -8,8 +8,9 @@ const idSchema = z.string().min(1).max(100);
 const titleSchema = z.string().trim().min(1).max(80);
 const colorSchema = z.string().regex(/^#[0-9a-f]{6}$/i);
 const timestampSchema = z.number().int().nonnegative();
+export const BROWSER_SEARCH_ENGINE = 'browser';
 export const searchEngineSchema = z.object({
-  id: idSchema,
+  id: idSchema.refine((id) => id !== BROWSER_SEARCH_ENGINE, 'errors.model.reservedSearchEngine'),
   name: titleSchema,
   url: z
     .string()
@@ -182,7 +183,7 @@ export const rayStateSchema = z
       const ids = settings.searchEngines.map((engine) => engine.id);
       if (new Set(ids).size !== ids.length)
         ctx.addIssue({ code: 'custom', message: 'errors.model.duplicateSearchEngineId' });
-      if (!ids.includes(settings.searchEngine))
+      if (settings.searchEngine !== BROWSER_SEARCH_ENGINE && !ids.includes(settings.searchEngine))
         ctx.addIssue({ code: 'custom', message: 'errors.model.missingSearchEngine' });
     };
     validateEngines(state.normalSettings);
@@ -201,7 +202,7 @@ export type RayState = z.infer<typeof rayStateSchema>;
 export const defaultSettings: SpaceSettings = {
   language: 'zh-CN',
   theme: 'system',
-  searchEngine: 'bing',
+  searchEngine: BROWSER_SEARCH_ENGINE,
   searchEngines: [
     { id: 'bing', name: '必应', url: 'https://www.bing.com/search?q=%s' },
     { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' },
@@ -286,7 +287,11 @@ export function effectiveSettings(state: RayState, spaceId: SpaceId): SpaceSetti
     spaceId === 'normal'
       ? state.normalSettings
       : { ...state.normalSettings, ...state.privateSettingOverrides };
-  if (settings.searchEngines.some((engine) => engine.id === settings.searchEngine)) return settings;
+  if (
+    settings.searchEngine === BROWSER_SEARCH_ENGINE ||
+    settings.searchEngines.some((engine) => engine.id === settings.searchEngine)
+  )
+    return settings;
   return { ...settings, searchEngine: settings.searchEngines[0].id };
 }
 export function normalizeUrl(value: string) {

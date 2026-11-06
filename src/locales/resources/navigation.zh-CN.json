@@ -36,19 +36,14 @@
     "metadataUpdated": "网站信息已更新",
     "noImage": "没有可用的图片，请上传图标",
     "desktopMenu": "桌面操作",
-    "appearanceSettings": "壁纸与主题",
-    "iconSettings": "图标与布局",
-    "allSettings": "全部设置",
-    "widgetSettings": "搜索与时钟设置",
     "organizeContents": "整理内容",
     "selectedSites_one": "已选择 {{count}} 个网站",
     "selectedSites_other": "已选择 {{count}} 个网站",
     "siteCount_one": "{{count}} 个网站",
     "siteCount_other": "{{count}} 个网站",
-    "newGroup": "新建分组",
     "name": "名称",
     "location": "存入位置",
-    "iconSection": "图标设置",
+    "iconSection": "图标与外观",
     "upload": "上传图片",
     "iconPreview": "图标预览",
     "chooseImage": "选择图片",
@@ -68,6 +63,8 @@
       "red": "红色",
       "pink": "粉色",
       "purple": "紫色"
-    }
+    },
+    "textIconHelp": "用文字和底色作为图标。",
+    "changedSiteIconFailed": "网址已更改，但未获取到新网站的图标。请重试，或选择文字图标、上传图片后保存。"
   }
 }

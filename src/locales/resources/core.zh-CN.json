@@ -12,7 +12,8 @@
       "missingSiteFolder": "网站引用了不存在的文件夹",
       "missingActiveGroup": "当前分组不存在",
       "duplicateSearchEngineId": "搜索引擎 ID 重复",
-      "missingSearchEngine": "当前搜索引擎不存在"
+      "missingSearchEngine": "当前搜索引擎不存在",
+      "reservedSearchEngine": "浏览器默认搜索不能作为自定义引擎覆盖"
     },
     "backup": {
       "missingResource": "备份需要的资源 {{id}} 不存在"

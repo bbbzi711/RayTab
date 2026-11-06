@@ -40,7 +40,7 @@
   "retry": "重试保存",
   "waitForSave": "正在处理，请等待完成后关闭。",
   "discardTitle": "放弃未保存的更改？",
-  "discardDescription": "当前表单输入或未保存的预览将被清除。",
+  "discardDescription": "未保存的表单输入和预览将被放弃，已保存的设置会保留。",
   "discard": "放弃更改",
   "keepEditing": "继续编辑",
   "followNormal": "恢复普通空间偏好",
@@ -275,5 +275,16 @@
   "webdavNutstoreHelp": "坚果云服务器地址：https://dav.jianguoyun.com/dav/；账号和应用密码请从“第三方应用管理”复制。",
   "syncDataDisclosure": "保存连接后，可将所选空间的网站、设置和已保存图片同步到你指定的服务；启用自动同步后会在后台定时同步。普通空间备份可读，私密空间按密码设置加密。",
   "syncCredentialDisclosure": "账号、应用密码或令牌保存在当前浏览器本地，未额外加密，用于重启后继续同步；它们不进入备份或同步文件。连接只使用 HTTPS。断开同步会删除本机连接凭据，不删除云端文件。",
-  "privacyPolicy": "隐私说明"
+  "privacyPolicy": "隐私说明",
+  "manageSearchEngines": "管理搜索引擎",
+  "chooseEngineOnHome": "在首页搜索框切换引擎，选择会自动记住。",
+  "saveStatus": "保存状态",
+  "pendingChanges": "有未保存内容",
+  "pendingSaveHelp": "保存后生效",
+  "deleteEngineTitle": "删除“{{name}}”？",
+  "deleteEngineDescription": "该搜索引擎将从列表中移除。",
+  "deleteActiveEngineDescription": "删除后将使用 {{name}} 搜索。",
+  "deleteEngineDraftDescription": "该引擎尚未保存的修改也会被放弃。",
+  "previewHome": "预览主页",
+  "returnToSettings": "返回设置"
 }
