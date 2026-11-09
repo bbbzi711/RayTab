@@ -16,6 +16,10 @@ export async function openSettings(page: Page, category: string) {
   return dialog;
 }
 
+export async function openIconOptions(editor: Locator) {
+  await editor.getByRole('button', { name: '图标与外观', exact: true }).click();
+}
+
 export async function openDesktopMenu(page: Page) {
   const workspace = page.getByTestId('desktop');
   const bounds = await workspace.boundingBox();

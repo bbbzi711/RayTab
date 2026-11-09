@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures';
-import { readSiteImage } from '../helpers';
+import { readSiteImage, openIconOptions } from '../helpers';
 
 const mark =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect x="12" y="12" width="104" height="104" rx="24" fill="#1677ff"/><path d="M40 64h48M64 40v48" stroke="white" stroke-width="12"/></svg>';
@@ -95,6 +95,7 @@ test('网站图标重新获取失败保留已保存图片，重试保存与离�
   await link.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await openIconOptions(edit);
   await expect(
     edit.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
   ).toBeVisible();

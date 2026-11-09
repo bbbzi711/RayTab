@@ -2,6 +2,7 @@ import { addSite, expect, test } from '../fixtures';
 import { openSettings, failNextWrite, settle, noHorizontalOverflow } from '../helpers';
 test('提交保存失败保留搜索引擎输入，重试仅新增一次', async ({ newTab }) => {
   const settings = await openSettings(newTab, '搜索与时钟');
+  await settings.getByRole('button', { name: '管理搜索引擎', exact: true }).click();
   const disclosure = settings.getByRole('button', { name: /^(添加|编辑)搜索引擎$/ });
   await expect(settings.getByLabel('搜索引擎名称', { exact: true })).not.toBeVisible();
   await disclosure.click();
@@ -21,18 +22,25 @@ test('提交保存失败保留搜索引擎输入，重试仅新增一次', async
   await form.getByRole('button', { name: '添加', exact: true }).click();
   await expect(form.getByRole('alert')).toBeVisible();
   await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('失败重试引擎');
-  await expect(settings.getByRole('button', { name: '失败重试引擎', exact: true })).toHaveCount(0);
+  await expect(
+    settings.getByRole('button', { name: '编辑 失败重试引擎', exact: true }),
+  ).toHaveCount(0);
   await form.getByRole('button', { name: '添加', exact: true }).click();
   await expect(form).not.toBeVisible();
   await expect(disclosure).toBeFocused();
   await disclosure.click();
   await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('');
   await disclosure.click();
-  await expect(settings.getByRole('button', { name: '失败重试引擎', exact: true })).toHaveCount(1);
+  await expect(
+    settings.getByRole('button', { name: '编辑 失败重试引擎', exact: true }),
+  ).toHaveCount(1);
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
   const reloaded = await openSettings(newTab, '搜索与时钟');
-  await expect(reloaded.getByRole('button', { name: '失败重试引擎', exact: true })).toHaveCount(1);
+  await reloaded.getByRole('button', { name: '管理搜索引擎', exact: true }).click();
+  await expect(
+    reloaded.getByRole('button', { name: '编辑 失败重试引擎', exact: true }),
+  ).toHaveCount(1);
   await reloaded.getByRole('button', { name: '编辑 必应', exact: true }).click();
   const name = reloaded.getByLabel('搜索引擎名称', { exact: true });
   await expect(name).toBeFocused();
@@ -90,7 +98,7 @@ test('私密偏好整体恢复需要确认，保留私密网站并在重载后�
   await slider.focus();
   await slider.press('ArrowRight');
   await settings.getByRole('switch', { name: '显示网站标题', exact: true }).click();
-  await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+  await expect(settings.getByRole('status', { name: '保存状态', exact: true })).toHaveText(
     '已保存',
   );
   const privateSpacing = await slider.getAttribute('aria-valuenow');

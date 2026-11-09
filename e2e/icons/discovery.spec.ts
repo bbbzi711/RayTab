@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { expect, test } from '../fixtures';
-import { readSiteImage } from '../helpers';
+import { readSiteImage, openIconOptions } from '../helpers';
 import { artworkSource } from '../artwork';
 test('自动图标跳过低清和损坏候选，矢量与实色底板保存后保留', async ({ newTab }) => {
   const png = async (size: number) =>
@@ -54,6 +54,7 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
   try {
     await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
     const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+    await openIconOptions(editor);
     await editor
       .getByLabel('网址', { exact: true })
       .fill(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
@@ -99,6 +100,7 @@ test('自动图标跳过低清和损坏候选，矢量与实色底板保存后�
     });
     expect(pixels).toEqual({ corner: [0, 0, 0, 0], center: [34, 102, 221, 255] });
     await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
+    await openIconOptions(editor);
     await editor
       .getByLabel('网址', { exact: true })
       .fill(`http://127.0.0.1:${(server.address() as AddressInfo).port}/vector-page`);
@@ -153,6 +155,7 @@ test('私密空间直接读取 PWA 高清图标，不向公共服务发送域名
   await newTab.getByRole('button', { name: '私密空间', exact: true }).click();
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor
     .getByLabel('网址', { exact: true })
     .fill('https://private-icons-acceptance.com/account?token=secret');

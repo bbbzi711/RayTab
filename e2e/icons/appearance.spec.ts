@@ -1,3 +1,4 @@
+import { openIconOptions } from '../helpers';
 import { expect, test } from '../fixtures';
 import { paintedArtwork } from '../artwork';
 
@@ -12,6 +13,7 @@ test('官网图标的底色独立保存，重新打开和离线重载不改变�
   );
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const add = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(add);
   await add.getByLabel('名称', { exact: true }).fill('Gemini 产品');
   await add.getByLabel('网址', { exact: true }).fill('https://gemini.google.com/app');
   await add.getByRole('button', { name: '获取网站图标', exact: true }).click();
@@ -26,6 +28,7 @@ test('官网图标的底色独立保存，重新打开和离线重载不改变�
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await openIconOptions(editor);
   await editor
     .getByRole('group', { name: '图标底色', exact: true })
     .getByRole('button', { name: '绿色', exact: true })
@@ -37,6 +40,7 @@ test('官网图标的底色独立保存，重新打开和离线重载不改变�
   expect((await paintedArtwork(site.getByTestId('site-icon'))).dominant).toBe(original);
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
+  await openIconOptions(editor);
   await expect(editor.getByRole('button', { name: '绿色', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',

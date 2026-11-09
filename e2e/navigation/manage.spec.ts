@@ -37,9 +37,9 @@ test('简洁模式桌面空白可打开设置，搜索输入保留原生右键�
   await openDesktopMenu(newTab);
   await newTab.getByRole('menuitem', { name: '进入简洁模式', exact: true }).click();
   await openDesktopMenu(newTab);
-  await expect(newTab.getByRole('menuitem', { name: '壁纸与主题', exact: true })).toBeVisible();
-  await newTab.getByRole('menuitem', { name: '壁纸与主题', exact: true }).click();
+  await newTab.getByRole('menuitem', { name: '设置', exact: true }).click();
   const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
+  await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
   await expect(settings.getByRole('combobox', { name: '主题', exact: true })).toBeVisible();
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   const input = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
@@ -179,7 +179,7 @@ for (const viewport of [
     await expect(
       settings.getByRole('switch', { name: '显示网站标题', exact: true }),
     ).not.toBeChecked();
-    await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+    await expect(settings.getByRole('status', { name: '保存状态', exact: true })).toHaveText(
       '已保存',
     );
     await settings.getByRole('button', { name: '关闭', exact: true }).click();

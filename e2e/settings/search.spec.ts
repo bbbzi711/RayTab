@@ -38,7 +38,7 @@ test('首次默认搜索完整传递输入，并遵循新标签页和当前页�
 
   const settings = await openSettings(newTab, '通用');
   await settings.getByRole('switch', { name: '在新标签页打开网站和搜索结果', exact: true }).click();
-  await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+  await expect(settings.getByRole('status', { name: '保存状态', exact: true })).toHaveText(
     '已保存',
   );
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
@@ -64,12 +64,9 @@ test('引擎选择保存失败保留原值，改选后跨页和重载保留，�
     newTab.getByRole('menuitemradio', { name: '浏览器默认', exact: true }),
   ).toBeChecked();
   await newTab.getByRole('menuitemradio', { name: 'Google', exact: true }).click();
-  const otherSettings = await openSettings(other, '搜索与时钟');
-  await expect(otherSettings.getByRole('button', { name: 'Google', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await otherSettings.getByRole('button', { name: '关闭', exact: true }).click();
+  await other.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
+  await expect(other.getByRole('menuitemradio', { name: 'Google', exact: true })).toBeChecked();
+  await other.keyboard.press('Escape');
   await newTab.reload();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
   await expect(newTab.getByRole('menuitemradio', { name: 'Google', exact: true })).toBeChecked();
@@ -89,12 +86,12 @@ test('引擎选择保存失败保留原值，改选后跨页和重载保留，�
     (url) => url.origin === 'https://www.google.com' && url.searchParams.get('q') === input,
   );
   await result.close();
-  const settings = await openSettings(newTab, '搜索与时钟');
-  await settings.getByRole('button', { name: '浏览器默认', exact: true }).click();
-  await expect(settings.getByRole('button', { name: '浏览器默认', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
+  await newTab.getByRole('menuitemradio', { name: '浏览器默认', exact: true }).click();
+  await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
+  await expect(
+    newTab.getByRole('menuitemradio', { name: '浏览器默认', exact: true }),
+  ).toBeChecked();
   await newTab.reload();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
   await expect(

@@ -26,7 +26,7 @@ for (const viewport of [
     await expect.poll(async () => (await icon.boundingBox())!.width).toBeGreaterThan(before);
     const saved = Number(await size.getAttribute('aria-valuenow'));
     expect(saved).toBeGreaterThan(initial);
-    await expect(settings.getByRole('status', { name: '自动保存', exact: true })).toHaveText(
+    await expect(settings.getByRole('status', { name: '保存状态', exact: true })).toHaveText(
       '已保存',
     );
     await settings.getByRole('button', { name: '关闭', exact: true }).click();

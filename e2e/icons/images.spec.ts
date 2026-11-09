@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures';
-import { readSiteImage } from '../helpers';
+import { readSiteImage, openIconOptions } from '../helpers';
 import type { Locator } from '@playwright/test';
 import { paintedArtwork } from '../artwork';
 
@@ -41,6 +41,7 @@ test('真实解析网页与 Manifest，保留小 viewBox SVG 原文，忽略仅�
   });
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('网址', { exact: true }).fill('https://manifest.example.test');
   await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
   await expect(editor.getByLabel('名称', { exact: true })).toHaveValue('Manifest 网站');
@@ -99,6 +100,7 @@ test('不能作为独立图片的 SVG 不进入资源库，使用安全图片且
   });
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('保留校验草稿');
   for (let index = 0; index < rejected.length; index++) {
     await editor
@@ -145,6 +147,7 @@ test('自动图标按可见图形统一大小与居中，完整底图和用户�
   for (let index = 0; index < icons.length; index++) {
     await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
     const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+    await openIconOptions(editor);
     await editor.getByLabel('名称', { exact: true }).fill(`图形 ${index}`);
     await editor.getByLabel('网址', { exact: true }).fill(`https://artwork.example.test/${index}`);
     await editor.getByRole('button', { name: '获取网站图标', exact: true }).click();
@@ -175,6 +178,7 @@ test('自动图标按可见图形统一大小与居中，完整底图和用户�
   await padded.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByRole('button', { name: '裁切图片', exact: true }).click();
   const crop = newTab.getByRole('dialog', { name: '裁切图标', exact: true });
   await crop.getByRole('button', { name: '使用裁切结果', exact: true }).click();
@@ -186,6 +190,7 @@ test('自动图标按可见图形统一大小与居中，完整底图和用户�
   expect(cropped.right - cropped.left).toBeCloseTo(0.25, 1);
   await padded.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
+  await openIconOptions(editor);
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
   await editor.locator('input[type=file]').setInputFiles({
     name: 'original.svg',

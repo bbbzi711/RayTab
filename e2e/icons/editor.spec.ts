@@ -1,10 +1,18 @@
 import { expect, test } from '../fixtures';
 import { paintedArtwork } from '../artwork';
-import { failNextWrite, settle, noHorizontalOverflow, deferred, readSiteImage } from '../helpers';
+import {
+  failNextWrite,
+  settle,
+  noHorizontalOverflow,
+  deferred,
+  readSiteImage,
+  openIconOptions,
+} from '../helpers';
 test('上传图片无额外留白，文字图标和背景选择重载后保留', async ({ newTab, context }) => {
   await context.route('https://github.com/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('透明图标测试');
   await editor.getByLabel('网址', { exact: true }).fill('https://github.com/custom-icon');
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
@@ -29,6 +37,7 @@ test('上传图片无额外留白，文字图标和背景选择重载后保留',
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await openIconOptions(edit);
   await edit.getByRole('radio', { name: '文字图标', exact: true }).click();
   await edit.getByLabel('图标文字', { exact: true }).fill('🙂AB');
   await edit.getByRole('button', { name: '保存', exact: true }).click();
@@ -38,6 +47,7 @@ test('上传图片无额外留白，文字图标和背景选择重载后保留',
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const reloaded = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await openIconOptions(reloaded);
   await expect(reloaded.getByRole('radio', { name: '文字图标', exact: true })).toHaveAttribute(
     'aria-checked',
     'true',
@@ -62,6 +72,7 @@ test('三种图标切换保留各自草稿，网站图片保存失败可重试�
   });
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('三种图标测试');
   await editor
     .getByLabel('网址', { exact: true })
@@ -130,6 +141,7 @@ test('现有图标可手动裁切透明边，保存及重载保留像素和底�
   await context.route('https://crop.example.test/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   let editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('裁切图标网站');
   await editor.getByLabel('网址', { exact: true }).fill('https://crop.example.test');
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
@@ -148,6 +160,7 @@ test('现有图标可手动裁切透明边，保存及重载保留像素和底�
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   editor = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
   await expect(editor.getByLabel('网址', { exact: true })).toBeFocused();
+  await openIconOptions(editor);
   await editor.getByRole('button', { name: '裁切图片', exact: true }).click();
   const crop = newTab.getByRole('dialog', { name: '裁切图标', exact: true });
   const apply = crop.getByRole('button', { name: '使用裁切结果', exact: true });
@@ -193,6 +206,7 @@ test('320×360 裁切和取消可滚动到达，返回编辑器保留草稿', as
   await newTab.setViewportSize({ width: 320, height: 360 });
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('小窗口裁切草稿');
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
   await editor.locator('input[type="file"]').setInputFiles({
@@ -237,6 +251,7 @@ test('迟到的网站图标不会覆盖用户后来选择的上传图片', async
   });
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('图标选择竞争');
   await editor.getByLabel('网址', { exact: true }).fill('https://late-icon.example.test');
   await editor.getByLabel('名称', { exact: true }).click();

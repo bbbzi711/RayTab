@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { expect, test } from '../fixtures';
-import { openSettings, exportNormalBackup, parseNormalBackup } from '../helpers';
+import { openSettings, exportNormalBackup, parseNormalBackup, openIconOptions } from '../helpers';
 test('图标资源随备份导出和确认替换恢复，切换网站图标移除上传引用', async ({
   newTab,
   context,
@@ -9,6 +9,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await context.route('https://backup-icon.example.test/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await openIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('备份图标网站');
   await editor.getByLabel('网址', { exact: true }).fill('https://backup-icon.example.test');
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
@@ -69,6 +70,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await openIconOptions(edit);
   await expect(edit.getByRole('button', { name: '自动配色', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -79,6 +81,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await newTab.reload();
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
+  await openIconOptions(edit);
   await expect(edit.getByRole('radio', { name: '网站图标', exact: true })).toBeChecked();
   await edit.getByRole('button', { name: '取消', exact: true }).click();
   expect((await exportNormalBackup(newTab)).resources.map((resource) => resource.id)).not.toContain(
