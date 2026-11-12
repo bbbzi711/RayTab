@@ -11,8 +11,6 @@ let loaded:
 let pending: AbortController | undefined;
 let pendingTask: Promise<void> | undefined;
 let background: HTMLDivElement | undefined;
-let imageLayer: HTMLDivElement;
-let overlayLayer: HTMLDivElement;
 
 export class WallpaperCacheError extends Error {}
 
@@ -22,10 +20,10 @@ function layers() {
   background.className = 'page-background';
   background.dataset.testid = 'wallpaper';
   background.setAttribute('aria-hidden', 'true');
-  imageLayer = document.createElement('div');
+  const imageLayer = document.createElement('div');
   imageLayer.className = 'page-background-image';
   imageLayer.dataset.testid = 'wallpaper-image';
-  overlayLayer = document.createElement('div');
+  const overlayLayer = document.createElement('div');
   overlayLayer.className = 'page-background-overlay';
   background.append(imageLayer, overlayLayer);
   document.body.prepend(background);
@@ -40,7 +38,13 @@ function layers() {
 function clearImage() {
   if (loaded) URL.revokeObjectURL(loaded.url);
   loaded = undefined;
-  if (imageLayer) imageLayer.style.backgroundImage = '';
+  document.documentElement.style.removeProperty('--wallpaper-photo');
+}
+
+function setWallpaperColor(color: string) {
+  const style = document.documentElement.style;
+  style.backgroundColor = color;
+  style.setProperty('--wallpaper-color', color);
 }
 
 function rememberColor(source: string, color: string) {
@@ -176,7 +180,7 @@ async function renderWallpaper(
   localOnly: boolean,
   resourceVersion: string,
 ) {
-  const layer = layers();
+  layers();
   if (scope !== nextScope) {
     clearImage();
     requestedSource = undefined;
@@ -186,10 +190,10 @@ async function renderWallpaper(
     display.resourceId || display.remoteUrl
       ? (loaded?.cache.color ?? display.color)
       : display.color;
-  layer.style.backgroundColor = color;
-  layer.style.backgroundImage = display.gradient ?? '';
-  document.documentElement.style.backgroundColor = color;
-  overlayLayer.style.backgroundColor = `rgba(0,0,0,${display.overlay})`;
+  const style = document.documentElement.style;
+  setWallpaperColor(color);
+  style.setProperty('--wallpaper-gradient', display.gradient ?? 'none');
+  style.setProperty('--wallpaper-shade', `rgba(0,0,0,${display.overlay})`);
   if (!display.resourceId && !display.remoteUrl) {
     generation++;
     pending?.abort();
@@ -210,8 +214,7 @@ async function renderWallpaper(
     (display.remoteUrl !== bingDailyUrl ||
       new Date(loaded.cache.fetchedAt).toDateString() === new Date().toDateString())
   ) {
-    layer.style.backgroundColor = loaded.cache.color;
-    document.documentElement.style.backgroundColor = loaded.cache.color;
+    setWallpaperColor(loaded.cache.color);
     try {
       await saveCache(loaded.cache);
     } catch {
@@ -268,9 +271,8 @@ async function renderWallpaper(
       cache: { ...cache, blob: cache.source.startsWith('resource:') ? undefined : cache.blob },
     };
     candidate = undefined;
-    imageLayer.style.backgroundImage = `url("${loaded.url}")`;
-    layer.style.backgroundColor = cache.color;
-    document.documentElement.style.backgroundColor = cache.color;
+    style.setProperty('--wallpaper-photo', `url("${loaded.url}")`);
+    setWallpaperColor(cache.color);
     // Uploaded wallpapers already live in resources: cache their color, never duplicate the image.
     if (previous) requestAnimationFrame(() => URL.revokeObjectURL(previous.url));
     if (!localOnly) {

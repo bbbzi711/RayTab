@@ -1,6 +1,18 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    &:where([data-theme='system'], [data-theme='system'] *) {
+      @slot;
+    }
+  }
+}
+
 .preload *,
 .preload *::before,
 .preload *::after {
@@ -8,13 +20,6 @@
   animation-duration: 0s !important;
 }
 
-.form-stack {
-  display: grid;
-  gap: 20px;
-}
-.app-shell {
-  isolation: isolate;
-}
 .background-dawn {
   background-image:
     radial-gradient(ellipse at 88% 3%, #ad8a69 0%, transparent 48%),
@@ -38,6 +43,12 @@
   opacity: 0.65;
 }
 
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -57,18 +68,22 @@
   --color-border: var(--preferences-line);
   --color-input: var(--preferences-line);
   --color-ring: var(--preferences-accent);
-  --radius-sm: 8px;
-  --radius-md: 10px;
+  --color-success: var(--toast-success-text);
+  --color-success-surface: var(--toast-success-surface);
+  --color-success-border: var(--toast-success-border);
+  --radius-sm: var(--radius-item);
+  --radius-md: var(--radius-control);
   --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-xl: var(--radius-panel);
 }
 :root {
   --radius-control: 10px;
   --radius-panel: 18px;
   --radius-item: 8px;
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --ui-icon-compact: 14px;
+  --ui-icon-action: 16px;
+  --ui-icon-rail: 20px;
+  color-scheme: light;
   color: #f8fafc;
   background: #090d16;
   --background: #ffffff;
@@ -77,6 +92,7 @@
   --surface-control: rgba(255, 255, 255, 0.82);
   --surface-control-hover: rgba(255, 255, 255, 0.94);
   --surface-border: rgba(255, 255, 255, 0.58);
+
   --surface-divider: color-mix(in srgb, var(--preferences-text) 12%, transparent);
   --surface-text: var(--preferences-text);
   --surface-muted: var(--preferences-muted);
@@ -114,12 +130,9 @@
   --preferences-selection: #eff6ff;
   --preferences-icon: #475569;
   --preferences-switch-off: #cbd5e1;
+
   --toolbar-surface: rgba(15, 23, 42, 0.65);
-  --toolbar-border: rgba(255, 255, 255, 0.16);
   --toolbar-text: #ffffff;
-  --toolbar-muted: rgba(255, 255, 255, 0.7);
-  --toolbar-hover: rgba(255, 255, 255, 0.14);
-  --toolbar-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.32);
   --search-surface: color-mix(in srgb, var(--preferences-surface) 72%, transparent);
   --search-surface-hover: color-mix(in srgb, var(--preferences-surface) 80%, transparent);
   --search-surface-focus: color-mix(in srgb, var(--preferences-surface) 88%, transparent);
@@ -128,6 +141,7 @@
   --search-text: var(--preferences-text);
   --search-action-hover: var(--preferences-selection);
   --search-shadow: 0 8px 24px -2px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.04);
+
   --search-shadow-focus:
     0 12px 32px -2px rgba(15, 23, 42, 0.15), 0 0 0 3px rgba(255, 255, 255, 0.32);
   --segmented-track: var(--preferences-field);
@@ -152,61 +166,33 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
+.ui-icon-compact,
+.ui-icon-action,
+.ui-icon-rail {
+  width: var(--ui-icon-size);
+  height: var(--ui-icon-size);
+  flex-shrink: 0;
+}
+.ui-icon-compact {
+  --ui-icon-size: var(--ui-icon-compact);
+}
+.ui-icon-action {
+  --ui-icon-size: var(--ui-icon-action);
+}
+.ui-icon-rail {
+  --ui-icon-size: var(--ui-icon-rail);
+}
 [data-home-mode='navigation'] {
   --dialog-center-offset: 0px;
 }
-[data-theme='dark'] {
-  --icon-folder-surface: #1e293b;
-  --icon-folder-mark: #94a3b8;
-  --background: #0b0f17;
-  --foreground: #f8fafc;
-  --surface-control: rgba(255, 255, 255, 0.09);
-  --surface-control-hover: rgba(255, 255, 255, 0.14);
-  --surface-border: rgba(255, 255, 255, 0.12);
-  --elevation-popover: 0 20px 50px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.25);
-  --dialog-control-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
-  --dialog-shadow: 0 28px 80px rgba(0, 0, 0, 0.56), 0 8px 24px rgba(0, 0, 0, 0.3);
-  --preferences-accent: #60a5fa;
-  --preferences-primary: #3b82f6;
-  --preferences-accent-foreground: #ffffff;
-  --preferences-switch-off: #475569;
-  --preferences-canvas: #0f1219;
-  --preferences-dialog: #181b22;
-  --preferences-surface: #181b22;
-  --preferences-field: #1e2330;
-  --preferences-text: #f1f5f9;
-  --preferences-muted: #94a3b8;
-  --preferences-line: #262b38;
-  --preferences-selection: rgba(59, 130, 246, 0.15);
-  --preferences-icon: #94a3b8;
-  --toolbar-surface: rgba(15, 23, 42, 0.82);
-  --toolbar-border: rgba(255, 255, 255, 0.14);
-  --toolbar-text: #f8fafc;
-  --toolbar-muted: rgba(248, 250, 252, 0.65);
-  --toolbar-hover: rgba(255, 255, 255, 0.12);
-  --toolbar-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.52);
-  --search-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  --search-shadow-focus: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.12);
-  --segmented-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --toast-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
-  --toast-success-surface: rgba(13, 40, 24, 0.95);
-  --toast-success-text: #86efac;
-  --toast-success-border: rgba(74, 222, 128, 0.3);
-  --toast-error-surface: rgba(42, 16, 21, 0.95);
-  --toast-error-text: #fca5a5;
-  --toast-error-border: rgba(248, 113, 113, 0.3);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.16);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
-  --vault-mark-bg: rgba(147, 51, 234, 0.16);
-  --vault-mark-border: rgba(168, 85, 247, 0.3);
-  --vault-mark-text: #d8b4fe;
-}
-@media (prefers-color-scheme: dark) {
-  [data-theme='system'] {
+:root {
+  @variant dark {
+    color-scheme: dark;
     --icon-folder-surface: #1e293b;
     --icon-folder-mark: #94a3b8;
     --background: #0b0f17;
     --foreground: #f8fafc;
+
     --surface-control: rgba(255, 255, 255, 0.09);
     --surface-control-hover: rgba(255, 255, 255, 0.14);
     --surface-border: rgba(255, 255, 255, 0.12);
@@ -226,13 +212,11 @@
     --preferences-line: #262b38;
     --preferences-selection: rgba(59, 130, 246, 0.15);
     --preferences-icon: #94a3b8;
+
     --toolbar-surface: rgba(15, 23, 42, 0.82);
-    --toolbar-border: rgba(255, 255, 255, 0.14);
     --toolbar-text: #f8fafc;
-    --toolbar-muted: rgba(248, 250, 252, 0.65);
-    --toolbar-hover: rgba(255, 255, 255, 0.12);
-    --toolbar-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.52);
     --search-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+
     --search-shadow-focus: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.12);
     --segmented-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
     --toast-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -279,36 +263,35 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-body {
-  margin: 0;
-}
-button,
-a,
-input,
-select {
-  -webkit-tap-highlight-color: transparent;
-}
-button,
-select {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-a {
-  color: inherit;
-  text-decoration: none;
-}
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 2px solid #38bdf8;
-  outline-offset: 3px;
-}
-.search-input:focus-visible {
-  outline: none;
+@layer base {
+  body {
+    margin: 0;
+  }
+  button,
+  a,
+  input,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline: 2px solid var(--surface-focus);
+    outline-offset: 3px;
+  }
 }
 .icon-frame {
   display: grid;
@@ -458,60 +441,6 @@ select:focus-visible {
   background: var(--search-surface-focus);
   box-shadow: var(--search-shadow-focus);
 }
-.search-engine-trigger,
-.search-action {
-  display: flex;
-  min-width: 36px;
-  height: 36px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  color: var(--home-search-color, var(--surface-muted));
-  transition:
-    color var(--motion-fast) var(--ease-standard),
-    background var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
-}
-.search-engine-trigger {
-  gap: 5px;
-  padding: 0 6px;
-}
-.search-engine-trigger:hover,
-.search-action:hover {
-  background: var(--search-action-hover);
-  color: var(--surface-text);
-}
-.search-action:active {
-  transform: scale(0.94);
-}
-.search-action--clear {
-  min-width: 32px;
-  width: 32px;
-  height: 32px;
-  margin-right: 2px;
-}
-.search-input {
-  min-width: 0;
-  height: 100%;
-  flex: 1;
-  border: 0;
-  padding: 0 9px;
-  outline: none;
-  background: transparent;
-  color: var(--home-search-color, inherit);
-  font-size: 14px;
-  font-weight: 400;
-}
-.search-input::placeholder {
-  color: color-mix(in srgb, currentColor 58%, transparent);
-}
-.app-shell {
-  min-height: 100dvh;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden auto;
-  background: transparent;
-}
 .home-mode-toggle {
   position: fixed;
   top: 24px;
@@ -585,6 +514,7 @@ select:focus-visible {
   letter-spacing: -0.01em !important;
   box-shadow: var(--toast-shadow) !important;
   backdrop-filter: blur(16px) saturate(130%) !important;
+
   border: 1px solid var(--toast-border) !important;
   background: var(--toast-surface) !important;
   color: var(--toast-text) !important;
@@ -604,77 +534,6 @@ select:focus-visible {
   border-color: var(--toast-error-border) !important;
 }
 
-.loading {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-[data-slot='dialog-content'] {
-  color: var(--foreground);
-}
-
-[data-slot='dialog-title'],
-[data-slot='dialog-description'] {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-[data-slot='dialog-description'] {
-  color: var(--dialog-muted);
-}
-
-[data-slot='dialog-content'].ray-dialog {
-  left: calc(50% + var(--dialog-center-offset));
-  max-height: calc(100dvh - 32px);
-  translate: -50% -50%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  border: 1px solid var(--dialog-border);
-  border-radius: var(--radius-panel);
-  padding: 28px 30px;
-  background: var(--dialog-surface);
-  box-shadow: var(--dialog-shadow);
-  color: var(--dialog-text);
-}
-
-.ray-dialog > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-@media (max-width: 480px) {
-  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog) {
-    padding: 22px 20px;
-    border-radius: 18px;
-  }
-}
-
-@media (max-width: 380px) {
-  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog) {
-    padding: 18px 16px;
-    border-radius: 16px;
-  }
-}
-
-@media (max-height: 480px) {
-  [data-slot='dialog-content'].ray-dialog:not(.site-edit-dialog, .onboarding-card) {
-    max-height: calc(100dvh - 20px);
-    padding-block: 16px;
-  }
-}
-/* Workspace dialogs share their entrance and theme tokens. */
-.dialog-workspace-overlay {
-  background: rgba(15, 23, 42, 0.24);
-  backdrop-filter: blur(2px);
-}
-.dialog-settings-overlay {
-  background: rgba(15, 23, 42, 0.28);
-  backdrop-filter: blur(5px);
-}
 .ray-workspace {
   top: 16px;
   right: 16px;
@@ -682,11 +541,6 @@ select:focus-visible {
   display: flex;
   width: min(620px, calc(100vw - 96px));
   overflow: hidden;
-  border: 1px solid var(--dialog-border);
-  border-radius: var(--radius-panel);
-  background: var(--dialog-surface);
-  color: var(--dialog-text);
-  box-shadow: var(--dialog-shadow);
 }
 .ray-workspace[data-state='open'] {
   animation: workspace-enter 260ms var(--ease-standard);
@@ -706,54 +560,6 @@ select:focus-visible {
     transform: translateX(20px);
   }
 }
-.dialog-close-button {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--dialog-muted);
-}
-.dialog-close-button:hover {
-  background: var(--dialog-hover);
-  color: var(--dialog-text);
-}
-[data-slot='button'] {
-  border-radius: var(--radius-control);
-  font-size: 13px;
-}
-:is(.ray-dialog, .ray-workspace) [data-slot='button'][data-variant='outline'] {
-  border-color: var(--dialog-border);
-  background: var(--dialog-control-surface);
-  color: var(--dialog-text);
-  box-shadow: none;
-}
-:is(.ray-dialog, .ray-workspace) [data-slot='button'][data-variant='default'] {
-  background: var(--preferences-primary);
-  color: var(--preferences-accent-foreground);
-}
-:is(.ray-dialog, .ray-workspace) [data-slot='button'][data-variant='default']:hover {
-  opacity: 0.88;
-}
-:is(.ray-dialog, .ray-workspace)
-  [data-slot='button']:is([data-variant='outline'], [data-variant='ghost']):hover {
-  background: var(--dialog-hover);
-  color: var(--dialog-text);
-}
-:is(.ray-dialog, .ray-workspace) [data-slot='input'] {
-  border-color: var(--dialog-border);
-  background: var(--dialog-control-surface);
-  color: var(--dialog-text);
-  box-shadow: none;
-}
-:is(.ray-dialog, .ray-workspace) [data-slot='input']::placeholder {
-  color: var(--dialog-muted);
-}
-:is(.ray-dialog, .ray-workspace) [data-slot='input'][aria-invalid='true'] {
-  border-color: var(--color-destructive);
-}
-:is(.ray-dialog, .ray-workspace) :is([data-slot='input'], [data-slot='button']):focus-visible {
-  outline: 2px solid var(--surface-focus);
-  outline-offset: 2px;
-  box-shadow: none;
-}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -763,102 +569,6 @@ select:focus-visible {
   }
 }
 
-.manage-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin: 0 auto 16px;
-  padding: 8px 12px;
-  border: 1px solid var(--toolbar-border);
-  border-radius: 16px;
-  background: var(--toolbar-surface);
-  color: var(--toolbar-text);
-  box-shadow: var(--toolbar-shadow);
-  backdrop-filter: blur(20px) saturate(125%);
-}
-
-.manage-toolbar-action {
-  min-height: 36px;
-  border-radius: 11px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard),
-    box-shadow var(--motion-fast) var(--ease-standard);
-}
-
-.manage-toolbar-action:active {
-  transform: scale(0.98);
-}
-
-.manage-toolbar-action[data-variant='ghost'] {
-  color: var(--toolbar-text);
-  background: transparent;
-}
-
-.manage-toolbar-action[data-variant='ghost']:hover {
-  background: var(--toolbar-hover);
-  color: var(--toolbar-text);
-}
-
-.manage-toolbar-action[data-variant='ghost']:disabled {
-  opacity: 0.45;
-  background: transparent;
-}
-
-.manage-toolbar-action--danger[data-variant='ghost'] {
-  color: var(--color-destructive);
-}
-
-.manage-toolbar-action--danger[data-variant='ghost']:hover {
-  background: color-mix(in srgb, var(--color-destructive) 16%, transparent);
-  color: var(--color-destructive);
-}
-
-.manage-toolbar-action--primary[data-slot='button'][data-variant='default'] {
-  padding-inline: 18px;
-  background: var(--preferences-primary);
-  color: var(--preferences-accent-foreground);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
-}
-
-.manage-toolbar-action--primary[data-slot='button'][data-variant='default']:enabled:hover {
-  background: var(--preferences-primary);
-  color: var(--preferences-accent-foreground);
-  opacity: 0.92;
-  transform: translateY(-0.5px);
-}
-
-.manage-toolbar-action--primary[data-slot='button']:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.manage-toolbar-count {
-  padding-inline: 8px;
-  color: var(--toolbar-muted);
-  font-size: 12px;
-  font-weight: 500;
-  user-select: none;
-}
-
-.group-tab-active-indicator {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 22px;
-  border-radius: 0 4px 4px 0;
-  background: var(--preferences-accent);
-}
 .site-grid {
   display: grid;
   width: 100%;
@@ -924,16 +634,8 @@ select:focus-visible {
   border-color: var(--dialog-inner-border);
   background: var(--dialog-control-surface);
 }
-.folder-dialog .site-card-main:focus-visible {
+.folder-dialog .site-card-main:not([aria-pressed]):focus-visible {
   outline-color: var(--color-ring, #0ea5e9);
-}
-.site-card--managing {
-  background: color-mix(in srgb, var(--home-cards-color, #fff) 7%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--home-cards-color, #fff) 18%, transparent);
-}
-.site-card--selected {
-  background: color-mix(in srgb, var(--preferences-accent) 16%, transparent);
-  box-shadow: inset 0 0 0 2px var(--preferences-accent);
 }
 .site-card-main {
   display: flex;
@@ -950,67 +652,45 @@ select:focus-visible {
   cursor: pointer;
   text-align: center;
 }
-.site-card-main:focus-visible {
+.site-card-main:not([aria-pressed]):focus-visible {
   border-radius: 14px;
   outline: 2px solid rgba(255, 255, 255, 0.92);
   outline-offset: 4px;
 }
+.site-card-main[aria-pressed]:focus-visible {
+  outline: none;
+}
 .site-card-selection {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 9;
   display: flex;
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   align-items: center;
   justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--dialog-text) 55%, var(--dialog-surface));
-  border-radius: 9999px;
-  background: var(--dialog-surface);
-  color: var(--dialog-text);
-  box-shadow: var(--dialog-control-shadow);
+  border: 1px solid var(--toolbar-text);
+  border-radius: 50%;
+  background: var(--toolbar-surface);
   pointer-events: none;
   transition:
     background var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
+    border-color var(--motion-fast) var(--ease-standard);
 }
-.site-card-selection.is-selected {
-  border-color: var(--preferences-primary);
+.site-card-main[aria-pressed='true'] .site-card-selection {
+  border-color: var(--preferences-accent-foreground);
   background: var(--preferences-primary);
   color: var(--preferences-accent-foreground);
 }
+.site-card-main:focus-visible .site-card-selection {
+  outline: 2px solid var(--toolbar-text);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--toolbar-surface);
+}
 @media (max-width: 720px) {
-  .ray-workspace:not(.ray-settings) {
+  .ray-workspace {
     inset: 0;
     width: 100%;
     border: 0;
     border-radius: 0;
   }
-}
-@media (max-width: 640px) {
-  .manage-toolbar {
-    padding: 6px 8px;
-    gap: 6px;
-  }
-  .manage-toolbar-action {
-    min-height: 34px;
-    font-size: 12px;
-  }
-}
-.settings-help {
-  margin: 0;
-  color: var(--dialog-muted);
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-.vault-dialog {
-  width: min(420px, calc(100% - 24px));
-  padding: 32px;
-}
-.vault-dialog .form-stack {
-  gap: 20px;
 }
 .vault-mark {
   display: grid;

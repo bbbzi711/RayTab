@@ -4,6 +4,7 @@ import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
 import { useTranslation } from 'react-i18next';
+import { isPlaceholderGroup } from '@/storage/group-privacy';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,7 +108,15 @@ function usePrivateLockReset(reset: () => void, enabled = true) {
   };
 }
 
-export function DataSettings({ spaceId, report }: { spaceId: SpaceId; report: DraftReporter }) {
+export function DataSettings({
+  spaceId,
+  groupId,
+  report,
+}: {
+  spaceId: SpaceId;
+  groupId?: string;
+  report: DraftReporter;
+}) {
   const { t } = useTranslation();
   const [active, setActive] = useState<'import' | 'export' | 'restore' | null>(null);
   const [visited, setVisited] = useState<Set<'import' | 'export' | 'restore'>>(() => new Set());
@@ -170,11 +179,12 @@ export function DataSettings({ spaceId, report }: { spaceId: SpaceId; report: Dr
         ))}
       </div>
       {active && (
-        <div className="data-task-heading">
+        <div className="data-task-heading mb-6 grid gap-4">
           <Button
             type="button"
             variant="ghost"
             size="sm"
+            className="-ml-2 justify-self-start"
             disabled={Object.values(busyForms).some(Boolean)}
             onClick={() => setActive(null)}
           >
@@ -188,7 +198,7 @@ export function DataSettings({ spaceId, report }: { spaceId: SpaceId; report: Dr
       )}
       {visited.has('import') && (
         <div className="data-task-body" hidden={active !== 'import'}>
-          <BookmarkImport spaceId={spaceId} report={reportForm} />
+          <BookmarkImport spaceId={spaceId} groupId={groupId} report={reportForm} />
         </div>
       )}
       {visited.has('export') && (
@@ -205,11 +215,23 @@ export function DataSettings({ spaceId, report }: { spaceId: SpaceId; report: Dr
   );
 }
 
-function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftReporter }) {
+function BookmarkImport({
+  spaceId,
+  groupId,
+  report,
+}: {
+  spaceId: SpaceId;
+  groupId?: string;
+  report: DraftReporter;
+}) {
   const { t } = useTranslation();
   const dispatch = useRayTabStore((store) => store.dispatch);
   const space = useRayTabStore((store) => store.state?.spaces[spaceId])!;
-  const activeGroup = useRayTabStore((store) => store.state?.local.activeGroup[spaceId])!;
+  const selectedGroup = useRayTabStore(
+    (store) => groupId ?? store.state?.local.activeGroup[spaceId],
+  )!;
+  const groups = space.groups.filter((group) => !isPlaceholderGroup(group.id));
+  const activeGroup = groups.find((group) => group.id === selectedGroup)?.id ?? groups[0]?.id ?? '';
   const defaults = {
     action: 'preview' as const,
     source: 'file' as const,
@@ -269,8 +291,10 @@ function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftRe
     }
   });
   return (
-    <form className="settings-form" noValidate onSubmit={submit}>
-      <p className="settings-help">{t('settings.bookmarkHelp')}</p>
+    <form className="settings-form grid min-w-0 gap-3.5 text-sm" noValidate onSubmit={submit}>
+      <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+        {t('settings.bookmarkHelp')}
+      </p>
       <SettingsFilePicker
         label={t('settings.bookmarkFile')}
         hint={t('settings.dataTasks.bookmarkFileHint')}
@@ -316,6 +340,7 @@ function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftRe
               name="organizeMode"
               render={({ field }) => (
                 <SettingsSelect
+                  triggerClassName="w-full max-w-full"
                   label={t('settings.organize')}
                   value={field.value}
                   options={[
@@ -332,6 +357,7 @@ function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftRe
               name="duplicateMode"
               render={({ field }) => (
                 <SettingsSelect
+                  triggerClassName="w-full max-w-full"
                   label={t('settings.duplicates')}
                   value={field.value}
                   options={[
@@ -348,9 +374,10 @@ function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftRe
               name="groupId"
               render={({ field }) => (
                 <SettingsSelect
+                  triggerClassName="w-full max-w-full"
                   label={t('settings.targetGroup')}
                   value={field.value}
-                  options={[...space.groups]
+                  options={[...groups]
                     .sort((a, b) => a.order - b.order)
                     .map((group) => [group.id, group.name])}
                   onChange={field.onChange}
@@ -361,7 +388,7 @@ function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftRe
           </div>
           <div className="data-preview-content">
             <strong>{t('settings.bookmarkPreview')}</strong>
-            <p className="settings-help">
+            <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
               {t('settings.importSummary', {
                 count: candidates.length,
                 duplicates: items.length - candidates.length,
@@ -377,7 +404,7 @@ function BookmarkImport({ spaceId, report }: { spaceId: SpaceId; report: DraftRe
               ))}
             </ul>
             {candidates.length > 8 && (
-              <p className="settings-help">
+              <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
                 {t('settings.remainingBookmarks', { count: candidates.length - 8 })}
               </p>
             )}
@@ -426,7 +453,7 @@ function BackupExport({ report }: { report: DraftReporter }) {
   );
   return (
     <form
-      className="settings-form"
+      className="settings-form grid min-w-0 gap-3.5 text-sm"
       noValidate
       onSubmit={form.handleSubmit(async (values) => {
         const isCurrent = operationBoundary();
@@ -458,6 +485,7 @@ function BackupExport({ report }: { report: DraftReporter }) {
         name="range"
         render={({ field }) => (
           <SettingsSelect
+            triggerClassName="w-full max-w-full"
             label={t('settings.exportRange')}
             value={field.value}
             options={[
@@ -470,7 +498,7 @@ function BackupExport({ report }: { report: DraftReporter }) {
           />
         )}
       />
-      <p className="settings-help">
+      <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
         {t('settings.backupRangeHelp', { range: t('settings.ranges.' + range) })}
       </p>
       {protectedPrivate && range !== 'normal' && (
@@ -486,10 +514,14 @@ function BackupExport({ report }: { report: DraftReporter }) {
         </label>
       )}
       {protectedPrivate && range !== 'normal' && (
-        <p className="settings-help">{t('settings.backupPasswordHelp')}</p>
+        <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+          {t('settings.backupPasswordHelp')}
+        </p>
       )}
       {locked && range !== 'normal' && (
-        <p className="settings-help">{t('settings.unlockForBackup')}</p>
+        <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+          {t('settings.unlockForBackup')}
+        </p>
       )}
       <FormError error={errors.password} />
       <FormError error={errors.root} />
@@ -527,7 +559,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
   const operationBoundary = usePrivateLockReset(() => form.reset(defaults));
   return (
     <form
-      className="settings-form"
+      className="settings-form grid min-w-0 gap-3.5 text-sm"
       noValidate
       onSubmit={form.handleSubmit(async (values) => {
         const isCurrent = operationBoundary();
@@ -583,6 +615,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
           if (!isCurrent()) return;
           await repository.restore(result.state, result.resources, {
             expectedRevision: current.revision,
+            ...(result.preserveGroupEncryption ? { protectWith: values.password } : {}),
             range: values.document.spaces.private
               ? values.document.spaces.normal
                 ? 'all'
@@ -641,7 +674,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
           <div className="data-preview-content">
             <strong>{t('settings.backupPreview')}</strong>
             {summary.normal && (
-              <p className="settings-help">
+              <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
                 {t('settings.spaceSummary', {
                   space: t('settings.normalSpace'),
                   groups: summary.normal.groups,
@@ -651,7 +684,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
               </p>
             )}
             {summary.private && (
-              <p className="settings-help">
+              <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
                 {'protected' in summary.private
                   ? t('settings.encryptedPrivate')
                   : t('settings.spaceSummary', {
@@ -668,6 +701,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
             name="mode"
             render={({ field }) => (
               <SettingsSelect
+                triggerClassName="w-full max-w-full"
                 label={t('settings.restoreMode')}
                 value={field.value}
                 options={[
@@ -679,7 +713,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
               />
             )}
           />
-          <p className="settings-help">
+          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
             {t(mode === 'merge' ? 'settings.mergeHelp' : 'settings.replaceModeHelp')}
           </p>
           {backup.spaces.private?.protected && (

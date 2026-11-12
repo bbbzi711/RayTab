@@ -64,7 +64,7 @@ export function WallpaperForm({
   useEffect(() => () => reset({ url: '' }), [reset]);
   return (
     <form
-      className="settings-form"
+      className="settings-form grid min-w-0 gap-3.5 text-sm"
       noValidate
       onSubmit={form.handleSubmit(async (values) => {
         try {
@@ -124,7 +124,7 @@ export function LocalWallpaperForm({
   useEffect(() => () => reset(), [reset]);
   return (
     <form
-      className="settings-form"
+      className="settings-form grid min-w-0 gap-3.5 text-sm"
       noValidate
       onSubmit={form.handleSubmit(async ({ file }) => {
         try {
@@ -217,12 +217,14 @@ export function SearchEngineSettings({
   return (
     <details className="search-engine-disclosure">
       <summary role="button">
-        <Settings2 size={15} aria-hidden="true" />
+        <Settings2 className="ui-icon-action" aria-hidden="true" />
         <span>{t('settings.manageSearchEngines')}</span>
-        <ChevronDown size={14} aria-hidden="true" />
+        <ChevronDown className="ui-icon-compact" aria-hidden="true" />
       </summary>
       <div className="search-engine-settings">
-        <p className="settings-help">{t('settings.chooseEngineOnHome')}</p>
+        <p className="mb-2.5 wrap-anywhere text-xs leading-5 text-muted-foreground">
+          {t('settings.chooseEngineOnHome')}
+        </p>
         <div className="search-engine-list">
           {settings.searchEngines.map((engine) => (
             <div className="search-engine-row" key={engine.id}>
@@ -241,19 +243,19 @@ export function SearchEngineSettings({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="search-engine-action"
+                className="text-muted-foreground"
                 disabled={busy}
                 aria-label={t('settings.editNamed', { name: engine.name })}
                 title={t('settings.editNamed', { name: engine.name })}
                 onClick={() => void edit(engine.id)}
               >
-                <Pencil size={14} aria-hidden="true" />
+                <Pencil className="ui-icon-action" aria-hidden="true" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="search-engine-action search-engine-delete"
+                className="search-engine-delete text-muted-foreground"
                 disabled={busy || settings.searchEngines.length === 1}
                 aria-label={t('settings.deleteNamed', { name: engine.name })}
                 title={t('settings.deleteNamed', { name: engine.name })}
@@ -303,7 +305,7 @@ export function SearchEngineSettings({
                   })();
                 }}
               >
-                <Trash2 size={14} aria-hidden="true" />
+                <Trash2 className="ui-icon-action" aria-hidden="true" />
               </Button>
             </div>
           ))}
@@ -323,16 +325,16 @@ export function SearchEngineSettings({
             }}
           >
             {editingId ? (
-              <Pencil size={14} aria-hidden="true" />
+              <Pencil className="ui-icon-action" aria-hidden="true" />
             ) : (
-              <Plus size={15} aria-hidden="true" />
+              <Plus className="ui-icon-action" aria-hidden="true" />
             )}
             <span>{t(editingId ? 'settings.editSearchEngine' : 'settings.addSearchEngine')}</span>
-            <ChevronDown size={14} aria-hidden="true" />
+            <ChevronDown className="ui-icon-compact" aria-hidden="true" />
           </summary>
           <form
             aria-label={t('settings.editSearchEngine')}
-            className="settings-form"
+            className="settings-form grid min-w-0 gap-3.5 text-sm"
             noValidate
             onSubmit={form.handleSubmit(async (values) => {
               try {
@@ -373,7 +375,9 @@ export function SearchEngineSettings({
             </label>
             <FormError error={errors.url} />
             <FormError error={errors.root} />
-            <p className="settings-help">{t('settings.engineHelp')}</p>
+            <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+              {t('settings.engineHelp')}
+            </p>
             <FormSaveHint dirty={isDirty} />
             <div className="settings-form-actions">
               <Button
@@ -408,11 +412,10 @@ export function PasswordForm({
   mode,
   report,
 }: {
-  mode: 'protect' | 'change' | 'remove';
+  mode: 'change' | 'remove';
   report: DraftReporter;
 }) {
   const { t } = useTranslation();
-  const protect = useRayTabStore((store) => store.protectPrivate);
   const change = useRayTabStore((store) => store.changePrivatePassword);
   const remove = useRayTabStore((store) => store.removePrivatePassword);
   const locked = useRayTabStore((store) => store.state?.privateSecurity.locked);
@@ -450,7 +453,7 @@ export function PasswordForm({
   }, [locked, reset]);
   return (
     <form
-      className="settings-form"
+      className="settings-form grid min-w-0 gap-3.5 text-sm"
       noValidate
       onSubmit={form.handleSubmit(async (values) => {
         if (
@@ -465,8 +468,7 @@ export function PasswordForm({
         )
           return;
         try {
-          if (mode === 'protect') await protect(values.password);
-          else if (mode === 'change') await change(values.password, values.next);
+          if (mode === 'change') await change(values.password, values.next);
           else await remove(values.password);
           form.reset({ password: '', next: '', confirm: '' });
           toast.success(t('settings.saved'));
@@ -477,13 +479,13 @@ export function PasswordForm({
     >
       <strong>{t(`settings.passwordActions.${mode}`)}</strong>
       <label>
-        {t(mode === 'protect' ? 'settings.password' : 'settings.currentPassword')}
+        {t('settings.currentPassword')}
         <Input
           type="password"
-          autoComplete={mode === 'protect' ? 'new-password' : 'current-password'}
+          autoComplete="current-password"
           {...form.register('password')}
           aria-invalid={Boolean(errors.password)}
-          disabled={isSubmitting || (mode !== 'protect' && locked)}
+          disabled={isSubmitting || locked}
         />
       </label>
       <FormError error={errors.password} />
@@ -519,7 +521,7 @@ export function PasswordForm({
         type="submit"
         variant={mode === 'remove' ? 'destructive' : 'outline'}
         size="sm"
-        disabled={isSubmitting || (mode !== 'protect' && locked)}
+        disabled={isSubmitting || locked}
       >
         {t(isSubmitting ? 'settings.saving' : `settings.passwordActions.${mode}`)}
       </Button>

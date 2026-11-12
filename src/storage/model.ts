@@ -36,6 +36,13 @@ export const groupSchema = z.object({
   ...recordMeta,
   name: titleSchema,
   order: z.number().int().nonnegative(),
+  hidden: z.boolean().optional(),
+});
+export const groupLabelSchema = groupSchema.pick({
+  id: true,
+  name: true,
+  order: true,
+  hidden: true,
 });
 export const folderSchema = z.object({
   ...recordMeta,
@@ -170,6 +177,14 @@ export const rayStateSchema = z
       sidebarMode: z.enum(['always', 'auto', 'hidden']).optional(),
     }),
     privateSecurity: z.object({ protected: z.boolean(), locked: z.boolean() }),
+    encryptedGroupIndex: z
+      .object({
+        labels: z.array(groupLabelSchema).max(200),
+        hasLegacyGroups: z.boolean(),
+        folderIds: z.array(idSchema).max(2000).optional(),
+        siteIds: z.array(idSchema).max(10000).optional(),
+      })
+      .optional(),
     local: localStateSchema,
   })
   .superRefine((state, ctx) => {
@@ -191,6 +206,7 @@ export const rayStateSchema = z
   });
 
 export type Group = z.infer<typeof groupSchema>;
+export type GroupLabel = z.infer<typeof groupLabelSchema>;
 export type Folder = z.infer<typeof folderSchema>;
 export type Site = z.infer<typeof siteSchema>;
 export type Tombstone = z.infer<typeof tombstoneSchema>;

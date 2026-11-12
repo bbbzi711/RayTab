@@ -1,19 +1,31 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
-import { errorMessage, storedErrorMessage } from '@/lib/errors';
+import { RayTabMark } from '@/components/ui/raytab-mark';
+import { AppError, errorMessage, storedErrorMessage } from '@/lib/errors';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { NavigationMenuItems, type NavigationAction } from '@/features/navigation/NavigationMenu';
 import { useShallow } from 'zustand/react/shallow';
-import { LayoutGrid, LockKeyhole, PanelLeft, Settings, ShieldCheck, Sun } from 'lucide-react';
+import {
+  Focus,
+  FolderPlus,
+  LayoutGrid,
+  ListChecks,
+  Plus,
+  Settings,
+  ShieldCheck,
+} from 'lucide-react';
 import { Background } from '@/features/appearance/Background';
 import { NavigationPage, type NavigationHandle } from '@/features/navigation/NavigationPage';
+import { GroupManagement } from '@/features/navigation/GroupManagement';
+import { MoveDialog } from '@/features/navigation/NavigationDialogs';
 import { SearchBar } from '@/features/search/SearchBar';
-import { type SpaceId } from '@/storage/model';
+import { isUserGroup, listGroupTabs, type GroupTab } from '@/storage/group-privacy';
+import type { RayState } from '@/storage/model';
 import { selectEffectiveSettings, startRayTabStore, useRayTabStore } from '@/storage/store';
 import { Clock } from '@/widgets/clock/Clock';
 import { Onboarding } from '@/features/onboarding/Onboarding';
@@ -26,13 +38,26 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
 import i18n from '@/locales';
 import { resolveHomeTextColors } from '@/features/appearance/text-colors';
 import { Tooltip, TooltipProvider } from '@/components/ui/tooltip';
+import type { SettingsHandle } from '@/features/settings/SettingsPanel';
 
 const unlockSchema = z.object({ password: z.string().min(1, 'navigation.passwordRequired') });
 const SettingsPanel = lazy(() => import('@/features/settings/SettingsPanel'));
+type PasswordRequest =
+  | { kind: 'group'; group?: GroupTab }
+  | { kind: 'settings' }
+  | { kind: 'delete'; group: GroupTab }
+  | { kind: 'privacy'; group: GroupTab; hidden?: boolean; create: boolean };
+
+function deletionDestinations(state: RayState, group: GroupTab) {
+  return state.spaces[group.spaceId].groups.filter(
+    (candidate) => candidate.id !== group.id && isUserGroup(state, group.spaceId, candidate),
+  );
+}
 
 export default function App() {
   const { t } = useTranslation();
@@ -41,22 +66,74 @@ export default function App() {
     defaultValues: { password: '' },
   });
   const navigationRef = useRef<NavigationHandle>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsRef = useRef<SettingsHandle>(null);
+  const settingsExitPending = useRef(false);
+  const passwordTriggerRef = useRef<HTMLElement | null>(null);
   const error = useRayTabStore((store) => store.error);
-  const spaceId = useRayTabStore((store) => store.state?.local.activeSpace);
+  const state = useRayTabStore((store) => store.state);
+  const spaceId = state?.local.activeSpace;
   const homeMode = useRayTabStore((store) => store.state?.local.homeMode);
   const onboardingComplete = useRayTabStore((store) => store.state?.local.onboardingComplete);
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const privateLocked = useRayTabStore((store) => store.state?.privateSecurity.locked);
-  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store)));
+  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, 'normal')));
   const dispatch = useRayTabStore((store) => store.dispatch);
   const refresh = useRayTabStore((store) => store.refresh);
   const lockPrivate = useRayTabStore((store) => store.lockPrivate);
   const unlockPrivate = useRayTabStore((store) => store.unlockPrivate);
+  const protectPrivate = useRayTabStore((store) => store.protectPrivate);
   useEffect(startRayTabStore, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [deferHiddenSelection, setDeferHiddenSelection] = useState(false);
+  const [passwordRequest, setPasswordRequest] = useState<PasswordRequest | null>(null);
+  const [groupToMove, setGroupToMove] = useState<GroupTab | null>(null);
+  const [confirmGroupDeletion, groupDeletionConfirmation] = useConfirm();
+  const unlockOpen = passwordRequest !== null;
+  const creatingPassword = passwordRequest?.kind === 'privacy' && passwordRequest.create;
+  const groupTabs = useMemo(() => (state ? listGroupTabs(state) : []), [state]);
+  const legacyLocked = Boolean(
+    protectedPrivate && privateLocked && (state?.encryptedGroupIndex?.hasLegacyGroups ?? true),
+  );
+  const currentGroup = groupTabs.find(
+    (group) => group.spaceId === spaceId && group.id === state?.local.activeGroup[group.spaceId],
+  );
+  const lastVisibleGroup = useRef<GroupTab | undefined>(undefined);
+  useEffect(() => {
+    if (currentGroup && !currentGroup.hidden) lastVisibleGroup.current = currentGroup;
+  }, [currentGroup]);
+  const fallback = groupTabs.find((group) => !group.hidden && !group.encrypted);
+  const displayedGroup =
+    currentGroup?.hidden && (!showHidden || deferHiddenSelection) ? fallback : currentGroup;
+  const displayedSpace = displayedGroup?.spaceId ?? spaceId;
+  useEffect(() => {
+    if (!showHidden && currentGroup?.hidden && currentGroup.encrypted && !privateLocked)
+      void lockPrivate().catch((reason) => toast.error(errorMessage(reason)));
+  }, [showHidden, currentGroup?.hidden, currentGroup?.encrypted, privateLocked, lockPrivate]);
   const navigationVisible = homeMode === 'navigation';
-  const [unlockOpen, setUnlockOpen] = useState(false);
   const openSettings = () => setSettingsOpen(true);
+  const showHome = () => {
+    setSettingsOpen(false);
+    requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  };
+  const leaveSettings = async (leave: () => void | Promise<void>) => {
+    if (settingsExitPending.current) return false;
+    settingsExitPending.current = true;
+    try {
+      if (settingsRef.current && !(await settingsRef.current.canClose())) return false;
+      await leave();
+      return true;
+    } finally {
+      settingsExitPending.current = false;
+    }
+  };
+  const closeSettings = () => leaveSettings(showHome);
+  const openSettingsPassword = (request: PasswordRequest) => {
+    const trigger = document.activeElement;
+    passwordTriggerRef.current = trigger instanceof HTMLElement ? trigger : null;
+    setPasswordRequest(request);
+  };
   useEffect(() => {
     void i18n.changeLanguage(settings?.language ?? 'zh-CN');
   }, [settings?.language]);
@@ -66,7 +143,6 @@ export default function App() {
     return () => window.removeEventListener('pagehide', clearPassword);
   }, [unlockForm.reset]);
   const rootTheme = settings?.theme;
-  const rootHomeMode = homeMode;
   useEffect(() => {
     // 确保首帧完成初始绘制后移除 preload，恢复后续正常的平滑交互动效
     const raf = requestAnimationFrame(() => {
@@ -75,119 +151,240 @@ export default function App() {
     return () => cancelAnimationFrame(raf);
   }, []);
   useEffect(() => {
-    if (!rootTheme || !rootHomeMode) return;
+    if (!rootTheme || !homeMode) return;
     document.documentElement.dataset.theme = rootTheme;
-    document.documentElement.dataset.homeMode = rootHomeMode;
-  }, [rootHomeMode, rootTheme]);
-  const sidebarMode = settings?.sidebarMode;
-  const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const [isSidebarPinnedOpen, setIsSidebarPinnedOpen] = useState(false);
-  const hoverLeaveTimerRef = useRef<number | null>(null);
-
-  const [groupsPortalNode, setGroupsPortalNode] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setIsSidebarHovered(false);
-    setIsSidebarPinnedOpen(false);
-    if (hoverLeaveTimerRef.current) window.clearTimeout(hoverLeaveTimerRef.current);
-    return () => {
-      if (hoverLeaveTimerRef.current) window.clearTimeout(hoverLeaveTimerRef.current);
-    };
-  }, [sidebarMode, spaceId, homeMode]);
-
-  const handleMouseEnterSidebar = () => {
-    if (hoverLeaveTimerRef.current) {
-      window.clearTimeout(hoverLeaveTimerRef.current);
-      hoverLeaveTimerRef.current = null;
-    }
-    setIsSidebarHovered(true);
-  };
-
-  const handleMouseLeaveSidebar = () => {
-    if (hoverLeaveTimerRef.current) {
-      window.clearTimeout(hoverLeaveTimerRef.current);
-    }
-    hoverLeaveTimerRef.current = window.setTimeout(() => {
-      setIsSidebarHovered(false);
-    }, 280);
-  };
-
-  const isSidebarVisible =
-    navigationVisible &&
-    (sidebarMode === 'always' ||
-      (sidebarMode === 'auto' && isSidebarHovered) ||
-      isSidebarPinnedOpen);
-
-  useEffect(() => {
-    if (!spaceId) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement)?.isContentEditable
-      ) {
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
-        if (homeMode === 'navigation') {
-          if (sidebarMode === 'always') {
-            void dispatch({
-              type: 'settings',
-              spaceId,
-              patch: { sidebarMode: 'auto' },
-            }).catch((reason) => toast.error(errorMessage(reason)));
-          } else {
-            setIsSidebarPinnedOpen((prev) => !prev);
-          }
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [dispatch, homeMode, sidebarMode, spaceId]);
-  if (!settings || !spaceId)
+    document.documentElement.dataset.homeMode = homeMode;
+  }, [homeMode, rootTheme]);
+  if (!settings || !spaceId || !displayedSpace)
     return (
-      <main className="loading">
-        <Sun size={32} />
-        <h1>RayTab</h1>
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-4">
+        <RayTabMark className="size-10" />
+        <h1 className="text-xl font-semibold">RayTab</h1>
         <p>{error ? storedErrorMessage(error) : t('messages.openingYourSpace')}</p>
-        {error && <button onClick={() => void refresh()}>{t('messages.retry')}</button>}
+        {error && <Button onClick={() => void refresh()}>{t('messages.retry')}</Button>}
       </main>
     );
 
   const textColors = resolveHomeTextColors(settings);
-  const switchSpace = (next: SpaceId) => {
-    if (next === 'private' && protectedPrivate && privateLocked) {
-      setUnlockOpen(true);
+  const selectGroup = async (group: GroupTab) => {
+    const current = useRayTabStore.getState().state;
+    if (
+      current?.local.activeSpace !== group.spaceId ||
+      current.local.activeGroup[group.spaceId] !== group.id ||
+      current.local.selectedFolder[group.spaceId][group.id]
+    ) {
+      await dispatch({ type: 'switch-space', spaceId: group.spaceId, groupId: group.id });
+    }
+    if (!group.encrypted && current?.privateSecurity.protected && !current.privateSecurity.locked)
+      await lockPrivate();
+  };
+
+  const openGroup = (group?: GroupTab) =>
+    leaveSettings(async () => {
+      if ((!group || group.encrypted) && privateLocked) {
+        setSettingsOpen(false);
+        setPasswordRequest({ kind: 'group', group });
+        return;
+      }
+      if (!group) return;
+      try {
+        await selectGroup(group);
+        setDeferHiddenSelection(false);
+      } catch (reason) {
+        toast.error(errorMessage(reason));
+      }
+    });
+
+  const toggleHiddenGroups = async () => {
+    if (showHidden && currentGroup?.hidden) {
+      const previous = lastVisibleGroup.current;
+      const destination =
+        groupTabs.find(
+          (group) =>
+            !group.hidden &&
+            (!group.encrypted || !privateLocked) &&
+            group.id === previous?.id &&
+            group.spaceId === previous.spaceId,
+        ) ?? fallback;
+      try {
+        if (destination) await selectGroup(destination);
+        else if (protectedPrivate && !privateLocked) await lockPrivate();
+      } catch (reason) {
+        toast.error(errorMessage(reason));
+        return;
+      }
+    }
+    if (!showHidden) setDeferHiddenSelection(Boolean(currentGroup?.hidden));
+    setShowHidden(!showHidden);
+  };
+
+  const updateGroupPrivacy = (group: GroupTab, hidden?: boolean) =>
+    dispatch(
+      hidden === undefined
+        ? {
+            type: 'set-group-encrypted',
+            spaceId: group.spaceId,
+            groupId: group.id,
+            encrypted: !group.encrypted,
+          }
+        : { type: 'set-group-hidden', spaceId: group.spaceId, groupId: group.id, hidden },
+    );
+
+  const changeGroupPrivacy = async (group: GroupTab, hidden?: boolean) => {
+    if (
+      (hidden === undefined && (!protectedPrivate || privateLocked)) ||
+      (group.encrypted && privateLocked)
+    ) {
+      openSettingsPassword({ kind: 'privacy', group, hidden, create: !protectedPrivate });
       return;
     }
-    void dispatch({ type: 'switch-space', spaceId: next })
-      .then(() =>
-        next === 'normal' && protectedPrivate && !privateLocked ? lockPrivate() : undefined,
-      )
-      .catch((reason) => toast.error(errorMessage(reason)));
-  };
-  const unlock = unlockForm.handleSubmit(async ({ password }) => {
     try {
-      await unlockPrivate(password);
-      await dispatch({ type: 'switch-space', spaceId: 'private' });
-      unlockForm.reset({ password: '' });
-      setUnlockOpen(false);
+      await updateGroupPrivacy(group, hidden);
+      const security = useRayTabStore.getState().state;
+      if (
+        security?.local.activeSpace === 'normal' &&
+        security.privateSecurity.protected &&
+        !security.privateSecurity.locked
+      )
+        await lockPrivate();
     } catch (reason) {
+      toast.error(errorMessage(reason));
+    }
+  };
+
+  const finishGroupDeletion = async (group: GroupTab) => {
+    const latest = useRayTabStore.getState().state;
+    if (group.encrypted && latest?.local.activeSpace === 'normal' && !latest.privateSecurity.locked)
+      await lockPrivate().catch((reason) => toast.error(errorMessage(reason)));
+  };
+
+  const prepareGroupDeletion = async (group: GroupTab) => {
+    let moving = false;
+    try {
+      const latest = useRayTabStore.getState().state;
+      const source = latest?.spaces[group.spaceId];
+      if (!latest || !source?.groups.some((candidate) => candidate.id === group.id))
+        throw new AppError('messages.theDestinationGroupDoesNotExist');
+      const siteIds = source.sites
+        .filter((site) => site.groupId === group.id)
+        .map((site) => site.id);
+      const folderIds = source.folders
+        .filter((folder) => folder.groupId === group.id)
+        .map((folder) => folder.id);
+      const hasContents = siteIds.length + folderIds.length > 0;
+      if (hasContents && deletionDestinations(latest, group).length) {
+        setGroupToMove(group);
+        moving = true;
+        return;
+      }
+      if (
+        await confirmGroupDeletion({
+          title: t('navigation.deleteNamedGroup', { name: group.name }),
+          description: t(
+            hasContents ? 'navigation.deleteGroupContentsHelp' : 'navigation.deleteEmptyGroupHelp',
+          ),
+          confirmText: t(hasContents ? 'navigation.deleteGroupContents' : 'messages.delete'),
+          variant: 'destructive',
+        })
+      ) {
+        await dispatch({
+          type: 'remove-group',
+          spaceId: group.spaceId,
+          id: group.id,
+          siteIds,
+          folderIds,
+        });
+        toast.success(t('messages.deleted'));
+      }
+    } catch (reason) {
+      toast.error(errorMessage(reason));
+    } finally {
+      if (!moving) await finishGroupDeletion(group);
+    }
+  };
+
+  const deleteGroup = (group: GroupTab) => {
+    if (group.encrypted && privateLocked) {
+      openSettingsPassword({ kind: 'delete', group });
+      return;
+    }
+    void prepareGroupDeletion(group);
+  };
+
+  const unlock = unlockForm.handleSubmit(async ({ password }) => {
+    if (!passwordRequest) return;
+    if (creatingPassword && password.length < 6) {
+      unlockForm.setError('password', { message: 'settings.passwordLength' });
+      return;
+    }
+    let unlocked = false;
+    try {
+      if (passwordRequest.kind === 'privacy' && passwordRequest.create) {
+        const { id, spaceId } = passwordRequest.group;
+        await protectPrivate(password, { spaceId, groupId: id });
+      } else {
+        await unlockPrivate(password, true);
+        unlocked = true;
+        if (passwordRequest.kind === 'group') {
+          const latest = useRayTabStore.getState().state;
+          const group =
+            passwordRequest.group ??
+            (latest && listGroupTabs(latest).find((tab) => tab.encrypted && tab.hidden));
+          if (group) {
+            if (group.hidden) setShowHidden(true);
+            await selectGroup(group);
+            setDeferHiddenSelection(false);
+          }
+        } else if (passwordRequest.kind === 'privacy') {
+          await updateGroupPrivacy(passwordRequest.group, passwordRequest.hidden);
+          if (useRayTabStore.getState().state?.local.activeSpace === 'normal') await lockPrivate();
+        }
+      }
+      unlockForm.reset({ password: '' });
+      setPasswordRequest(null);
+      if (passwordRequest.kind === 'delete') {
+        passwordTriggerRef.current = null;
+        void prepareGroupDeletion(passwordRequest.group);
+      }
+    } catch (reason) {
+      if (unlocked) await lockPrivate().catch((error) => toast.error(errorMessage(error)));
       unlockForm.setError('root', { message: errorMessage(reason) });
     }
   });
+  const homeModeLabel = t(
+    navigationVisible ? 'messages.enterFocusMode' : 'messages.openNavigation',
+  );
+  const settingsLabel = t('messages.settings');
+  const HomeModeIcon = navigationVisible ? Focus : LayoutGrid;
+  const switchHomeMode = async () => {
+    if (settingsOpen && !(await closeSettings())) return;
+    try {
+      await dispatch({ type: 'set-home-mode', mode: navigationVisible ? 'focus' : 'navigation' });
+      if (navigationVisible && protectedPrivate && !privateLocked) await lockPrivate();
+    } catch (reason) {
+      toast.error(errorMessage(reason));
+    }
+  };
+  const settingsActionLabel = settingsOpen ? t('messages.backToHome') : settingsLabel;
+  const utilityButtonClass =
+    'size-11 text-current opacity-85 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-current';
   const desktopActions: NavigationAction[] = [
-    { id: 'add-site', label: t('messages.addSite'), run: () => navigationRef.current?.addSite() },
+    {
+      id: 'add-site',
+      label: t('messages.addSite'),
+      icon: Plus,
+      run: () => navigationRef.current?.addSite(),
+    },
     {
       id: 'add-folder',
       label: t('messages.newFolder'),
+      icon: FolderPlus,
       run: () => navigationRef.current?.addFolder(),
     },
     {
       id: 'organize',
       label: t('messages.organize'),
+      icon: ListChecks,
       run: async () => {
         try {
           await dispatch({ type: 'set-home-mode', mode: 'navigation' });
@@ -199,320 +396,303 @@ export default function App() {
     },
     {
       id: 'mode',
-      label: t(homeMode === 'focus' ? 'messages.openNavigation' : 'messages.enterFocusMode'),
+      label: homeModeLabel,
+      icon: HomeModeIcon,
       separator: true,
-      run: () =>
-        dispatch({
-          type: 'set-home-mode',
-          mode: homeMode === 'focus' ? 'navigation' : 'focus',
-        }).catch((reason) => toast.error(errorMessage(reason))),
+      run: switchHomeMode,
     },
-    { id: 'settings', label: t('messages.settings'), run: openSettings },
+    { id: 'settings', label: settingsLabel, icon: Settings, run: openSettings },
   ];
   return (
     <TooltipProvider delayDuration={200}>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <main
-            className="app-shell"
-            onContextMenuCapture={(event) => {
-              const target = event.target as HTMLElement;
-              if (
-                target.closest(
-                  'input, textarea, select, [contenteditable="true"], [data-desktop-control]',
-                ) ||
-                (target.closest('[role="dialog"]') && !target.closest('[data-navigation-object]'))
-              )
-                event.stopPropagation();
-            }}
-            data-theme={settings.theme}
-            style={
-              {
-                '--home-clock-color': textColors.clock,
-                '--home-date-color': textColors.date,
-                '--home-greeting-color': textColors.greeting,
-                '--home-tabs-color': textColors.tabs,
-                '--home-cards-color': textColors.cards,
-              } as React.CSSProperties
-            }
-          >
-            <Background key={spaceId} settings={settings} spaceId={spaceId} />
-
-            {homeMode === 'focus' && (
-              <div className="fixed top-4 right-4 z-40" data-desktop-control>
-                <Tooltip content={t('messages.openNavigation')} side="left">
-                  <button
-                    className="flex items-center justify-center w-11 h-11 rounded-2xl bg-black/25 hover:bg-black/40 text-white/85 hover:text-white backdrop-blur-xl border border-white/20 shadow-sm transition-[color,background-color,transform] duration-200 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80"
-                    aria-label={t('messages.openNavigation')}
-                    onClick={() =>
-                      void dispatch({
-                        type: 'set-home-mode',
-                        mode: 'navigation',
-                      }).catch((reason) => toast.error(errorMessage(reason)))
-                    }
-                  >
-                    <LayoutGrid size={16} />
-                  </button>
-                </Tooltip>
-              </div>
-            )}
-
-            {/* 边缘悬停滑出热区与微光指示条 */}
-            {navigationVisible && sidebarMode === 'auto' && (
-              <div
-                className="fixed left-0 top-0 bottom-0 w-3.5 z-40 flex items-center group pointer-events-auto cursor-pointer select-none"
-                onMouseEnter={handleMouseEnterSidebar}
-                onMouseLeave={handleMouseLeaveSidebar}
-                onClick={() => setIsSidebarPinnedOpen((prev) => !prev)}
-                aria-label={
-                  isSidebarVisible ? t('messages.collapseSidebar') : t('messages.expandSidebar')
-                }
+      <main
+        className="relative isolate min-h-dvh"
+        data-theme={settings.theme}
+        style={
+          {
+            '--home-clock-color': textColors.clock,
+            '--home-date-color': textColors.date,
+            '--home-greeting-color': textColors.greeting,
+            '--home-tabs-color': textColors.tabs,
+            '--home-cards-color': textColors.cards,
+          } as React.CSSProperties
+        }
+        onKeyDown={(event) => {
+          if (
+            settingsOpen &&
+            event.key === 'Escape' &&
+            !event.defaultPrevented &&
+            !event.nativeEvent.isComposing &&
+            !document.querySelector(
+              '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]',
+            )
+          ) {
+            event.preventDefault();
+            void closeSettings();
+          }
+        }}
+      >
+        <Background settings={settings} spaceId="normal" />
+        <header className="absolute inset-x-0 top-0 z-40 flex h-14 items-center justify-end px-3 text-[color:var(--home-tabs-color)] sm:px-6 [&_svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.65)]">
+          <div className="flex items-center gap-1">
+            <Tooltip content={homeModeLabel} side="bottom">
+              <Button
+                type="button"
+                variant="link"
+                size="icon-lg"
+                className={utilityButtonClass}
+                aria-label={homeModeLabel}
+                onClick={switchHomeMode}
               >
-                <div
-                  className={cn(
-                    'w-1 h-16 rounded-full bg-white/20 group-hover:bg-white/70 group-hover:w-1.5 transition-all duration-300 ml-0.5 shadow-xs backdrop-blur-md',
-                    isSidebarVisible
-                      ? 'opacity-0 pointer-events-none'
-                      : 'opacity-70 group-hover:opacity-100',
-                  )}
-                />
-              </div>
-            )}
-
-            {/* 完全隐藏模式下的快捷悬浮唤出按钮 */}
-            {navigationVisible && sidebarMode === 'hidden' && !isSidebarVisible && (
-              <Tooltip content={t('messages.expandSidebar')} side="right">
-                <button
-                  className="fixed left-3 bottom-3 z-40 w-9 h-9 rounded-xl bg-black/40 hover:bg-black/60 text-white/80 hover:text-white border border-white/15 backdrop-blur-xl flex items-center justify-center transition-all duration-200 shadow-lg cursor-pointer"
-                  onClick={() => setIsSidebarPinnedOpen(true)}
-                  aria-label={t('messages.expandSidebar')}
-                >
-                  <PanelLeft size={16} />
-                </button>
-              </Tooltip>
-            )}
-
-            {/* 左侧贴边极简侧边栏 */}
-            <aside
-              onMouseEnter={handleMouseEnterSidebar}
-              onMouseLeave={handleMouseLeaveSidebar}
-              className={cn(
-                'fixed left-0 top-0 bottom-0 z-30 flex flex-col items-center py-4 sm:py-[22px] transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] select-none',
-                'w-[56px] sm:w-[76px]',
-                'bg-black/20 hover:bg-black/30 border-r border-white/10 backdrop-blur-2xl',
-                !isSidebarVisible
-                  ? '-translate-x-full opacity-0 pointer-events-none'
-                  : 'translate-x-0 opacity-100 shadow-2xl',
-              )}
-              aria-label={t('messages.groupsSidebar')}
-              aria-hidden={!isSidebarVisible}
-              inert={!isSidebarVisible}
-            >
-              <div
-                className="text-[21px] tracking-[-2px] font-medium leading-[32px] text-white/90 mb-[18px] shrink-0"
-                aria-label="RayTab"
+                <HomeModeIcon className="size-5" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={settingsActionLabel} side="bottom">
+              <Button
+                ref={settingsButtonRef}
+                type="button"
+                variant="link"
+                size="icon-lg"
+                className={cn(utilityButtonClass, 'aria-expanded:opacity-100')}
+                aria-label={settingsActionLabel}
+                aria-expanded={settingsOpen}
+                onClick={settingsOpen ? closeSettings : openSettings}
               >
-                R.
-              </div>
+                <Settings className="size-5" aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          </div>
+        </header>
 
-              {/* Groups Portal */}
-              <div
-                ref={setGroupsPortalNode}
-                role="navigation"
-                aria-label={t('messages.groupNavigation')}
-                className="flex-1 w-full min-h-0 flex flex-col gap-[7px] items-center overflow-y-auto no-scrollbar px-1 sm:px-2"
-              />
-
-              <div className="flex flex-col gap-[3px] shrink-0 w-full px-1 sm:px-2 mt-auto pt-2">
-                <Tooltip
-                  content={t(
-                    spaceId === 'normal'
-                      ? 'messages.switchToPrivateSpace'
-                      : 'messages.switchToPersonalSpace',
-                  )}
-                  side="right"
-                >
-                  <button
-                    className="relative flex flex-col items-center justify-center w-full min-h-[50px] sm:min-h-[54px] rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
-                    data-desktop-control
-                    onClick={() => switchSpace(spaceId === 'normal' ? 'private' : 'normal')}
-                  >
-                    <LockKeyhole size={19} strokeWidth={1.6} />
-                    <span className="text-[11px] font-medium leading-none mt-[5px]">
-                      {t(spaceId === 'normal' ? 'messages.privateSpace' : 'messages.personalSpace')}
-                    </span>
-                  </button>
-                </Tooltip>
-                <Tooltip content={t('messages.settings')} side="right">
-                  <button
-                    className="flex flex-col items-center justify-center w-full min-h-[50px] sm:min-h-[54px] rounded-xl text-white/75 hover:text-white hover:bg-white/15 transition-all duration-150 cursor-pointer"
-                    aria-label={t('messages.settings')}
-                    data-desktop-control
-                    onClick={() => {
-                      openSettings();
-                      setIsSidebarPinnedOpen(false);
-                    }}
-                  >
-                    <Settings size={19} strokeWidth={1.6} />
-                    <span className="text-[11px] font-medium leading-none mt-[5px]">
-                      {t('messages.settings')}
-                    </span>
-                  </button>
-                </Tooltip>
-              </div>
-            </aside>
-
-            {/* 主工作区 */}
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
             <div
-              data-sidebar-visible={isSidebarVisible || undefined}
-              data-testid="desktop"
-              onClick={(event) => {
-                if (isSidebarPinnedOpen && event.currentTarget.contains(event.target as Node))
-                  setIsSidebarPinnedOpen(false);
+              className={cn('relative text-white', settingsOpen && 'invisible pointer-events-none')}
+              inert={settingsOpen}
+              onContextMenuCapture={(event) => {
+                const target = event.target as HTMLElement;
+                if (
+                  target.closest(
+                    'input, textarea, select, [contenteditable="true"], [data-desktop-control]',
+                  ) ||
+                  (target.closest('[role="dialog"]') && !target.closest('[data-navigation-object]'))
+                )
+                  event.stopPropagation();
               }}
-              className={cn(
-                'desktop-workspace relative w-full flex flex-col items-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
-                !navigationVisible
-                  ? 'min-h-screen pt-[118px] px-4 pb-8'
-                  : 'desktop-workspace--navigation',
-              )}
             >
-              <div className="desktop-content w-full mx-auto flex flex-col transition-all duration-500">
-                <div className="desktop-header flex shrink-0 flex-col">
-                  {(settings.showClock ||
-                    settings.showDate ||
-                    settings.showLunar ||
-                    settings.showGreeting) && (
-                    <Clock
-                      language={settings.language}
-                      hour12={settings.hour12}
-                      showClock={settings.showClock}
-                      showDate={settings.showDate}
-                      showLunar={settings.showLunar}
-                      showGreeting={settings.showGreeting}
-                      compact={navigationVisible}
-                    />
-                  )}
-                  {settings.showSearch && (
-                    <div className="desktop-search relative z-20 w-full flex justify-center mt-[29px]">
-                      <SearchBar key={spaceId} spaceId={spaceId} />
-                    </div>
-                  )}
-                </div>
+              {/* 主工作区 */}
+              <div
+                data-testid="desktop"
+                className={cn(
+                  'desktop-workspace relative w-full flex flex-col items-center transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
+                  !navigationVisible
+                    ? 'min-h-screen pt-[118px] px-4 pb-8'
+                    : 'desktop-workspace--navigation',
+                )}
+              >
+                <div className="desktop-content w-full mx-auto flex flex-col transition-all duration-500">
+                  <div className="desktop-header flex shrink-0 flex-col">
+                    {(settings.showClock ||
+                      settings.showDate ||
+                      settings.showLunar ||
+                      settings.showGreeting) && (
+                      <Clock
+                        language={settings.language}
+                        hour12={settings.hour12}
+                        showClock={settings.showClock}
+                        showDate={settings.showDate}
+                        showLunar={settings.showLunar}
+                        showGreeting={settings.showGreeting}
+                        compact={navigationVisible}
+                      />
+                    )}
+                    {settings.showSearch && (
+                      <div className="desktop-search relative z-20 w-full flex justify-center mt-[29px]">
+                        <SearchBar key={spaceId} spaceId="normal" />
+                      </div>
+                    )}
+                  </div>
 
-                {/* 导航卡片区域 */}
-                <div
-                  data-testid="site-navigation"
-                  className={cn(
-                    'desktop-navigation relative z-10 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
-                    !navigationVisible
-                      ? 'opacity-0 max-h-0 pointer-events-none overflow-hidden translate-y-6 scale-[0.98]'
-                      : 'opacity-100 translate-y-0 scale-100',
-                  )}
-                  aria-hidden={!navigationVisible}
-                  inert={!navigationVisible}
-                >
-                  <NavigationPage
-                    key={spaceId}
-                    spaceId={spaceId}
-                    ref={navigationRef}
-                    groupsPortal={groupsPortalNode}
-                  />
+                  {/* 导航卡片区域 */}
+                  <div
+                    className={cn(
+                      'desktop-navigation relative z-10 mt-[clamp(12px,2.4vh,20px)] flex w-full flex-col transition-opacity',
+                      !navigationVisible
+                        ? 'invisible pointer-events-none max-h-0 overflow-hidden opacity-0'
+                        : 'opacity-100',
+                    )}
+                    inert={!navigationVisible}
+                  >
+                    <NavigationPage
+                      key={displayedSpace}
+                      spaceId={displayedSpace}
+                      groupId={displayedGroup?.id}
+                      ref={navigationRef}
+                      active={
+                        navigationVisible && !!onboardingComplete && !settingsOpen && !unlockOpen
+                      }
+                      groupTabs={groupTabs}
+                      showGrid={Boolean(displayedGroup)}
+                      showHidden={showHidden}
+                      legacyLocked={legacyLocked}
+                      onSelectGroup={openGroup}
+                      onToggleHidden={toggleHiddenGroups}
+                      onDeleteGroup={deleteGroup}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-
-            {error && (
-              <div className="load-error" role="alert">
-                <span>{storedErrorMessage(error)}</span>
-                <Button type="button" onClick={() => void refresh()}>
-                  {t('messages.retry')}
-                </Button>
-              </div>
-            )}
-            {settingsOpen && (
-              <Suspense
-                fallback={
-                  <Dialog open onOpenChange={(open) => !open && setSettingsOpen(false)}>
-                    <DialogContent aria-describedby={undefined} aria-busy>
-                      <DialogTitle role="status">{t('settings.loading')}</DialogTitle>
-                    </DialogContent>
-                  </Dialog>
-                }
-              >
-                <SettingsPanel
-                  key={spaceId}
-                  spaceId={spaceId}
-                  open={settingsOpen}
-                  onClose={() => setSettingsOpen(false)}
-                />
-              </Suspense>
-            )}
-            {!onboardingComplete && (
-              <Onboarding onFinish={() => dispatch({ type: 'complete-onboarding' })} />
-            )}
-            <Dialog
-              open={unlockOpen}
-              onOpenChange={(open) => {
-                if (unlockForm.formState.isSubmitting) return;
-                setUnlockOpen(open);
-                if (!open) unlockForm.reset({ password: '' });
-              }}
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <NavigationMenuItems actions={desktopActions} />
+          </ContextMenuContent>
+        </ContextMenu>
+        {settingsOpen && (
+          <div className="fixed inset-x-2 top-14 bottom-2 z-30 m-auto flex max-h-[720px] max-w-[1120px] flex-col overflow-hidden rounded-xl bg-background text-foreground shadow-[var(--dialog-shadow)] sm:inset-x-8 sm:top-20 sm:bottom-8">
+            <Suspense
+              fallback={
+                <p className="p-6" role="status">
+                  {t('settings.loading')}
+                </p>
+              }
             >
-              <DialogContent
-                className="vault-dialog rounded-3xl"
-                closeLabel={t('messages.close')}
-                showCloseButton={!unlockForm.formState.isSubmitting}
-              >
-                <form className="form-stack" onSubmit={unlock} noValidate>
-                  <div className="vault-mark shadow-xs mx-auto" aria-hidden="true">
-                    <ShieldCheck size={28} />
-                  </div>
-                  <DialogHeader className="text-center">
-                    <DialogTitle className="text-lg font-bold">
-                      {t('messages.unlockPrivateSpace')}
-                    </DialogTitle>
-                    <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-                      {t('messages.thePasswordIsUsedOnlyInThisTabRefreshingOrReturningTo')}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <Input
-                    {...unlockForm.register('password')}
-                    aria-label={t('messages.privateSpacePassword')}
-                    aria-invalid={Boolean(unlockForm.formState.errors.password)}
-                    disabled={unlockForm.formState.isSubmitting}
-                    type="password"
-                    autoComplete="current-password"
-                    autoFocus
-                    placeholder={t('messages.privateSpacePassword')}
-                    className="h-10 text-center rounded-xl border-black/10 dark:border-white/15 bg-black/[0.02] dark:bg-white/5 tracking-widest placeholder:tracking-normal"
+              <SettingsPanel
+                spaceId="normal"
+                importSpaceId={displayedSpace}
+                importGroupId={displayedGroup?.id}
+                ref={settingsRef}
+                onUnlockGroups={() => openSettingsPassword({ kind: 'settings' })}
+                groupManagement={
+                  <GroupManagement
+                    groups={groupTabs}
+                    legacyLocked={legacyLocked}
+                    showHidden={showHidden}
+                    onShowHidden={toggleHiddenGroups}
+                    onHiddenChange={changeGroupPrivacy}
+                    onEncryptionChange={changeGroupPrivacy}
+                    onDeleteGroup={deleteGroup}
+                    onOpenLegacy={() => void openGroup()}
                   />
-                  {unlockForm.formState.errors.password && (
-                    <p className="form-error" role="alert">
-                      {t('navigation.passwordRequired')}
-                    </p>
+                }
+              />
+            </Suspense>
+          </div>
+        )}
+        {error && (
+          <div className="load-error" role="alert">
+            <span>{storedErrorMessage(error)}</span>
+            <Button type="button" onClick={() => void refresh()}>
+              {t('messages.retry')}
+            </Button>
+          </div>
+        )}
+        {!onboardingComplete && (
+          <Onboarding onFinish={() => dispatch({ type: 'complete-onboarding' })} />
+        )}
+        {groupDeletionConfirmation}
+        {groupToMove && state && (
+          <MoveDialog
+            title={t('navigation.deleteNamedGroup', { name: groupToMove.name })}
+            description={t('messages.chooseAGroupToReceiveAllSitesAndFolders')}
+            groups={deletionDestinations(state, groupToMove)}
+            folders={[]}
+            initialGroupId={state.local.activeGroup[groupToMove.spaceId]}
+            allowFolders={false}
+            destructive
+            confirmLabel={t('messages.deleteAndMoveContents')}
+            onMove={async (destinationGroupId) => {
+              await dispatch({
+                type: 'delete-group',
+                spaceId: groupToMove.spaceId,
+                id: groupToMove.id,
+                destinationGroupId,
+              });
+              return true;
+            }}
+            onClose={() => {
+              setGroupToMove(null);
+              void finishGroupDeletion(groupToMove);
+            }}
+          />
+        )}
+        <Dialog
+          open={unlockOpen}
+          onOpenChange={(open) => {
+            if (!open && !unlockForm.formState.isSubmitting) {
+              unlockForm.reset({ password: '' });
+              setPasswordRequest(null);
+            }
+          }}
+        >
+          <DialogContent
+            layout="custom"
+            className="w-[min(420px,calc(100%-24px))] p-8 max-[480px]:p-5"
+            closeLabel={t('messages.close')}
+            showCloseButton={!unlockForm.formState.isSubmitting}
+            onCloseAutoFocus={(event) => {
+              const trigger = passwordTriggerRef.current;
+              passwordTriggerRef.current = null;
+              if (!trigger) return;
+              event.preventDefault();
+              (trigger.isConnected ? trigger : settingsButtonRef.current)?.focus();
+            }}
+          >
+            <form className="grid gap-5" onSubmit={unlock} noValidate>
+              <div className="vault-mark shadow-xs mx-auto" aria-hidden="true">
+                <ShieldCheck size={28} />
+              </div>
+              <DialogHeader className="text-center">
+                <DialogTitle>
+                  {t(
+                    creatingPassword
+                      ? 'navigation.createGroupPassword'
+                      : 'messages.unlockPrivateGroup',
                   )}
-                  {unlockForm.formState.errors.root && (
-                    <p className="form-error" role="alert">
-                      {unlockForm.formState.errors.root.message}
-                    </p>
+                </DialogTitle>
+                <DialogDescription>
+                  {t(
+                    creatingPassword
+                      ? 'navigation.sharedGroupPasswordHelp'
+                      : legacyLocked
+                        ? 'navigation.legacyGroupMigrationHelp'
+                        : 'messages.thePasswordIsUsedOnlyInThisTabRefreshingOrReturningTo',
                   )}
-                  <Button
-                    type="submit"
-                    disabled={unlockForm.formState.isSubmitting}
-                    className="h-10 w-full rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 font-medium cursor-pointer shadow-xs transition-all"
-                  >
-                    {t('messages.unlock')}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </main>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <NavigationMenuItems actions={desktopActions} />
-        </ContextMenuContent>
-      </ContextMenu>
+                </DialogDescription>
+              </DialogHeader>
+              <Input
+                {...unlockForm.register('password')}
+                aria-label={t('messages.privateGroupPassword')}
+                aria-invalid={Boolean(unlockForm.formState.errors.password)}
+                disabled={unlockForm.formState.isSubmitting}
+                type="password"
+                autoComplete={creatingPassword ? 'new-password' : 'current-password'}
+                autoFocus
+                placeholder={t('messages.privateGroupPassword')}
+                className="h-10 text-center tracking-widest placeholder:tracking-normal"
+              />
+              {unlockForm.formState.errors.password && (
+                <p className="form-error" role="alert">
+                  {t(unlockForm.formState.errors.password.message ?? 'navigation.passwordRequired')}
+                </p>
+              )}
+              {unlockForm.formState.errors.root && (
+                <p className="form-error" role="alert">
+                  {unlockForm.formState.errors.root.message}
+                </p>
+              )}
+              <Button
+                type="submit"
+                disabled={unlockForm.formState.isSubmitting}
+                size="lg"
+                className="w-full"
+              >
+                {t(creatingPassword ? 'navigation.encryptGroup' : 'messages.unlock')}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </main>
       <Toaster theme={settings.theme} />
     </TooltipProvider>
   );

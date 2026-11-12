@@ -2,6 +2,7 @@ import { NavigationMenuItems, type NavigationAction } from './NavigationMenu';
 import { useSortable } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { Check, Folder as FolderIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { Site, Folder } from '@/storage/model';
 import { SiteIcon } from '@/features/navigation/SiteIcon';
@@ -54,6 +55,17 @@ export function SiteTitle({ title }: { title: string }) {
   );
 }
 
+function SelectableIcon({ children, selected }: { children: ReactNode; selected: boolean }) {
+  return (
+    <span className="relative flex max-w-full">
+      {children}
+      <span className="site-card-selection absolute -end-1 -top-1" aria-hidden="true">
+        {selected && <Check size={12} />}
+      </span>
+    </span>
+  );
+}
+
 export function SiteCardView({
   site,
   openInNewTab,
@@ -83,8 +95,6 @@ export function SiteCardView({
         'site-card group relative',
         isDragging && !dragOverlay && 'opacity-45 scale-95 z-50',
         dragOverlay && 'scale-105 z-50 shadow-xl opacity-90',
-        manageMode && 'site-card--managing',
-        selected && 'site-card--selected',
       )}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -102,7 +112,9 @@ export function SiteCardView({
             onToggleSelection?.();
           }}
         >
-          <SiteIcon site={site} interactive />
+          <SelectableIcon selected={selected}>
+            <SiteIcon site={site} />
+          </SelectableIcon>
           {showTitle && <SiteTitle title={site.title} />}
         </button>
       ) : (
@@ -120,11 +132,6 @@ export function SiteCardView({
           <SiteIcon site={site} interactive />
           {showTitle && <SiteTitle title={site.title} />}
         </a>
-      )}
-      {manageMode && (
-        <span className={cn('site-card-selection', selected && 'is-selected')} aria-hidden="true">
-          {selected && <Check size={15} />}
-        </span>
       )}
     </article>
   );
@@ -175,33 +182,33 @@ export function SiteCard(props: SiteCardProps) {
 
 export function FolderPreview({ sites }: { sites: Site[] }) {
   return (
-    <div className="folder-preview relative flex items-center justify-center pointer-events-none">
-      <div
+    <span className="folder-preview relative flex items-center justify-center pointer-events-none">
+      <span
         className="folder-icon-frame absolute inset-0 flex flex-wrap content-start justify-center gap-[6%] p-[6%] overflow-hidden"
         style={{ borderRadius: 'var(--site-icon-radius, 24%)' }}
       >
         {sites.length === 0 ? (
-          <div className="w-full h-full flex items-center justify-center">
+          <span className="w-full h-full flex items-center justify-center">
             <FolderIcon size="50%" strokeWidth={1.5} />
-          </div>
+          </span>
         ) : (
           sites.slice(0, 4).map((site) => (
-            <div
+            <span
               key={site.id}
               className="relative w-[44%] aspect-square overflow-hidden"
               style={{ borderRadius: 'var(--site-icon-radius, 24%)' }}
             >
-              <div
+              <span
                 className="absolute inset-0 origin-top-left flex items-center justify-center"
                 style={{ width: '227%', height: '227%', transform: 'scale(0.44)' }}
               >
                 <SiteIcon site={site} interactive={false} />
-              </div>
-            </div>
+              </span>
+            </span>
           ))
         )}
-      </div>
-    </div>
+      </span>
+    </span>
   );
 }
 
@@ -241,8 +248,6 @@ export function FolderCardView({
         'site-card group relative',
         isDragging && !dragOverlay && 'opacity-45 scale-95 z-50',
         dragOverlay && 'scale-105 z-50 shadow-xl opacity-90',
-        manageMode && 'site-card--managing',
-        selected && 'site-card--selected',
         isCenterOver && !isDragging && 'ring-2 ring-white/60 shadow-lg scale-105 bg-white/10',
       )}
       style={{
@@ -264,6 +269,7 @@ export function FolderCardView({
         ref={setActivatorNodeRef}
         type="button"
         aria-label={folder.name}
+        aria-pressed={manageMode ? selected : undefined}
         className="site-card-main"
         onClick={(e) => {
           if (manageMode) {
@@ -274,15 +280,15 @@ export function FolderCardView({
           onClick?.(e);
         }}
       >
-        <FolderPreview sites={previewSites} />
+        {manageMode ? (
+          <SelectableIcon selected={selected}>
+            <FolderPreview sites={previewSites} />
+          </SelectableIcon>
+        ) : (
+          <FolderPreview sites={previewSites} />
+        )}
         {showTitle && <SiteTitle title={folder.name} />}
       </button>
-
-      {manageMode && (
-        <span className={cn('site-card-selection', selected && 'is-selected')} aria-hidden="true">
-          {selected && <Check size={15} />}
-        </span>
-      )}
     </article>
   );
 

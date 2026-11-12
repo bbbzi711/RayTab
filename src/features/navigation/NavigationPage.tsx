@@ -1,10 +1,19 @@
-import { useState, useEffect, useMemo, useCallback, useImperativeHandle, type Ref } from 'react';
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useImperativeHandle,
+  useRef,
+  type Ref,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errors';
-import { NavigationMenuItems, NavigationMoreMenu, type NavigationAction } from './NavigationMenu';
+import { NavigationMenuItems, type NavigationAction } from './NavigationMenu';
 import { useShallow } from 'zustand/react/shallow';
-import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -22,13 +31,14 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import {
+  ArrowDown,
+  ArrowUp,
+  FolderOpen,
+  LockKeyhole,
   Plus,
-  ListTree,
+  ListChecks,
   CheckSquare,
   Square,
-  House,
-  Layers,
-  MoreHorizontal,
   Pencil,
   FolderInput,
   Trash2,
@@ -45,6 +55,7 @@ import {
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent } from '@/components/ui/context-menu';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import type { Command } from '@/storage/operations';
+import type { GroupTab } from '@/storage/group-privacy';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { type Site, type Folder, type Group } from '@/storage/model';
 import { resolveHomeTextColors } from '@/features/appearance/text-colors';
@@ -65,20 +76,44 @@ export type NavigationHandle = { addSite: () => void; addFolder: () => void; org
 
 export interface NavigationPageProps {
   spaceId: 'normal' | 'private';
-  groupsPortal?: HTMLElement | null;
+  groupId?: string;
+  active: boolean;
+  groupTabs: GroupTab[];
+  showGrid: boolean;
+  showHidden: boolean;
+  legacyLocked: boolean;
+  onSelectGroup: (group?: GroupTab) => void;
+  onToggleHidden: () => void;
+  onDeleteGroup: (group: GroupTab) => void;
   ref?: Ref<NavigationHandle>;
 }
 
 const byOrder = (a: { order: number; id: string }, b: { order: number; id: string }) =>
   a.order - b.order || a.id.localeCompare(b.id);
+const groupTabClass =
+  'relative h-10 max-w-40 justify-start px-2.5 text-current opacity-75 hover:no-underline hover:opacity-100 focus-visible:ring-current aria-pressed:font-semibold aria-pressed:opacity-100 aria-pressed:after:absolute aria-pressed:after:inset-x-2.5 aria-pressed:after:bottom-1 aria-pressed:after:h-0.5 aria-pressed:after:rounded-full aria-pressed:after:bg-current';
+const groupStripClass =
+  'flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain px-0.5 py-0.5';
 
 type RootItem = { kind: 'folder'; folder: Folder } | { kind: 'site'; site: Site };
 
-export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPageProps) {
+export function NavigationPage({
+  spaceId,
+  groupId,
+  ref,
+  active,
+  groupTabs,
+  showGrid,
+  showHidden,
+  legacyLocked,
+  onSelectGroup,
+  onToggleHidden,
+  onDeleteGroup,
+}: NavigationPageProps) {
   const space = useRayTabStore((store) => store.state?.spaces[spaceId])!;
-  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
-  const activeGroupId =
-    useRayTabStore((store) => store.state?.local.activeGroup[spaceId]) || space.groups[0]?.id;
+  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, 'normal')))!;
+  const selectedGroupId = useRayTabStore((store) => store.state?.local.activeGroup[spaceId]);
+  const activeGroupId = groupId ?? selectedGroupId ?? space.groups[0].id;
   const selectedFolderId = useRayTabStore(
     (store) => store.state?.local.selectedFolder[spaceId]?.[activeGroupId] ?? null,
   );
@@ -99,8 +134,55 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     [dispatch],
   );
 
-  const orderedGroups = useMemo(() => [...space.groups].sort(byOrder), [space.groups]);
-  const activeGroup = orderedGroups.find((g) => g.id === activeGroupId) || orderedGroups[0];
+  const orderedGroups = useMemo(
+    () =>
+      space.groups
+        .filter((group) => groupTabs.some((tab) => tab.spaceId === spaceId && tab.id === group.id))
+        .sort(byOrder),
+    [groupTabs, spaceId, space.groups],
+  );
+  const activeGroup = orderedGroups.find((group) => group.id === activeGroupId) ?? space.groups[0];
+  const groupStrip = useRef<HTMLDivElement>(null);
+  const pendingClick = useRef<{ count: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const firstGestureGroup = groupTabs.find((group) => !group.hidden && !group.encrypted);
+  const hasHiddenGroups = legacyLocked || groupTabs.some((group) => group.hidden);
+  const visibleTabs = [
+    ...groupTabs.filter((group) => !group.hidden),
+    ...(showHidden ? groupTabs.filter((group) => group.hidden) : []),
+  ];
+
+  const clearPendingClick = () => {
+    if (pendingClick.current) clearTimeout(pendingClick.current.timer);
+    pendingClick.current = null;
+  };
+  useEffect(() => clearPendingClick, [active, firstGestureGroup?.id, firstGestureGroup?.spaceId]);
+  useEffect(() => {
+    if (active) {
+      groupStrip.current
+        ?.querySelector('[aria-pressed="true"]')
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [active, activeGroup.id]);
+
+  const activateTab = (event: ReactMouseEvent, tab: GroupTab) => {
+    const previousCount = pendingClick.current?.count ?? 0;
+    clearPendingClick();
+    if (!hasHiddenGroups || tab !== firstGestureGroup || !event.detail) {
+      onSelectGroup(tab);
+      return;
+    }
+    if (previousCount === 2) {
+      onToggleHidden();
+      return;
+    }
+    pendingClick.current = {
+      count: previousCount + 1,
+      timer: setTimeout(() => {
+        pendingClick.current = null;
+        onSelectGroup(tab);
+      }, 350),
+    };
+  };
 
   const rootItems = useMemo<RootItem[]>(() => {
     const folders = space.folders
@@ -157,8 +239,8 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     item?: Group | Folder;
   } | null>(null);
   const [moveTarget, setMoveTarget] = useState<{
-    type: 'site' | 'folder' | 'group' | 'sites';
-    item?: Site | Folder | Group;
+    type: 'site' | 'folder' | 'sites';
+    item?: Site | Folder;
     ids?: string[];
   } | null>(null);
 
@@ -166,13 +248,18 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     ref,
     () => ({
       addSite: () => {
+        if (!showGrid) return;
         setEditingSite(undefined);
         setEditorOpen(true);
       },
-      addFolder: () => setNameTarget({ type: 'folder' }),
-      organize: () => setManageMode(true),
+      addFolder: () => {
+        if (showGrid) setNameTarget({ type: 'folder' });
+      },
+      organize: () => {
+        if (showGrid) setManageMode(true);
+      },
     }),
-    [setManageMode],
+    [showGrid, setManageMode],
   );
 
   const [activeDrag, setActiveDrag] = useState<NavigationDrag | null>(null);
@@ -250,6 +337,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
   }, [managementLocation]);
 
   useEffect(() => {
+    if (!active) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (
         e.key !== 'Escape' ||
@@ -267,7 +355,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedFolderId, editorOpen, nameTarget, moveTarget, manageMode, setManageMode]);
+  }, [active, selectedFolderId, editorOpen, nameTarget, moveTarget, manageMode, setManageMode]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => {
@@ -293,8 +381,17 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     const id = isNew ? crypto.randomUUID() : nameTarget.item!.id;
     const expected = isNew ? undefined : nameTarget.item!.updatedAt;
     if (nameTarget.type === 'group') {
-      await dispatch({ type: 'save-group', spaceId, id, name, expected });
-      if (isNew) await run({ type: 'select-group', spaceId, groupId: id });
+      const destination = isNew ? 'normal' : spaceId;
+      await dispatch({ type: 'save-group', spaceId: destination, id, name, expected });
+      if (isNew)
+        onSelectGroup({
+          id,
+          name,
+          order: 0,
+          spaceId: destination,
+          encrypted: false,
+          hidden: false,
+        });
     } else {
       await dispatch({ type: 'save-folder', spaceId, id, groupId: activeGroup.id, name, expected });
     }
@@ -319,13 +416,6 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
       await dispatch({ type: 'move-sites', spaceId, ids, groupId, folderId });
       setSelectedIds(new Set());
       setManageMode(false);
-    } else if (moveTarget.type === 'group' && moveTarget.item) {
-      await dispatch({
-        type: 'delete-group',
-        spaceId,
-        id: moveTarget.item.id,
-        destinationGroupId: groupId,
-      });
     }
     return true;
   };
@@ -368,16 +458,19 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     {
       id: 'rename',
       label: t('messages.rename'),
+      icon: Pencil,
       run: () => setNameTarget({ type: 'folder', item: folder }),
     },
     {
       id: 'move',
       label: t('messages.move'),
+      icon: FolderInput,
       run: () => setMoveTarget({ type: 'folder', item: folder }),
     },
     {
       id: 'organize',
       label: t('navigation.organizeContents'),
+      icon: ListChecks,
       run: async () => {
         if (
           await run({
@@ -393,6 +486,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     {
       id: 'dissolve',
       label: t('messages.dissolveFolder'),
+      icon: FolderOpen,
       separator: true,
       destructive: true,
       run: async () => {
@@ -411,15 +505,17 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
       },
     },
   ];
-  const groupActions = (group: Group, index: number): NavigationAction[] => [
+  const groupActions = (group: Group, index: number, tab: GroupTab): NavigationAction[] => [
     {
       id: 'rename',
       label: t('messages.rename'),
+      icon: Pencil,
       run: () => setNameTarget({ type: 'group', item: group }),
     },
     {
       id: 'earlier',
       label: t('messages.moveEarlier'),
+      icon: ArrowUp,
       disabled: index === 0,
       run: () =>
         run({ type: 'move-group', spaceId, id: group.id, beforeId: orderedGroups[index - 1]?.id }),
@@ -427,6 +523,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     {
       id: 'later',
       label: t('messages.moveLater'),
+      icon: ArrowDown,
       disabled: index === orderedGroups.length - 1,
       run: () =>
         run({ type: 'move-group', spaceId, id: group.id, beforeId: orderedGroups[index + 2]?.id }),
@@ -434,15 +531,59 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     {
       id: 'delete',
       label: t('messages.delete'),
+      icon: Trash2,
       separator: true,
       destructive: true,
-      disabled: orderedGroups.length <= 1,
-      run: () => setMoveTarget({ type: 'group', item: group }),
+      run: () => onDeleteGroup(tab),
     },
   ];
 
+  const renderGroupTab = (tab: GroupTab) => {
+    const groupIndex =
+      tab.spaceId === spaceId ? orderedGroups.findIndex((group) => group.id === tab.id) : -1;
+    const editable = orderedGroups[groupIndex];
+    const key = `${tab.spaceId}:${tab.id}`;
+    const button = (
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        aria-label={tab.name}
+        aria-pressed={tab.spaceId === spaceId && tab.id === activeGroup.id}
+        className={cn(groupTabClass, 'shrink-0')}
+        onClick={(event) => activateTab(event, tab)}
+      >
+        {tab.encrypted && <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />}
+        <span className="truncate">{tab.name}</span>
+      </Button>
+    );
+    if (!editable)
+      return (
+        <Tooltip key={key} content={tab.name}>
+          {button}
+        </Tooltip>
+      );
+    return (
+      <DroppableGroupTab key={key} group={editable} className="min-w-0 shrink-0">
+        <ContextMenu>
+          <Tooltip content={tab.name}>
+            <ContextMenuTrigger asChild>{button}</ContextMenuTrigger>
+          </Tooltip>
+          <ContextMenuContent>
+            <NavigationMenuItems actions={groupActions(editable, groupIndex, tab)} />
+          </ContextMenuContent>
+        </ContextMenu>
+      </DroppableGroupTab>
+    );
+  };
+
   const renderToolbar = (currentSites: Site[]) => {
     const allSelected = currentSites.length > 0 && currentSites.every((s) => selectedIds.has(s.id));
+    const selectLabel = allSelected
+      ? t('messages.clearVisibleSelection')
+      : t('messages.selectVisible');
+    const actionClass =
+      'relative min-w-8 text-current after:absolute after:inset-x-2 after:bottom-0.5 after:h-px after:bg-current after:opacity-0 hover:no-underline hover:after:opacity-100 focus-visible:ring-0 focus-visible:after:opacity-100 pointer-coarse:min-h-11 @min-[13rem]:pointer-coarse:min-w-11';
     const handleToggleAll = () => {
       if (allSelected) {
         setSelectedIds((prev) => {
@@ -460,75 +601,85 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
     };
 
     return (
-      <div className="manage-toolbar" style={{ maxWidth: gridStyle.maxWidth }}>
-        <Button
-          type="button"
-          variant="ghost"
-          className="manage-toolbar-action"
-          aria-pressed={allSelected}
-          aria-label={
-            allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')
-          }
-          title={allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')}
-          onClick={handleToggleAll}
+      <div className="@container mb-4 w-full">
+        <div
+          className={cn(
+            'mx-auto grid w-fit max-w-full grid-cols-[repeat(4,auto)] items-center gap-x-0.5 gap-y-1 text-[color:var(--home-cards-color,#fff)] @min-[34rem]:flex @min-[34rem]:gap-x-1',
+            !selectedFolderId &&
+              'text-shadow-[0_1px_3px_rgb(0_0_0/0.7)] [&_svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.65)]',
+          )}
         >
-          {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-          {allSelected ? t('messages.clearVisibleSelection') : t('messages.selectVisible')}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={selectedIds.size === 0}
-          className="manage-toolbar-action"
-          aria-label={t('messages.moveSelected')}
-          title={t('messages.moveSelected')}
-          onClick={() => setMoveTarget({ type: 'sites', ids: Array.from(selectedIds) })}
-        >
-          {t('messages.moveSelected')}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="manage-toolbar-action manage-toolbar-action--danger"
-          disabled={selectedIds.size === 0}
-          aria-label={t('messages.deleteSelected')}
-          title={t('messages.deleteSelected')}
-          onClick={async () => {
-            const ok = await confirm({
-              title: t('messages.deleteSelectedSites'),
-              description: t('navigation.selectedSites', { count: selectedIds.size }),
-              confirmText: t('messages.delete'),
-              cancelText: t('messages.cancel'),
-              variant: 'destructive',
-            });
-            if (ok) {
-              if (await run({ type: 'delete-sites', spaceId, ids: Array.from(selectedIds) })) {
-                setSelectedIds(new Set());
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className={actionClass}
+            aria-pressed={allSelected}
+            aria-label={selectLabel}
+            title={selectLabel}
+            onClick={handleToggleAll}
+          >
+            {allSelected ? <CheckSquare aria-hidden="true" /> : <Square aria-hidden="true" />}
+            <span className="hidden @min-[34rem]:inline">{selectLabel}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className={actionClass}
+            disabled={selectedIds.size === 0}
+            aria-label={t('messages.moveSelected')}
+            title={t('messages.moveSelected')}
+            onClick={() => setMoveTarget({ type: 'sites', ids: Array.from(selectedIds) })}
+          >
+            <FolderInput aria-hidden="true" />
+            <span className="hidden @min-[34rem]:inline">{t('messages.moveSelected')}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className={actionClass}
+            disabled={selectedIds.size === 0}
+            aria-label={t('messages.deleteSelected')}
+            title={t('messages.deleteSelected')}
+            onClick={async () => {
+              const ok = await confirm({
+                title: t('messages.deleteSelectedSites'),
+                description: t('navigation.selectedSites', { count: selectedIds.size }),
+                confirmText: t('messages.delete'),
+                cancelText: t('messages.cancel'),
+                variant: 'destructive',
+              });
+              if (ok) {
+                if (await run({ type: 'delete-sites', spaceId, ids: Array.from(selectedIds) })) {
+                  setSelectedIds(new Set());
+                }
               }
-            }
-          }}
-        >
-          {t('messages.deleteSelected')}
-        </Button>
-        {selectedIds.size > 0 && (
-          <span className="manage-toolbar-count">
+            }}
+          >
+            <Trash2 aria-hidden="true" />
+            <span className="hidden @min-[34rem]:inline">{t('messages.deleteSelected')}</span>
+          </Button>
+          <span
+            role="status"
+            className="col-span-full row-start-2 px-2 py-0.5 text-center text-xs tabular-nums opacity-90"
+          >
             {t('navigation.selectedSites', { count: selectedIds.size })}
           </span>
-        )}
-        <div className="flex-1 min-w-[8px]" />
-        <Button
-          type="button"
-          variant="default"
-          className="manage-toolbar-action manage-toolbar-action--primary"
-          aria-label={t('messages.done')}
-          title={t('messages.done')}
-          onClick={() => {
-            setManageMode(false);
-            setSelectedIds(new Set());
-          }}
-        >
-          {t('messages.done')}
-        </Button>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className={cn(actionClass, 'font-semibold')}
+            onClick={() => {
+              setManageMode(false);
+              setSelectedIds(new Set());
+            }}
+          >
+            {t('messages.done')}
+          </Button>
+        </div>
       </div>
     );
   };
@@ -542,147 +693,122 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div
-        className="w-full flex flex-col items-center flex-1 min-h-0"
-        style={{ color: 'var(--home-tabs-color)' }}
-      >
-        {groupsPortal &&
-          createPortal(
-            <div className="flex flex-col gap-[7px] w-full text-[var(--home-tabs-color)]">
-              {orderedGroups.map((group, index) => {
-                const GroupIcon = index === 0 ? House : Layers;
-                return (
-                  <DroppableGroupTab key={group.id} group={group} className="w-full relative group">
-                    <Tooltip content={group.name} side="right">
-                      <ContextMenu>
-                        <ContextMenuTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={group.name}
-                            aria-pressed={group.id === activeGroup.id}
-                            className={cn(
-                              'relative flex flex-col items-center justify-center w-full min-h-[54px] gap-[5px] rounded-xl transition-all duration-150 cursor-pointer overflow-hidden',
-                              group.id === activeGroup.id
-                                ? 'bg-white/15 shadow-xs'
-                                : 'opacity-75 hover:opacity-100 hover:bg-white/10',
-                            )}
-                            onClick={() =>
-                              run({ type: 'select-group', spaceId, groupId: group.id })
-                            }
-                          >
-                            {group.id === activeGroup.id && (
-                              <div className="group-tab-active-indicator" />
-                            )}
-                            <GroupIcon size={19} strokeWidth={1.6} />
-                            <span className="text-[11px] font-medium leading-none truncate w-full text-center px-1">
-                              {group.name}
-                            </span>
-                          </button>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <NavigationMenuItems actions={groupActions(group, index)} />
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    </Tooltip>
-                    <NavigationMoreMenu actions={groupActions(group, index)}>
-                      <button
-                        type="button"
-                        className="group-more-trigger"
-                        aria-label={`${t('messages.moreActions')}: ${group.name}`}
-                      >
-                        <MoreHorizontal size={13} />
-                      </button>
-                    </NavigationMoreMenu>
-                  </DroppableGroupTab>
-                );
-              })}
-              <Tooltip content={t('messages.addGroup')} side="right">
-                <button
-                  type="button"
-                  aria-label={t('messages.addGroup')}
-                  className="flex flex-col items-center justify-center w-full min-h-[54px] gap-[5px] rounded-xl opacity-75 hover:opacity-100 hover:bg-white/10 transition-all duration-150 cursor-pointer"
-                  onClick={() => setNameTarget({ type: 'group' })}
-                >
-                  <Plus size={19} strokeWidth={1.6} />
-                </button>
-              </Tooltip>
-            </div>,
-            groupsPortal,
-          )}
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center text-[color:var(--home-tabs-color)]">
+        <nav
+          aria-label={t('messages.groupNavigation')}
+          className="mx-auto flex w-full shrink-0 items-center justify-center gap-1 px-2 pb-2 text-shadow-[0_1px_3px_rgb(0_0_0/0.7)] [&_svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.65)]"
+          style={{ maxWidth: gridStyle.maxWidth }}
+        >
+          <div ref={groupStrip} className={groupStripClass}>
+            {visibleTabs.map(renderGroupTab)}
+            {showHidden && legacyLocked && (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className={groupTabClass}
+                onClick={() => onSelectGroup()}
+              >
+                <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
+                {t('navigation.unlockLegacyGroups')}
+              </Button>
+            )}
+          </div>
+          <Tooltip content={t('messages.addGroup')}>
+            <Button
+              type="button"
+              variant="link"
+              size="icon"
+              className="size-10 shrink-0 text-current opacity-80 hover:opacity-100 focus-visible:ring-current"
+              aria-label={t('messages.addGroup')}
+              onClick={() => setNameTarget({ type: 'group' })}
+            >
+              <Plus aria-hidden="true" />
+            </Button>
+          </Tooltip>
+        </nav>
 
-        {manageMode &&
-          !selectedFolderId &&
-          renderToolbar(
-            rootItems
-              .filter((i) => i.kind === 'site')
-              .map((i) => (i as { kind: 'site'; site: Site }).site),
+        <div
+          data-testid="site-navigation"
+          className={cn(
+            'min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pt-2 pb-8',
+            !showGrid && 'hidden',
           )}
+        >
+          {manageMode &&
+            !selectedFolderId &&
+            renderToolbar(
+              rootItems
+                .filter((i) => i.kind === 'site')
+                .map((i) => (i as { kind: 'site'; site: Site }).site),
+            )}
 
-        <div className="w-full min-h-[40vh]">
-          <DroppableRootGrid
-            groupId={activeGroup.id}
-            style={gridStyle}
-            className="site-grid w-full mb-12 min-h-[200px]"
-          >
-            <SortableContext items={rootSortableIds} strategy={rectSortingStrategy}>
-              {rootItems.map((item) =>
-                item.kind === 'folder' ? (
-                  <FolderCard
-                    key={item.folder.id}
-                    folder={item.folder}
-                    previewSites={space.sites
-                      .filter((s) => s.folderId === item.folder.id)
-                      .sort(byOrder)}
-                    showTitle={settings.showSiteTitle}
-                    manageMode={false}
-                    disabledDrag={manageMode}
-                    selected={false}
+          <div className="w-full min-h-[40vh]">
+            <DroppableRootGrid
+              groupId={activeGroup.id}
+              style={gridStyle}
+              className="site-grid w-full mb-12 min-h-[200px]"
+            >
+              <SortableContext items={rootSortableIds} strategy={rectSortingStrategy}>
+                {rootItems.map((item) =>
+                  item.kind === 'folder' ? (
+                    <FolderCard
+                      key={item.folder.id}
+                      folder={item.folder}
+                      previewSites={space.sites
+                        .filter((s) => s.folderId === item.folder.id)
+                        .sort(byOrder)}
+                      showTitle={settings.showSiteTitle}
+                      manageMode={false}
+                      disabledDrag={manageMode}
+                      selected={false}
+                      onClick={() => {
+                        run({
+                          type: 'select-folder',
+                          spaceId,
+                          groupId: activeGroup.id,
+                          folderId: item.folder.id,
+                        });
+                      }}
+                      menuActions={folderActions(item.folder)}
+                    />
+                  ) : (
+                    <SiteCard
+                      key={item.site.id}
+                      site={item.site}
+                      openInNewTab={settings.openInNewTab}
+                      showTitle={settings.showSiteTitle}
+                      manageMode={manageMode}
+                      disabledDrag={manageMode}
+                      selected={selectedIds.has(item.site.id)}
+                      onToggleSelection={() => toggleSelection(item.site.id)}
+                      menuActions={siteActions(item.site)}
+                    />
+                  ),
+                )}
+                {!manageMode && (
+                  <button
+                    type="button"
+                    className="add-site-card cursor-pointer"
+                    aria-label={t('messages.addSite')}
+                    title={t('messages.addSite')}
                     onClick={() => {
-                      run({
-                        type: 'select-folder',
-                        spaceId,
-                        groupId: activeGroup.id,
-                        folderId: item.folder.id,
-                      });
+                      openEditor();
                     }}
-                    menuActions={folderActions(item.folder)}
-                  />
-                ) : (
-                  <SiteCard
-                    key={item.site.id}
-                    site={item.site}
-                    openInNewTab={settings.openInNewTab}
-                    showTitle={settings.showSiteTitle}
-                    manageMode={manageMode}
-                    disabledDrag={manageMode}
-                    selected={selectedIds.has(item.site.id)}
-                    onToggleSelection={() => toggleSelection(item.site.id)}
-                    menuActions={siteActions(item.site)}
-                  />
-                ),
-              )}
-              {!manageMode && (
-                <button
-                  type="button"
-                  className="add-site-card cursor-pointer"
-                  aria-label={t('messages.addSite')}
-                  title={t('messages.addSite')}
-                  onClick={() => {
-                    openEditor();
-                  }}
-                >
-                  <span className="add-site-icon">
-                    <Plus size={22} />
-                  </span>
-                  {settings.showSiteTitle && <SiteTitle title={t('messages.addSite')} />}
-                </button>
-              )}
-            </SortableContext>
-          </DroppableRootGrid>
+                  >
+                    <span className="add-site-icon">
+                      <Plus size={22} />
+                    </span>
+                    {settings.showSiteTitle && <SiteTitle title={t('messages.addSite')} />}
+                  </button>
+                )}
+              </SortableContext>
+            </DroppableRootGrid>
+          </div>
         </div>
 
         <Dialog
-          open={Boolean(selectedFolderId)}
+          open={showGrid && Boolean(selectedFolderId)}
           onOpenChange={(open) => {
             if (!open) {
               run({
@@ -727,7 +853,7 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
                     className="rounded-xl shrink-0"
                     onClick={() => setManageMode(true)}
                   >
-                    <ListTree size={15} />
+                    <ListChecks className="ui-icon-action" aria-hidden="true" />
                     {t('messages.organize')}
                   </Button>
                 )}
@@ -795,13 +921,8 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
 
         {moveTarget && (
           <MoveDialog
-            title={moveTarget.type === 'group' ? t('messages.deleteGroup') : t('messages.move')}
-            description={
-              moveTarget.type === 'group'
-                ? t('messages.chooseAGroupToReceiveAllSitesAndFolders')
-                : undefined
-            }
-            groups={space.groups}
+            title={t('messages.move')}
+            groups={orderedGroups}
             folders={space.folders}
             initialGroupId={activeGroupId}
             initialFolderId={
@@ -811,21 +932,16 @@ export function NavigationPage({ spaceId, ref, groupsPortal }: NavigationPagePro
                   ? selectedFolderId
                   : null
             }
-            excludeGroupId={moveTarget.type === 'group' ? moveTarget.item!.id : undefined}
-            allowFolders={moveTarget.type !== 'group' && moveTarget.type !== 'folder'}
-            destructive={moveTarget.type === 'group'}
-            confirmLabel={
-              moveTarget.type === 'group' ? t('messages.deleteAndMoveContents') : undefined
-            }
+            allowFolders={moveTarget.type !== 'folder'}
             onMove={handleMoveSave}
             onClose={() => setMoveTarget(null)}
           />
         )}
 
-        {editorOpen && (
+        {showGrid && editorOpen && (
           <SiteEditor
             site={editingSite}
-            space={space}
+            space={{ ...space, groups: orderedGroups }}
             spaceId={spaceId}
             groupId={activeGroupId}
             folderId={selectedFolderId}

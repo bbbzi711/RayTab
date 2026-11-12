@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   clearSyncConfig,
+  InvalidSyncConfigError,
   loadSyncConfig,
   loadSyncStatus,
   resolveSyncConflict,
@@ -143,7 +144,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   const connected = connectionInfo !== null;
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<'invalid' | 'unavailable'>();
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [status, setStatus] = useState<SyncStatus>({ schemaVersion: 1, conflicts: [] });
   const recoveryGroupName = useRayTabStore(
@@ -177,7 +178,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       return;
     }
     setLoading(true);
-    setLoadFailed(false);
+    setLoadFailure(undefined);
     form.clearErrors('root');
     const reload = async () => {
       const version = ++loadVersion;
@@ -190,6 +191,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
         return;
       }
       if (!mounted || version !== loadVersion) return;
+      setLoadFailure(undefined);
       setConnectionInfo(
         config
           ? {
@@ -209,7 +211,9 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
     void reload()
       .catch((reason: unknown) => {
         if (mounted) {
-          setLoadFailed(true);
+          const invalid = reason instanceof InvalidSyncConfigError;
+          setLoadFailure(invalid ? 'invalid' : 'unavailable');
+          if (invalid) setConnectionInfo(null);
           form.setError('root', { message: errorMessage(reason) });
         }
       })
@@ -333,16 +337,16 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   return (
     <div className="sync-settings">
       <section className="sync-overview" aria-label={t('settings.syncOverview.status')}>
-        <div className="sync-overview-heading">
+        <div className="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-4">
           <span className="sync-overview-icon" aria-hidden="true">
             <Cloud size={26} />
           </span>
           <div>
-            <h2>
+            <h2 className="mb-1.5 text-lg font-semibold tracking-tight">
               {t(
                 loading
                   ? 'settings.syncOverview.loading'
-                  : loadFailed
+                  : loadFailure
                     ? 'settings.syncOverview.loadFailed'
                     : connected
                       ? 'settings.syncOverview.configured'
@@ -357,7 +361,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 },
               )}
             </h2>
-            <p className="settings-help">
+            <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
               {t(
                 !available
                   ? 'settings.syncUnavailable'
@@ -383,7 +387,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
           </p>
         )}
         {status.recovery && (
-          <p role="status" className="settings-help">
+          <p role="status" className="wrap-anywhere text-xs leading-5 text-muted-foreground">
             {t('settings.syncRecovered', {
               sites: status.recovery.sites,
               folders: status.recovery.folders,
@@ -401,7 +405,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
             type="button"
             variant={connected || editing ? 'outline' : 'default'}
             aria-expanded={editing}
-            disabled={busy || loading || loadFailed || !available}
+            disabled={busy || loading || loadFailure === 'unavailable' || !available}
             onClick={() => setEditing((value) => !value)}
           >
             <Settings2 size={16} aria-hidden="true" />
@@ -413,7 +417,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                   : 'settings.syncOverview.configure',
             )}
           </Button>
-          {loadFailed && (
+          {loadFailure && (
             <Button
               type="button"
               variant="outline"
@@ -423,16 +427,20 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
             </Button>
           )}
         </div>
-        {isDirty && <p className="settings-help">{t('settings.syncDirtyHelp')}</p>}
+        {isDirty && (
+          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+            {t('settings.syncDirtyHelp')}
+          </p>
+        )}
         <FormError error={errors.root} />
         <FormError error={actions.formState.errors.root} />
         {status.lastError && (
-          <p className="settings-form-error" role="alert">
+          <p className="m-0 wrap-anywhere text-xs text-destructive" role="alert">
             {storedErrorMessage(status.lastError)}
           </p>
         )}
         {status.nextRetryAt && (
-          <p className="settings-help">
+          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
             {t('settings.syncRetry', {
               count: status.retryCount ?? 0,
               date: new Date(status.nextRetryAt).toLocaleString(i18n.language),
@@ -441,10 +449,12 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
         )}
       </section>
       <div className="sync-connection-editor" hidden={!editing}>
-        <h2>{t('settings.sections.connection')}</h2>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t('settings.sections.connection')}
+        </h2>
         <form
           aria-label={t('settings.sections.connection')}
-          className="settings-form"
+          className="settings-form grid min-w-0 gap-3.5 text-sm"
           noValidate
           onSubmit={(event) => {
             if (busy) {
@@ -516,10 +526,10 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 />
               )}
             />
-            <div className="sync-connection-fields">
+            <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-4.5 max-[560px]:grid-cols-1">
               {fields.map(([name, label, type]) => (
                 <div
-                  className={name === 'url' || name === 'token' ? 'sync-field-wide' : undefined}
+                  className={name === 'url' || name === 'token' ? 'col-span-full' : undefined}
                   key={name}
                 >
                   <label>
@@ -543,12 +553,12 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
               ))}
             </div>
             {provider === 'webdav' && (
-              <div className="settings-help">
+              <div className="wrap-anywhere text-xs leading-5 text-muted-foreground">
                 <p>{t('settings.webdavServerHelp')}</p>
                 <p>{t('settings.webdavNutstoreHelp')}</p>
               </div>
             )}
-            <div className="settings-help">
+            <div className="wrap-anywhere text-xs leading-5 text-muted-foreground">
               <p>{t('settings.syncDataDisclosure')}</p>
               <p>{t('settings.syncCredentialDisclosure')}</p>
               <a
@@ -587,9 +597,15 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
               />
               <FormError error={errors.automatic} />
               {includePrivate && protectedPrivate && (
-                <p className="settings-help">{t('settings.protectedPrivateAutomaticSync')}</p>
+                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                  {t('settings.protectedPrivateAutomaticSync')}
+                </p>
               )}
-              {locked && <p className="settings-help">{t('settings.unlockPrivateForSync')}</p>}
+              {locked && (
+                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                  {t('settings.unlockPrivateForSync')}
+                </p>
+              )}
               {includePrivate && (
                 <div>
                   <label>
@@ -662,7 +678,9 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 <small>{t('settings.localValue', { value: summarize(conflict.local) })}</small>
                 <small>{t('settings.remoteValue', { value: summarize(conflict.remote) })}</small>
                 {conflict.id === 'private-space' && (
-                  <p className="settings-help">{t('settings.privateSyncConflictHelp')}</p>
+                  <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                    {t('settings.privateSyncConflictHelp')}
+                  </p>
                 )}
                 <div className="settings-form-actions">
                   <Button

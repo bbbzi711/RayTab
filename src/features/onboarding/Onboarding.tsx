@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ArrowRight, Compass, Layers3, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { RayTabMark } from '@/components/ui/raytab-mark';
 import { errorMessage } from '@/lib/errors';
 
 const items = [
@@ -34,6 +35,7 @@ export function Onboarding({ onFinish }: { onFinish: () => Promise<void> }) {
   return (
     <Dialog open>
       <DialogContent
+        layout="custom"
         className="onboarding-card"
         overlayClassName="onboarding-backdrop"
         showCloseButton={false}
@@ -44,10 +46,7 @@ export function Onboarding({ onFinish }: { onFinish: () => Promise<void> }) {
           title.current?.focus({ preventScroll: true });
         }}
       >
-        <div className="onboarding-brand" aria-hidden="true">
-          <span>R</span>
-          <i />
-        </div>
+        <RayTabMark className="block size-[46px]" />
         <header className="onboarding-copy">
           <p>{t('onboarding.welcome')}</p>
           <DialogTitle asChild>

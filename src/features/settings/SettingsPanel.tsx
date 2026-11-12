@@ -1,25 +1,20 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-  Cloud,
-  Database,
-  Grid2X2,
-  Palette,
-  SlidersHorizontal,
-  Clock3,
-  Eye,
-  PanelRightClose,
-} from 'lucide-react';
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useImperativeHandle,
+  type ReactNode,
+  type Ref,
+} from 'react';
+import { Cloud, Database, Grid2X2, Palette, SlidersHorizontal, Clock3 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import { errorMessage } from '@/lib/errors';
@@ -39,6 +34,7 @@ import {
   Toggle,
   type DraftReporter,
 } from './SettingsControls';
+import { SettingsPreview } from './SettingsPreview';
 import './settings.css';
 
 const DataSettings = lazy(() =>
@@ -58,14 +54,22 @@ const tabs = [
 ] as const;
 type SettingsTab = (typeof tabs)[number][0];
 
+export type SettingsHandle = { canClose: () => Promise<boolean> };
+
 export default function SettingsPanel({
   spaceId,
-  open,
-  onClose,
+  ref,
+  onUnlockGroups,
+  groupManagement,
+  importSpaceId,
+  importGroupId,
 }: {
   spaceId: SpaceId;
-  open: boolean;
-  onClose: () => void;
+  ref?: Ref<SettingsHandle>;
+  onUnlockGroups: () => void;
+  groupManagement: ReactNode;
+  importSpaceId: SpaceId;
+  importGroupId?: string;
 }) {
   const { t } = useTranslation();
   const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
@@ -75,7 +79,6 @@ export default function SettingsPanel({
   const dispatch = useRayTabStore((store) => store.dispatch);
   const previewSettings = useRayTabStore((store) => store.previewSettings);
   const clearPreview = useRayTabStore((store) => store.clearSettingsPreview);
-  const overrides = useRayTabStore((store) => store.state?.privateSettingOverrides)!;
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const privateLocked = useRayTabStore((store) => store.state?.privateSecurity.locked);
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -85,7 +88,6 @@ export default function SettingsPanel({
   const [failure, setFailure] = useState<string>();
   const [failedPatch, setFailedPatch] = useState<Partial<SpaceSettings>>({});
   const [hasSaved, setHasSaved] = useState(false);
-  const [homePreview, setHomePreview] = useState(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const [confirm, confirmation] = useConfirm();
   const content = useRef<HTMLDivElement>(null);
@@ -95,26 +97,23 @@ export default function SettingsPanel({
   const scrollPositions = useRef<Partial<Record<SettingsTab, number>>>({});
   const hasDraft = Object.values(drafts).some((draft) => draft.dirty);
   const busy = saving || Object.values(drafts).some((draft) => draft.busy);
-  const canPreviewHome = activeTab === 'icons' || activeTab === 'appearance';
 
   const changeTab = useCallback((tab: SettingsTab) => {
     if (content.current) scrollPositions.current[currentTab.current] = content.current.scrollTop;
     currentTab.current = tab;
     setActiveTab(tab);
     setVisited((current) => new Set([...current, tab]));
-    if (tab !== 'icons' && tab !== 'appearance') setHomePreview(false);
   }, []);
   useLayoutEffect(() => {
     content.current?.scrollTo({ top: scrollPositions.current[activeTab] ?? 0 });
   }, [activeTab]);
   useEffect(() => {
-    if (!open) return;
     const revealCategory = () =>
       category.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
     revealCategory();
     window.addEventListener('resize', revealCategory);
     return () => window.removeEventListener('resize', revealCategory);
-  }, [activeTab, open]);
+  }, [activeTab]);
   useEffect(
     () => () => {
       clearPreview(spaceId);
@@ -163,43 +162,10 @@ export default function SettingsPanel({
       toast.error(errorMessage(reason)),
     );
   const preview = (patch: Partial<SpaceSettings>) => previewSettings(spaceId, patch);
-  const resetPrivatePreferences = async () => {
-    if (
-      !(await confirm({
-        title: t('settings.resetPrivateTitle'),
-        description: t('settings.resetPrivateDescription'),
-        confirmText: t('settings.followNormal'),
-      }))
-    )
-      return;
-    setSaving(true);
-    // Read after queued saves so all current overrides participate in the reset.
-    const persist = () =>
-      dispatch({
-        type: 'reset-private-setting',
-        keys: Object.keys(
-          useRayTabStore.getState().state!.privateSettingOverrides,
-        ) as (keyof SpaceSettings)[],
-      });
-    const operation = queue.current.then(persist, persist);
-    queue.current = operation;
-    try {
-      await operation;
-      clearPreview(spaceId);
-      setFailedPatch({});
-      setFailure(undefined);
-      setHasSaved(true);
-    } catch (reason) {
-      setFailure(errorMessage(reason));
-      toast.error(errorMessage(reason));
-    } finally {
-      if (queue.current === operation) setSaving(false);
-    }
-  };
-  const requestClose = async () => {
+  const canClose = async () => {
     if (busy) {
       toast.info(t('settings.waitForSave'));
-      return;
+      return false;
     }
     const unsavedPreview = useRayTabStore.getState().settingsPreview;
     if (hasDraft || unsavedPreview?.spaceId === spaceId) {
@@ -212,11 +178,16 @@ export default function SettingsPanel({
           variant: 'destructive',
         }))
       )
-        return;
+        return false;
     }
     clearPreview(spaceId);
-    onClose();
+    return true;
   };
+  useImperativeHandle(ref, () => ({ canClose }));
+  useEffect(() => {
+    language.current?.focus({ preventScroll: true });
+  }, []);
+  const showPreview = activeTab === 'icons' || activeTab === 'appearance';
   const numberRange = (
     key: 'maxCardsPerRow' | 'iconSpacing' | 'overlay' | 'iconRadius',
     min: number,
@@ -268,127 +239,85 @@ export default function SettingsPanel({
   };
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) void requestClose();
-      }}
-    >
-      <DialogContent
-        variant="settings"
-        className={`settings-workspace${homePreview ? ' settings-workspace--preview' : ''}`}
-        overlayClassName={homePreview ? 'settings-preview-overlay' : undefined}
-        closeLabel={t('settings.close')}
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          language.current?.focus();
-        }}
-      >
-        <div className="settings-layout">
-          <aside className="settings-sidebar">
-            <div className="settings-brand">
-              <span className="settings-brand-mark" aria-hidden="true">
-                R
-              </span>
-              <div className="settings-brand-copy">
-                <span className="settings-brand-name">{t('settings.title')}</span>
-                <span className="settings-space-label">
-                  {t(spaceId === 'normal' ? 'messages.personalSpace' : 'messages.privateSpace')}
-                </span>
-              </div>
+    <section aria-labelledby="raytab-settings-title" className="flex min-h-0 flex-1 flex-col">
+      <h1 id="raytab-settings-title" className="sr-only">
+        {t('settings.title')}
+      </h1>
+      <div className="settings-layout">
+        <aside className="settings-sidebar">
+          <div className="settings-brand">
+            <div className="settings-brand-copy">
+              <span className="settings-brand-name">{t('settings.title')}</span>
             </div>
-            <nav className="settings-tabs" aria-label={t('settings.categories')}>
-              {tabs.map(([tab, Icon]) => (
-                <button
-                  type="button"
-                  key={tab}
-                  ref={activeTab === tab ? category : undefined}
-                  aria-current={activeTab === tab ? 'page' : undefined}
-                  className={activeTab === tab ? 'active' : ''}
-                  title={t('settings.tabs.' + tab)}
-                  onClick={() => changeTab(tab)}
-                >
-                  <span className="settings-tab-icon" aria-hidden="true">
-                    <Icon size={15} />
-                  </span>
-                  <span>{t('settings.tabs.' + tab)}</span>
-                </button>
-              ))}
-            </nav>
-          </aside>
-          <div className="settings-main">
-            <DialogHeader className="settings-workspace-header">
-              <DialogTitle className="sr-only">{t('settings.title')}</DialogTitle>
-              <p className="settings-current-space">
-                {t(spaceId === 'normal' ? 'messages.personalSpace' : 'messages.privateSpace')}
-              </p>
-              <div className="settings-header-line">
-                <h2 className="settings-category-title">{t('settings.tabs.' + activeTab)}</h2>
-                <div
-                  className="settings-autosave"
-                  role="status"
-                  aria-label={t('settings.saveStatus')}
-                  aria-live="polite"
-                  title={t('settings.autoSaveHelp')}
-                >
-                  <span>
-                    {t(
-                      busy
-                        ? 'settings.saving'
-                        : failure || Object.keys(failedPatch).length
-                          ? 'settings.unsaved'
-                          : hasDraft
-                            ? 'settings.pendingChanges'
-                            : hasSaved
-                              ? 'settings.saved'
-                              : 'settings.autoSave',
-                    )}
-                  </span>
-                  {Object.keys(failedPatch).length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={saving}
-                      onClick={retry}
-                    >
-                      {t('settings.retry')}
-                    </Button>
+          </div>
+          <nav className="settings-tabs" aria-label={t('settings.categories')}>
+            {tabs.map(([tab, Icon]) => (
+              <Button
+                type="button"
+                variant="ghost"
+                key={tab}
+                ref={activeTab === tab ? category : undefined}
+                aria-current={activeTab === tab ? 'page' : undefined}
+                className="min-h-10 justify-start gap-2.5 px-3 aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-[var(--preferences-accent)] max-[760px]:min-h-11"
+                title={t('settings.tabs.' + tab)}
+                onClick={() => changeTab(tab)}
+              >
+                <Icon className="ui-icon-action" aria-hidden="true" />
+                <span>{t('settings.tabs.' + tab)}</span>
+              </Button>
+            ))}
+          </nav>
+        </aside>
+        <div className="settings-main">
+          <header className="settings-workspace-header">
+            <div className="settings-header-line">
+              <h2 className="text-xl font-semibold tracking-tight max-[420px]:mr-auto [@media(max-height:480px)]:text-lg">
+                {t('settings.tabs.' + activeTab)}
+              </h2>
+              <div
+                className="settings-autosave"
+                role="status"
+                aria-label={t('settings.saveStatus')}
+                aria-live="polite"
+                title={t('settings.autoSaveHelp')}
+              >
+                <span>
+                  {t(
+                    busy
+                      ? 'settings.saving'
+                      : failure || Object.keys(failedPatch).length
+                        ? 'settings.unsaved'
+                        : hasDraft
+                          ? 'settings.pendingChanges'
+                          : hasSaved
+                            ? 'settings.saved'
+                            : 'settings.autoSave',
                   )}
-                </div>
-              </div>
-              <div className="settings-category-meta">
-                <p className="settings-category-description">
-                  {t('settings.categoryDescriptions.' + activeTab)}
-                </p>
-                {canPreviewHome && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="settings-preview-toggle"
-                    aria-pressed={homePreview}
-                    onClick={() => setHomePreview((value) => !value)}
-                  >
-                    {homePreview ? <PanelRightClose size={14} /> : <Eye size={14} />}
-                    {t(homePreview ? 'settings.returnToSettings' : 'settings.previewHome')}
+                </span>
+                {Object.keys(failedPatch).length > 0 && (
+                  <Button type="button" variant="ghost" size="xs" disabled={saving} onClick={retry}>
+                    {t('settings.retry')}
                   </Button>
                 )}
               </div>
-              <DialogDescription className="sr-only">
-                {t(
-                  spaceId === 'normal'
-                    ? 'settings.normalDescription'
-                    : 'settings.privateDescription',
-                )}
-              </DialogDescription>
-              {failure && Object.keys(failedPatch).length > 0 && (
-                <p className="settings-save-failed" role="alert">
-                  {failure}
-                </p>
-              )}
-            </DialogHeader>
-            <div className="settings-content" ref={content}>
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {t('settings.categoryDescriptions.' + activeTab)}
+            </p>
+            {failure && Object.keys(failedPatch).length > 0 && (
+              <p className="wrap-anywhere text-xs leading-5 text-destructive" role="alert">
+                {failure}
+              </p>
+            )}
+          </header>
+          <div
+            className={
+              showPreview ? 'settings-content settings-content--with-preview' : 'settings-content'
+            }
+            ref={content}
+          >
+            {showPreview && <SettingsPreview settings={settings} spaceId={spaceId} />}
+            <div className="settings-fields">
               {visited.has('general') && (
                 <div className="settings-panel-content" hidden={activeTab !== 'general'}>
                   <SettingsSection title={t('settings.sections.preferences')}>
@@ -403,19 +332,12 @@ export default function SettingsPanel({
                       triggerRef={language}
                     />
                     {toggle('openInNewTab')}
-                    <SettingsSelect
-                      label={t('settings.fields.sidebarMode')}
-                      value={settings.sidebarMode}
-                      options={['always', 'auto', 'hidden'].map(
-                        (value) => [value, t('settings.sidebarModes.' + value)] as const,
-                      )}
-                      onChange={(value) =>
-                        update({ sidebarMode: value as SpaceSettings['sidebarMode'] })
-                      }
-                    />
+                  </SettingsSection>
+                  <SettingsSection title={t('navigation.manageGroups')}>
+                    {groupManagement}
                   </SettingsSection>
                   <SettingsSection title={t('settings.privateProtection')}>
-                    <p className="settings-help">
+                    <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
                       {t(
                         protectedPrivate
                           ? privateLocked
@@ -424,44 +346,21 @@ export default function SettingsPanel({
                           : 'settings.protectionHelp',
                       )}
                     </p>
-                    {!privateLocked && (
+                    {protectedPrivate && privateLocked && (
+                      <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
+                        {t('navigation.unlockGroups')}
+                      </Button>
+                    )}
+                    {protectedPrivate && !privateLocked && (
                       <details className="settings-advanced">
-                        <summary>
-                          {t(
-                            protectedPrivate
-                              ? 'settings.managePassword'
-                              : 'settings.enableProtection',
-                          )}
-                        </summary>
+                        <summary>{t('settings.managePassword')}</summary>
                         <div>
-                          {!protectedPrivate ? (
-                            <PasswordForm mode="protect" report={report} />
-                          ) : (
-                            <>
-                              <PasswordForm mode="change" report={report} />
-                              <PasswordForm mode="remove" report={report} />
-                            </>
-                          )}
+                          <PasswordForm mode="change" report={report} />
+                          <PasswordForm mode="remove" report={report} />
                         </div>
                       </details>
                     )}
                   </SettingsSection>
-                  {spaceId === 'private' && (
-                    <SettingsSection title={t('settings.privateInheritance')}>
-                      <p className="settings-help">
-                        {t('settings.privateInheritanceHelp', {
-                          count: Object.keys(overrides).length,
-                        })}
-                      </p>
-                      <Button
-                        variant="outline"
-                        disabled={saving || !Object.keys(overrides).length}
-                        onClick={() => void resetPrivatePreferences()}
-                      >
-                        {t('settings.followNormal')}
-                      </Button>
-                    </SettingsSection>
-                  )}
                 </div>
               )}
               {visited.has('icons') && (
@@ -560,7 +459,7 @@ export default function SettingsPanel({
                     )}
                     {numberRange('overlay', 0, 0.8, 0.05, (value) => Math.round(value * 100) + '%')}
                     <div
-                      className="settings-panel-content settings-form"
+                      className="settings-panel-content settings-form grid min-w-0 gap-3.5 text-sm"
                       hidden={settings.background !== 'custom'}
                     >
                       <LocalWallpaperForm save={save} report={report} />
@@ -604,20 +503,23 @@ export default function SettingsPanel({
               {visited.has('data') && (
                 <div className="settings-panel-content" hidden={activeTab !== 'data'}>
                   <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
-                    <DataSettings spaceId={spaceId} report={report} />
+                    <DataSettings spaceId={importSpaceId} groupId={importGroupId} report={report} />
                   </Suspense>
                 </div>
               )}
               {hasDraft && (
-                <p className="settings-draft-note" role="status">
+                <p
+                  className="mt-6 wrap-anywhere text-xs leading-5 text-muted-foreground"
+                  role="status"
+                >
                   {t('settings.draftHelp')}
                 </p>
               )}
             </div>
           </div>
         </div>
-        {confirmation}
-      </DialogContent>
-    </Dialog>
+      </div>
+      {confirmation}
+    </section>
   );
 }

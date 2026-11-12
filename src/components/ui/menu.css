@@ -1,8 +1,5 @@
 .menu-surface {
   --menu-destructive: color-mix(in srgb, var(--color-destructive) 82%, var(--surface-text));
-  z-index: 50;
-  min-width: 176px;
-  max-width: min(320px, calc(100vw - 16px));
   max-height: min(
     calc(100vh - 16px),
     var(
@@ -10,67 +7,18 @@
       var(--radix-context-menu-content-available-height, calc(100vh - 16px))
     )
   );
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: 6px;
-  border: 1px solid var(--surface-divider);
-  border-radius: var(--radius-panel);
-  background: var(--surface-popover);
-  color: var(--surface-text);
-  box-shadow: var(--elevation-popover);
-  backdrop-filter: blur(20px) saturate(135%);
-  font-size: 13px;
-  line-height: 20px;
   transform-origin: var(
     --radix-dropdown-menu-content-transform-origin,
     var(--radix-context-menu-content-transform-origin)
   );
 }
 
-.menu-surface[data-state='open'] {
-  animation: menu-appear var(--motion-fast) var(--ease-standard);
-}
-
-.menu-surface[data-state='closed'] {
-  animation: menu-disappear var(--motion-fast) var(--ease-standard);
-}
-
-.menu-item {
-  position: relative;
-  display: flex;
-  min-height: 36px;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--radius-item);
-  outline: none;
-  color: inherit;
-  cursor: pointer;
-  user-select: none;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
-}
-
-.menu-item[data-highlighted],
-.menu-item[data-state='open'] {
-  background: var(--dialog-hover);
-}
-
-.menu-item[data-disabled] {
-  pointer-events: none;
-  opacity: 0.45;
-}
-
-.menu-item[data-inset] {
-  padding-left: 32px;
-}
-.menu-item--checkable {
-  padding-right: 32px;
-}
 .menu-item--checkable[data-state='checked'] {
-  background: var(--preferences-selection);
+  background: color-mix(in srgb, var(--preferences-accent) 13%, var(--preferences-surface));
   color: var(--preferences-accent);
+}
+.menu-item--checkable[data-state='checked'][data-highlighted] {
+  background: color-mix(in srgb, var(--preferences-accent) 22%, var(--preferences-surface));
 }
 
 .menu-item[data-variant='destructive'] {
@@ -79,84 +27,4 @@
 
 .menu-item[data-variant='destructive'][data-highlighted] {
   background: color-mix(in srgb, var(--menu-destructive) 12%, transparent);
-}
-
-.menu-item > svg,
-.menu-indicator svg {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  pointer-events: none;
-}
-
-.search-engine-menu {
-  min-width: min(192px, calc(100vw - 16px));
-}
-
-.search-engine-menu .menu-item > span:last-child {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.menu-indicator {
-  position: absolute;
-  right: 10px;
-  display: flex;
-  width: 14px;
-  height: 14px;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.menu-label {
-  padding: 5px 10px;
-  color: var(--surface-muted);
-  font-size: 11px;
-  font-weight: 600;
-  user-select: none;
-}
-
-.menu-label[data-inset] {
-  padding-left: 32px;
-}
-
-.menu-separator {
-  height: 1px;
-  margin: 5px 4px;
-  background: var(--surface-divider);
-}
-
-.menu-shortcut {
-  margin-left: auto;
-  color: var(--surface-muted);
-  font-size: 11px;
-}
-
-@keyframes menu-appear {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes menu-disappear {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .menu-surface,
-  .menu-item {
-    animation: none;
-    transition: none;
-  }
 }

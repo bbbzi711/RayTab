@@ -7,8 +7,14 @@ import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
 import { Check, ExternalLink, Globe2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { RayTabMark } from '@/components/ui/raytab-mark';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import {
+  NativeSelect,
+  NativeSelectOptGroup,
+  NativeSelectOption,
+} from '@/components/ui/native-select';
 import { SiteIcon } from '@/features/navigation/SiteIcon';
 import { destinationSchema } from '@/features/navigation/navigation-form-schemas';
 import {
@@ -19,6 +25,7 @@ import {
   type Site,
 } from '@/storage/model';
 import { startRayTabStore, useRayTabStore } from '@/storage/store';
+import { isPlaceholderGroup } from '@/storage/group-privacy';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
 import { prepareImage } from '@/lib/images';
 import i18n from '@/locales';
@@ -51,7 +58,10 @@ export default function Popup() {
   const error = useRayTabStore((store) => store.error);
   const settings = useRayTabStore((store) => store.state?.normalSettings);
   const normalSpace = useRayTabStore((store) => store.state?.spaces.normal);
-  const activeGroupId = useRayTabStore((store) => store.state?.local.activeGroup.normal);
+  const savedGroupId = useRayTabStore((store) => store.state?.local.activeGroup.normal);
+  const normalGroups = normalSpace?.groups.filter((group) => !isPlaceholderGroup(group.id)) ?? [];
+  const activeGroupId =
+    normalGroups.find((group) => group.id === savedGroupId)?.id ?? normalGroups[0]?.id;
   const dispatch = useRayTabStore((store) => store.dispatch);
   const refresh = useRayTabStore((store) => store.refresh);
   useEffect(startRayTabStore, []);
@@ -214,28 +224,41 @@ export default function Popup() {
       </p>
     ) : null;
   return (
-    <main className="popup-shell">
+    <main className="flex min-h-[420px] flex-col bg-background px-4.5 pt-4 pb-4.5 text-foreground">
       <Toaster theme={settings?.theme ?? 'system'} />
       {!settings || !normalSpace ? (
-        <div className="popup-loading">
+        <div className="grid min-h-[420px] place-items-center text-sm text-muted-foreground">
           <p>{error ? storedErrorMessage(error) : t('messages.openingYourSpace')}</p>
           {error && <Button onClick={() => void refresh()}>{t('messages.retry')}</Button>}
         </div>
+      ) : normalGroups.length === 0 ? (
+        <div className="grid min-h-70 place-content-center justify-items-center gap-3 text-sm">
+          <p className="text-muted-foreground">{t('navigation.noWritableGroups')}</p>
+          <Button type="button" variant="outline" onClick={() => void openRayTab()}>
+            {t('messages.openHome')}
+          </Button>
+        </div>
       ) : (
         <>
-          <header className="popup-header">
-            <div className="popup-header-brand">
+          <header className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-1.5 text-base font-semibold tracking-tight">
+              <RayTabMark className="size-6 text-primary" />
               <span>RayTab</span>
             </div>
-            <span className="popup-header-badge">{t('messages.personalSpace')}</span>
+            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {t('messages.personalSpace')}
+            </span>
           </header>
           {saved ? (
-            <div className="popup-success" role="status">
-              <div className="popup-success-icon">
+            <div
+              className="flex min-h-70 flex-col items-center justify-center gap-3 text-center"
+              role="status"
+            >
+              <div className="grid size-12 place-items-center rounded-full border border-success-border bg-success-surface text-success">
                 <Check size={28} />
               </div>
-              <strong>{t('messages.siteAdded')}</strong>
-              <small>{title}</small>
+              <strong className="text-base font-semibold">{t('messages.siteAdded')}</strong>
+              <small className="text-xs text-muted-foreground">{title}</small>
               <div className="flex gap-2 w-full mt-4">
                 <Button
                   type="button"
@@ -255,14 +278,14 @@ export default function Popup() {
                   {t('messages.addAnother')}
                 </Button>
                 <Button type="button" onClick={() => void openRayTab()}>
-                  <ExternalLink size={14} />
+                  <ExternalLink className="ui-icon-action" aria-hidden="true" />
                   {t('messages.viewHome')}
                 </Button>
               </div>
             </div>
           ) : (
             <>
-              <div className="popup-preview">
+              <div className="popup-preview mt-3.5 flex items-center gap-3 rounded-lg border border-border bg-muted px-3 py-2.5">
                 <SiteIcon
                   site={{
                     title,
@@ -273,19 +296,21 @@ export default function Popup() {
                   size="preview"
                   radius={settings.iconRadius}
                 />
-                <div className="popup-preview-text">
-                  <div className="popup-preview-title">{title || t('messages.currentTab')}</div>
-                  <div className="popup-preview-url">{url}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">
+                    {title || t('messages.currentTab')}
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">{url}</div>
                 </div>
               </div>
               <form
                 aria-label={t('messages.quickAddToPersonalSpace')}
-                className="popup-form"
+                className="mt-3.5 flex flex-1 flex-col gap-3"
                 onSubmit={submit}
                 noValidate
               >
-                <div className="popup-field">
-                  <label htmlFor="title">{t('messages.name')}</label>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="title">{t('messages.name')}</Label>
                   <Input
                     id="title"
                     autoFocus
@@ -296,8 +321,8 @@ export default function Popup() {
                   />
                   {fieldError(errors.title?.message)}
                 </div>
-                <div className="popup-field">
-                  <label htmlFor="url">{t('messages.url')}</label>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="url">{t('messages.url')}</Label>
                   <Input
                     id="url"
                     placeholder="https://example.com"
@@ -307,30 +332,36 @@ export default function Popup() {
                   />
                   {fieldError(errors.url?.message)}
                 </div>
-                <div className="popup-field">
-                  <label htmlFor="location">{t('messages.saveTo')}</label>
-                  <Select id="location" {...form.register('location')} disabled={isSubmitting}>
-                    {[...normalSpace.groups]
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="location">{t('messages.saveTo')}</Label>
+                  <NativeSelect
+                    id="location"
+                    {...form.register('location')}
+                    disabled={isSubmitting}
+                  >
+                    {[...normalGroups]
                       .sort((a, b) => a.order - b.order)
                       .map((group) => (
-                        <optgroup key={group.id} label={group.name}>
-                          <option value={JSON.stringify({ groupId: group.id, folderId: null })}>
+                        <NativeSelectOptGroup key={group.id} label={group.name}>
+                          <NativeSelectOption
+                            value={JSON.stringify({ groupId: group.id, folderId: null })}
+                          >
                             {group.name}
-                          </option>
+                          </NativeSelectOption>
                           {normalSpace.folders
                             .filter((folder) => folder.groupId === group.id)
                             .sort((a, b) => a.order - b.order)
                             .map((folder) => (
-                              <option
+                              <NativeSelectOption
                                 key={folder.id}
                                 value={JSON.stringify({ groupId: group.id, folderId: folder.id })}
                               >
                                 {folder.name}
-                              </option>
+                              </NativeSelectOption>
                             ))}
-                        </optgroup>
+                        </NativeSelectOptGroup>
                       ))}
-                  </Select>
+                  </NativeSelect>
                   {fieldError(errors.location?.message)}
                 </div>
                 {errors.root?.message && (
@@ -354,18 +385,18 @@ export default function Popup() {
                     </Button>
                   </div>
                 )}
-                <div className="popup-footer-actions">
+                <div className="mt-auto flex gap-2 pt-3.5">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="outline"
                     disabled={isSubmitting}
                     onClick={() => void openRayTab()}
                   >
-                    <Globe2 size={14} />
+                    <Globe2 className="ui-icon-action" aria-hidden="true" />
                     {t('messages.openHome')}
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    <Plus size={15} />
+                  <Button type="submit" className="min-w-0 flex-1" disabled={isSubmitting}>
+                    <Plus className="ui-icon-action" aria-hidden="true" />
                     {fetchingIcon
                       ? t('popup.fetchingIcon')
                       : isSubmitting

@@ -2,7 +2,15 @@ import * as React from 'react';
 import { cn } from 'cn';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
-import './menu.css';
+import {
+  menuCheckableItemClass,
+  menuIndicatorClass,
+  menuItemClass,
+  menuLabelClass,
+  menuSeparatorClass,
+  menuShortcutClass,
+  menuSurfaceClass,
+} from './menu-styles';
 
 function DropdownMenu({ ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
@@ -30,7 +38,7 @@ function DropdownMenuContent({
       <DropdownMenuPrimitive.Content
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
-        className={cn('menu-surface', className)}
+        className={cn(menuSurfaceClass, className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
@@ -55,7 +63,7 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
-      className={cn('menu-item', className)}
+      className={cn(menuItemClass, className)}
       {...props}
     />
   );
@@ -70,11 +78,11 @@ function DropdownMenuCheckboxItem({
   return (
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
-      className={cn('menu-item menu-item--checkable', className)}
+      className={cn(menuItemClass, menuCheckableItemClass, className)}
       checked={checked}
       {...props}
     >
-      <span className="menu-indicator">
+      <span className={menuIndicatorClass}>
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -98,10 +106,10 @@ function DropdownMenuRadioItem({
   return (
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
-      className={cn('menu-item menu-item--checkable', className)}
+      className={cn(menuItemClass, menuCheckableItemClass, className)}
       {...props}
     >
-      <span className="menu-indicator">
+      <span className={menuIndicatorClass}>
         <DropdownMenuPrimitive.ItemIndicator>
           <CheckIcon />
         </DropdownMenuPrimitive.ItemIndicator>
@@ -122,7 +130,7 @@ function DropdownMenuLabel({
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       data-inset={inset}
-      className={cn('menu-label', className)}
+      className={cn(menuLabelClass, className)}
       {...props}
     />
   );
@@ -135,7 +143,7 @@ function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn('menu-separator', className)}
+      className={cn(menuSeparatorClass, className)}
       {...props}
     />
   );
@@ -145,7 +153,7 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<'spa
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn('menu-shortcut', className)}
+      className={cn(menuShortcutClass, className)}
       {...props}
     />
   );
@@ -167,7 +175,7 @@ function DropdownMenuSubTrigger({
     <DropdownMenuPrimitive.SubTrigger
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
-      className={cn('menu-item', className)}
+      className={cn(menuItemClass, className)}
       {...props}
     >
       {children}
@@ -183,7 +191,7 @@ function DropdownMenuSubContent({
   return (
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
-      className={cn('menu-surface', className)}
+      className={cn(menuSurfaceClass, className)}
       {...props}
     />
   );

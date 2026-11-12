@@ -3,6 +3,7 @@ import { z } from '@/lib/zod';
 import { serializeError, type StoredError } from '@/lib/errors';
 import { repository } from './repository';
 import { applyCommand, type Command } from './operations';
+import type { GroupPrivacyTarget } from './group-privacy';
 import type { RepositoryCommit } from './database';
 import { wallpaperDisplay } from '@/features/appearance/wallpaper-source';
 import {
@@ -65,8 +66,8 @@ type RayTabStore = {
   clearSettingsPreview: (spaceId?: SpaceId, savedPatch?: Partial<SpaceSettings>) => void;
   refresh: (commit?: RepositoryCommit) => Promise<void>;
   dispatch: (command: Command, assets?: Map<string, Blob>) => Promise<void>;
-  protectPrivate: (password: string) => Promise<void>;
-  unlockPrivate: (password: string) => Promise<void>;
+  protectPrivate: (password: string, target?: GroupPrivacyTarget) => Promise<void>;
+  unlockPrivate: (password: string, adoptGroups?: boolean) => Promise<void>;
   lockPrivate: () => Promise<void>;
   changePrivatePassword: (current: string, next: string) => Promise<void>;
   removePrivatePassword: (password: string) => Promise<void>;
@@ -178,8 +179,14 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
       )
         await get().refresh();
     },
-    protectPrivate: (password) => runPrivate(() => repository.protectPrivate(password)),
-    unlockPrivate: (password) => runPrivate(() => repository.unlockPrivate(password)),
+    protectPrivate: (password, target) =>
+      runPrivate(() =>
+        target ? repository.protectPrivate(password, target) : repository.protectPrivate(password),
+      ),
+    unlockPrivate: (password, adoptGroups) =>
+      runPrivate(() =>
+        adoptGroups ? repository.unlockPrivate(password, true) : repository.unlockPrivate(password),
+      ),
     lockPrivate: () =>
       runPrivate(() => {
         const current = get().state;

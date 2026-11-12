@@ -1,5 +1,7 @@
 {
   "title": "设置",
+  "liveAppearance": "实时效果",
+  "exampleSite": "示例网站",
   "unlockPrivateForSync": "请先解锁私密空间，再修改或保存包含私密空间的同步配置。",
   "close": "关闭",
   "categories": "设置分类",
@@ -19,7 +21,7 @@
     "widgets": "搜索引擎、时间与问候语",
     "sync": "连接、同步与冲突处理",
     "data": "书签导入、备份与恢复",
-    "general": "使用偏好与私密空间"
+    "general": "使用偏好、分组与加密"
   },
   "sections": {
     "layout": "布局",
@@ -60,9 +62,11 @@
   "chooseWallpaperFile": "请选择一张壁纸图片。",
   "search": "搜索",
   "clock": "时钟与问候",
-  "privateProtection": "私密空间保护",
-  "lockedHelp": "私密空间已加密并锁定。进入私密空间解锁后可修改或取消密码。",
-  "unlockedHelp": "私密网站、设置和图片已加密保存。返回普通空间或刷新会清除解锁状态。",
+  "privateProtection": "分组加密",
+  "enterPrivateSpace": "进入私密空间",
+  "returnToPersonalSpace": "返回普通空间",
+  "lockedHelp": "加密分组已锁定。解锁后可以修改或移除共用密码。",
+  "unlockedHelp": "已解锁。加密分组里的网站和图片仍以密文保存。",
   "privateInheritance": "私密空间偏好",
   "privateInheritanceHelp": "已有 {{count}} 项独立偏好。恢复后将统一跟随普通空间，网站和分组不受影响。",
   "language": "语言",
@@ -80,15 +84,9 @@
     "showGreeting": "显示问候语",
     "hour12": "12 小时制",
     "openInNewTab": "在新标签页打开网站和搜索结果",
-    "sidebarMode": "分组栏显示",
     "theme": "主题",
     "solidColor": "背景颜色",
     "language": "语言"
-  },
-  "sidebarModes": {
-    "always": "常驻显示",
-    "auto": "自动隐藏",
-    "hidden": "完全隐藏"
   },
   "themes": {
     "system": "跟随系统",
@@ -240,7 +238,7 @@
   "privateInheritanceHelp_other": "已有 {{count}} 项独立偏好。恢复后将统一跟随普通空间，网站和分组不受影响。",
   "resetPrivateTitle": "恢复普通空间偏好？",
   "resetPrivateDescription": "私密空间的外观和使用偏好将跟随普通空间。私密网站、分组和密码保护会保留。",
-  "protectionHelp": "为私密网站和图片设置密码，在本机加密保存。",
+  "protectionHelp": "在分组管理中选择要加密的分组，首次加密时设置共用密码。",
   "managePassword": "管理密码",
   "enableProtection": "设置密码保护",
   "dataTasks": {
@@ -284,7 +282,5 @@
   "deleteEngineTitle": "删除“{{name}}”？",
   "deleteEngineDescription": "该搜索引擎将从列表中移除。",
   "deleteActiveEngineDescription": "删除后将使用 {{name}} 搜索。",
-  "deleteEngineDraftDescription": "该引擎尚未保存的修改也会被放弃。",
-  "previewHome": "预览主页",
-  "returnToSettings": "返回设置"
+  "deleteEngineDraftDescription": "该引擎尚未保存的修改也会被放弃。"
 }

@@ -12,7 +12,7 @@ import {
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
-import { RadioGroup, Select } from 'radix-ui';
+import { RadioGroup } from 'radix-ui';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
@@ -27,7 +27,17 @@ import {
   Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -465,8 +475,9 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
   return (
     <Dialog open onOpenChange={(open) => !open && void requestClose()}>
       <DialogContent
-        className="site-edit-dialog"
-        overlayClassName="site-edit-overlay"
+        layout="custom"
+        className="site-edit-dialog left-1/2 flex w-[min(600px,calc(100vw-32px))] overflow-hidden max-[380px]:w-[calc(100vw-20px)] [@media(max-height:480px)]:max-h-[calc(100dvh-16px)]"
+        overlayClassName="bg-slate-950/40 backdrop-blur-[3px]"
         closeLabel={t('messages.close')}
         showCloseButton={!busy}
         aria-describedby={undefined}
@@ -483,10 +494,12 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
             <div className="site-edit-controls">
               <section className="site-edit-information">
                 <div className="site-edit-field">
-                  <label htmlFor={`${id}-url`}>{t('messages.url')}</label>
-                  <div className="site-edit-url-row">
-                    <Link size={14} aria-hidden="true" />
-                    <Input
+                  <Label htmlFor={`${id}-url`}>{t('messages.url')}</Label>
+                  <InputGroup>
+                    <InputGroupAddon aria-hidden="true">
+                      <Link className="ui-icon-compact" aria-hidden="true" />
+                    </InputGroupAddon>
+                    <InputGroupInput
                       id={`${id}-url`}
                       {...form.register('url', {
                         onChange: () => {
@@ -497,9 +510,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                         onBlur: (event: FocusEvent<HTMLInputElement>) => {
                           if (
                             event.relatedTarget instanceof HTMLElement &&
-                            event.relatedTarget.closest(
-                              '.site-edit-fetch, .site-edit-save, .site-edit-cancel',
-                            )
+                            event.relatedTarget.closest('[data-skip-icon-fetch]')
                           )
                             return;
                           if (!submitting.current && shouldAutoFetch()) void autoFetch(true);
@@ -510,7 +521,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                       disabled={busy}
                       placeholder="example.com"
                     />
-                  </div>
+                  </InputGroup>
                   {errors.url && (
                     <p id={`${id}-url-error`} className="form-error" role="alert">
                       {t(errors.url.message!)}
@@ -519,10 +530,12 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                 </div>
                 <div className="site-edit-details">
                   <div className="site-edit-field">
-                    <label htmlFor={`${id}-title`}>{t('messages.name')}</label>
-                    <div className="site-edit-name-row">
-                      <Type size={14} aria-hidden="true" />
-                      <Input
+                    <Label htmlFor={`${id}-title`}>{t('messages.name')}</Label>
+                    <InputGroup>
+                      <InputGroupAddon aria-hidden="true">
+                        <Type className="ui-icon-compact" aria-hidden="true" />
+                      </InputGroupAddon>
+                      <InputGroupInput
                         id={`${id}-title`}
                         {...form.register('title', {
                           onChange: (event) => {
@@ -536,7 +549,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                         aria-describedby={errors.title ? `${id}-title-error` : undefined}
                         disabled={busy}
                       />
-                    </div>
+                    </InputGroup>
                     {errors.title && (
                       <p id={`${id}-title-error`} className="form-error" role="alert">
                         {t(errors.title.message!)}
@@ -544,12 +557,12 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                     )}
                   </div>
                   <div className="site-edit-field">
-                    <label htmlFor={`${id}-location`}>{t('messages.saveTo')}</label>
+                    <Label htmlFor={`${id}-location`}>{t('messages.saveTo')}</Label>
                     <Controller
                       control={form.control}
                       name="location"
                       render={({ field }) => (
-                        <Select.Root
+                        <Select
                           name={field.name}
                           value={JSON.stringify(field.value)}
                           disabled={busy}
@@ -566,64 +579,41 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                             if (location) field.onChange(location);
                           }}
                         >
-                          <Select.Trigger
+                          <SelectTrigger
                             id={`${id}-location`}
                             ref={field.ref}
                             onBlur={field.onBlur}
-                            className="site-edit-select"
+                            className="w-full"
                           >
-                            <Select.Value />
-                            <Select.Icon>
-                              <ChevronDown size={15} aria-hidden="true" />
-                            </Select.Icon>
-                          </Select.Trigger>
-                          <Select.Portal>
-                            <Select.Content
-                              className="site-edit-select-content"
-                              position="popper"
-                              sideOffset={6}
-                            >
-                              <Select.Viewport>
-                                {orderedGroups.map((group) => (
-                                  <Select.Group key={group.id}>
-                                    <Select.Label className="site-edit-select-label">
-                                      {group.name}
-                                    </Select.Label>
-                                    <Select.Item
-                                      className="site-edit-select-item"
-                                      value={JSON.stringify({ groupId: group.id, folderId: null })}
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="w-[min(var(--radix-select-trigger-width),100vw)]">
+                            {orderedGroups.map((group) => (
+                              <SelectGroup key={group.id}>
+                                <SelectLabel>{group.name}</SelectLabel>
+                                <SelectItem
+                                  value={JSON.stringify({ groupId: group.id, folderId: null })}
+                                >
+                                  {group.name}
+                                </SelectItem>
+                                {space.folders
+                                  .filter((folder) => folder.groupId === group.id)
+                                  .sort((a, b) => a.order - b.order)
+                                  .map((folder) => (
+                                    <SelectItem
+                                      key={folder.id}
+                                      value={JSON.stringify({
+                                        groupId: group.id,
+                                        folderId: folder.id,
+                                      })}
                                     >
-                                      <Select.ItemText>{group.name}</Select.ItemText>
-                                      <Select.ItemIndicator>
-                                        <Check size={14} aria-hidden="true" />
-                                      </Select.ItemIndicator>
-                                    </Select.Item>
-                                    {space.folders
-                                      .filter((folder) => folder.groupId === group.id)
-                                      .sort((a, b) => a.order - b.order)
-                                      .map((folder) => (
-                                        <Select.Item
-                                          key={folder.id}
-                                          className="site-edit-select-item"
-                                          value={JSON.stringify({
-                                            groupId: group.id,
-                                            folderId: folder.id,
-                                          })}
-                                        >
-                                          <Select.ItemText>
-                                            {group.name} / {folder.name}
-                                          </Select.ItemText>
-                                          <Select.ItemIndicator>
-                                            <Check size={14} aria-hidden="true" />
-                                          </Select.ItemIndicator>
-                                        </Select.Item>
-                                      ))}
-                                  </Select.Group>
-                                ))}
-                              </Select.Viewport>
-                            </Select.Content>
-                          </Select.Portal>
-                        </Select.Root>
+                                      {group.name} / {folder.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectGroup>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       )}
                     />
                     {errors.location && (
@@ -675,7 +665,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                       onClick={() => setIconOptionsOpen((open) => !open)}
                     >
                       <span>{t('navigation.iconSection')}</span>
-                      <ChevronDown size={16} aria-hidden="true" />
+                      <ChevronDown className="ui-icon-compact" aria-hidden="true" />
                     </button>
                     <p className="site-edit-help" role="status">
                       {t(
@@ -722,7 +712,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                           className="site-edit-icon-choice"
                           aria-label={t('navigation.websiteIcon')}
                         >
-                          <Globe2 size={15} aria-hidden="true" />
+                          <Globe2 className="ui-icon-action" aria-hidden="true" />
                           <span>{t('navigation.websiteIcon')}</span>
                         </RadioGroup.Item>
                         <RadioGroup.Item
@@ -730,7 +720,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                           className="site-edit-icon-choice"
                           aria-label={t('navigation.textIcon')}
                         >
-                          <Type size={15} aria-hidden="true" />
+                          <Type className="ui-icon-action" aria-hidden="true" />
                           <span>{t('navigation.textIcon')}</span>
                         </RadioGroup.Item>
                         <RadioGroup.Item
@@ -738,7 +728,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                           className="site-edit-icon-choice"
                           aria-label={t('navigation.upload')}
                         >
-                          <Upload size={15} aria-hidden="true" />
+                          <Upload className="ui-icon-action" aria-hidden="true" />
                           <span>{t('navigation.upload')}</span>
                         </RadioGroup.Item>
                       </RadioGroup.Root>
@@ -746,12 +736,13 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                   />
                   {selectedImageSource && (
                     <div className="site-edit-source-panel">
-                      <div className="site-edit-image-actions">
+                      <div className="flex min-w-0 flex-wrap gap-2">
                         {selectedImageSource === 'auto' && (
                           <Button
                             type="button"
                             variant="outline"
-                            className="site-edit-fetch"
+                            size="sm"
+                            data-skip-icon-fetch
                             aria-label={t('navigation.fetchIcon')}
                             onClick={() => void autoFetch()}
                             disabled={busy || fetching}
@@ -759,7 +750,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                             {fetching ? (
                               <LoaderCircle className="spin" size={14} />
                             ) : (
-                              <Globe2 size={14} />
+                              <Globe2 className="ui-icon-action" aria-hidden="true" />
                             )}
                             {t(
                               selectedResourceId ? 'navigation.refreshIcon' : 'navigation.getIcon',
@@ -770,10 +761,11 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                           <Button
                             type="button"
                             variant="outline"
+                            size="sm"
                             disabled={busy}
                             onClick={() => imageInput.current?.click()}
                           >
-                            <Upload size={14} />
+                            <Upload className="ui-icon-action" aria-hidden="true" />
                             {t(
                               selectedResourceId
                                 ? 'navigation.replaceImage'
@@ -785,13 +777,14 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                           <Button
                             type="button"
                             variant="ghost"
+                            size="sm"
                             disabled={busy || openingCrop}
                             onClick={() => void openCrop()}
                           >
                             {openingCrop ? (
                               <LoaderCircle className="spin" size={14} />
                             ) : (
-                              <Crop size={14} />
+                              <Crop className="ui-icon-action" aria-hidden="true" />
                             )}
                             {t('navigation.cropIcon')}
                           </Button>
@@ -802,6 +795,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                             <Button
                               type="button"
                               variant="ghost"
+                              size="sm"
                               disabled={busy}
                               onClick={() => {
                                 const image = images[selectedImageSource]!;
@@ -842,10 +836,12 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                   )}
                   {selectedSource === 'text' && (
                     <div className="site-edit-text-row">
-                      <label htmlFor={`${id}-text`}>{t('navigation.iconText')}</label>
-                      <div className="site-edit-text-input">
-                        <Type size={14} aria-hidden="true" />
-                        <Input
+                      <Label htmlFor={`${id}-text`}>{t('navigation.iconText')}</Label>
+                      <InputGroup>
+                        <InputGroupAddon aria-hidden="true">
+                          <Type className="ui-icon-compact" aria-hidden="true" />
+                        </InputGroupAddon>
+                        <InputGroupInput
                           id={`${id}-text`}
                           {...form.register('textIcon', {
                             onChange: () => {
@@ -857,7 +853,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                           aria-describedby={errors.textIcon ? `${id}-text-error` : undefined}
                           disabled={busy}
                         />
-                      </div>
+                      </InputGroup>
                       {errors.textIcon && (
                         <p id={`${id}-text-error`} className="form-error" role="alert">
                           {t(errors.textIcon.message!)}
@@ -885,7 +881,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                             disabled={busy}
                             onClick={() => field.onChange({ mode: 'auto' })}
                           >
-                            <Sparkles size={14} aria-hidden="true" />
+                            <Sparkles className="ui-icon-compact" aria-hidden="true" />
                           </button>
                           {BACKGROUND_COLORS.map(({ color, label }) => (
                             <button
@@ -902,7 +898,7 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
                               onClick={() => field.onChange({ mode: 'color', color })}
                             >
                               {field.value.mode === 'color' && field.value.color === color && (
-                                <Check size={14} aria-hidden="true" />
+                                <Check className="ui-icon-compact" aria-hidden="true" />
                               )}
                             </button>
                           ))}
@@ -972,7 +968,8 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
             <Button
               type="button"
               variant="ghost"
-              className="site-edit-cancel"
+              className="min-w-19"
+              data-skip-icon-fetch
               disabled={busy}
               onClick={() => void requestClose()}
             >
@@ -980,7 +977,8 @@ export function SiteEditor({ site, space, spaceId, groupId, folderId, onClose }:
             </Button>
             <Button
               type="submit"
-              className="site-edit-save"
+              className="min-w-20"
+              data-skip-icon-fetch
               disabled={busy || fetching || openingCrop}
             >
               {busy && <LoaderCircle className="spin" size={15} />}

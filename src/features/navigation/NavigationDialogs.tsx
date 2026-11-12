@@ -14,7 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+  NativeSelect,
+  NativeSelectOptGroup,
+  NativeSelectOption,
+} from '@/components/ui/native-select';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { errorMessage } from '@/lib/errors';
 import type { Group, Folder } from '@/storage/model';
@@ -49,7 +53,7 @@ export function DestinationSelect({
       .map((folder) => ({ groupId: group.id, folderId: folder.id })),
   ]);
   return (
-    <Select
+    <NativeSelect
       id={id}
       ref={inputRef}
       name={name}
@@ -62,24 +66,24 @@ export function DestinationSelect({
       }}
     >
       {groups.map((group) => (
-        <optgroup key={group.id} label={group.name}>
-          <option value={JSON.stringify({ groupId: group.id, folderId: null })}>
+        <NativeSelectOptGroup key={group.id} label={group.name}>
+          <NativeSelectOption value={JSON.stringify({ groupId: group.id, folderId: null })}>
             {group.name}
-          </option>
+          </NativeSelectOption>
           {folders
             .filter((folder) => folder.groupId === group.id)
             .sort((a, b) => a.order - b.order)
             .map((folder) => (
-              <option
+              <NativeSelectOption
                 key={folder.id}
                 value={JSON.stringify({ groupId: group.id, folderId: folder.id })}
               >
                 {group.name} / {folder.name}
-              </option>
+              </NativeSelectOption>
             ))}
-        </optgroup>
+        </NativeSelectOptGroup>
       ))}
-    </Select>
+    </NativeSelect>
   );
 }
 
@@ -131,7 +135,7 @@ export function NameDialog({ title, initialName = '', onSave, onClose }: NameDia
               setError('root', { message: errorMessage(reason) });
             }
           })}
-          className="form-stack"
+          className="grid gap-5"
           noValidate
         >
           <DialogHeader>
@@ -260,7 +264,7 @@ export function MoveDialog({
               setError('root', { message: errorMessage(reason) });
             }
           })}
-          className="form-stack"
+          className="grid gap-5"
           noValidate
         >
           <DialogHeader>

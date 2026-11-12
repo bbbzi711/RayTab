@@ -9,6 +9,9 @@ import { searchWithBrowser } from './browser-search';
 import { errorMessage } from '@/lib/errors';
 import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -16,6 +19,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
+
+const searchActionClass =
+  'rounded-full text-[color:var(--home-search-color,var(--surface-muted))] hover:bg-[var(--search-action-hover)] hover:text-[color:var(--surface-text)]';
 
 export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
   const { t } = useTranslation();
@@ -68,17 +74,18 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
       >
         <Tooltip content={t('messages.switchSearchEngine')} side="bottom">
           <DropdownMenuTrigger asChild>
-            <button
+            <Button
               type="button"
-              className="search-engine-trigger"
+              variant="ghost"
+              className={cn(searchActionClass, 'min-w-9 gap-1.25 px-1.5 has-[>svg]:px-1.5')}
               aria-label={t('messages.switchSearchEngine')}
             >
               {getSearchEngineIcon(
                 useBrowserEngine ? BROWSER_SEARCH_ENGINE : engine.id,
                 engine.name,
               )}
-              <ChevronDown size={13} aria-hidden="true" />
-            </button>
+              <ChevronDown className="ui-icon-compact" aria-hidden="true" />
+            </Button>
           </DropdownMenuTrigger>
         </Tooltip>
         <DropdownMenuContent
@@ -86,7 +93,7 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
           // Align to the search shell, whose trigger is inset 11px horizontally and 6px vertically.
           alignOffset={-11}
           sideOffset={12}
-          className="search-engine-menu"
+          className="min-w-[min(192px,calc(100vw-16px))]"
           onCloseAutoFocus={(event) => {
             if (!focusSearchOnClose.current) return;
             event.preventDefault();
@@ -109,7 +116,7 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               }}
             >
               {getSearchEngineIcon(BROWSER_SEARCH_ENGINE, '')}
-              <span>{t('messages.browserSearchEngine')}</span>
+              <span className="min-w-0 truncate">{t('messages.browserSearchEngine')}</span>
             </DropdownMenuRadioItem>
             {settings.searchEngines.map((item) => (
               <DropdownMenuRadioItem
@@ -120,41 +127,49 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
                 }}
               >
                 {getSearchEngineIcon(item.id, item.name)}
-                <span>{item.name}</span>
+                <span className="min-w-0 truncate">{item.name}</span>
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-      <input
+      <Input
         ref={inputRef}
         name="q"
         aria-label={t('messages.searchQuery')}
         placeholder={t('messages.searchTheWeb')}
-        className="search-input"
+        className="h-full flex-1 rounded-none border-0 bg-transparent px-2.25 text-[color:var(--home-search-color,inherit)] placeholder:text-[color:color-mix(in_srgb,currentColor_58%,transparent)] focus-visible:ring-0"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         autoComplete="off"
       />
       {query.length > 0 && (
         <Tooltip content={t('messages.clear')} side="top">
-          <button
+          <Button
             type="button"
             aria-label={t('messages.clear')}
-            className="search-action search-action--clear"
+            variant="ghost"
+            size="icon-sm"
+            className={cn(searchActionClass, 'mr-0.5')}
             onClick={() => {
               setQuery('');
               inputRef.current?.focus();
             }}
           >
-            <X size={13} />
-          </button>
+            <X className="ui-icon-compact" aria-hidden="true" />
+          </Button>
         </Tooltip>
       )}
       <Tooltip content={t('messages.search')} side="bottom">
-        <button type="submit" aria-label={t('messages.search')} className="search-action">
-          <Search size={17} />
-        </button>
+        <Button
+          type="submit"
+          aria-label={t('messages.search')}
+          variant="ghost"
+          size="icon"
+          className={searchActionClass}
+        >
+          <Search className="ui-icon-action" aria-hidden="true" />
+        </Button>
       </Tooltip>
     </form>
   );

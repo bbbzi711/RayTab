@@ -11,18 +11,22 @@ import {
   type SpaceSettings,
 } from './model';
 import type { BookmarkCandidate } from '@/features/import/bookmarks';
+import { ensureSpaceGroup, isPlaceholderGroup, isUserGroup, transferGroup } from './group-privacy';
 
 export type SiteInput = Pick<Site, 'title' | 'url' | 'icon' | 'iconBackground'>;
 type Destination = { groupId: string; folderId: string | null };
 export type Command =
-  | { type: 'switch-space'; spaceId: SpaceId }
+  | { type: 'switch-space'; spaceId: SpaceId; groupId?: string }
   | { type: 'set-home-mode'; mode: RayState['local']['homeMode'] }
   | { type: 'complete-onboarding' }
   | { type: 'select-group'; spaceId: SpaceId; groupId: string }
+  | { type: 'set-group-hidden'; spaceId: SpaceId; groupId: string; hidden: boolean }
+  | { type: 'set-group-encrypted'; spaceId: SpaceId; groupId: string; encrypted: boolean }
   | { type: 'move-group'; spaceId: SpaceId; id: string; beforeId?: string }
   | { type: 'select-folder'; spaceId: SpaceId; groupId: string; folderId: string | null }
   | { type: 'save-group'; spaceId: SpaceId; id: string; name: string; expected?: number }
   | { type: 'delete-group'; spaceId: SpaceId; id: string; destinationGroupId: string }
+  | { type: 'remove-group'; spaceId: SpaceId; id: string; siteIds: string[]; folderIds: string[] }
   | {
       type: 'save-folder';
       spaceId: SpaceId;
@@ -75,7 +79,10 @@ function ensureExpected(item: { updatedAt: number } | undefined, expected?: numb
     throw new AppError('messages.thisItemChangedInAnotherPageCloseTheEditorAndTryAgain');
 }
 function destination(space: SpaceData, target: Destination) {
-  if (!space.groups.some((item) => item.id === target.groupId))
+  if (
+    isPlaceholderGroup(target.groupId) ||
+    !space.groups.some((item) => item.id === target.groupId)
+  )
     throw new AppError('messages.theDestinationGroupDoesNotExist');
   if (
     target.folderId !== null &&
@@ -107,6 +114,12 @@ export function applyCommand(state: RayState, command: Command) {
   if (command.type === 'switch-space') {
     if (command.spaceId === 'private' && state.privateSecurity.locked)
       throw new AppError('messages.unlockThePrivateSpaceFirst');
+    if (command.groupId !== undefined)
+      applyCommand(state, {
+        type: 'select-group',
+        spaceId: command.spaceId,
+        groupId: command.groupId,
+      });
     state.local.activeSpace = command.spaceId;
     return;
   }
@@ -123,6 +136,19 @@ export function applyCommand(state: RayState, command: Command) {
   if (command.spaceId === 'private' && state.privateSecurity.locked)
     throw new AppError('messages.unlockThePrivateSpaceFirst');
   const space = state.spaces[command.spaceId];
+  if (command.type === 'set-group-hidden') {
+    const group = space.groups.find((item) => item.id === command.groupId);
+    if (!group) throw new AppError('messages.theDestinationGroupDoesNotExist');
+    Object.assign(group, { hidden: command.hidden, ...changed(group.updatedAt) });
+    return;
+  }
+  if (command.type === 'set-group-encrypted') {
+    if (!state.privateSecurity.protected || state.privateSecurity.locked)
+      throw new AppError('messages.unlockThePrivateSpaceFirst');
+    const destinationId = command.encrypted ? 'private' : 'normal';
+    if (command.spaceId !== destinationId) transferGroup(state, command, destinationId);
+    return;
+  }
   const tombstone = (entity: 'group' | 'folder' | 'site', id: string) => {
     const { updatedAt, changeId } = changed();
     space.tombstones.push({ id, entity, deletedAt: updatedAt, changeId });
@@ -179,6 +205,37 @@ export function applyCommand(state: RayState, command: Command) {
       if (command.type === 'save-group') space.groups.push(record);
       else space.folders.push({ ...record, groupId: command.groupId });
     }
+    return;
+  }
+  if (command.type === 'remove-group') {
+    destination(space, { groupId: command.id, folderId: null });
+    const sites = space.sites.filter((site) => site.groupId === command.id);
+    const folders = space.folders.filter((folder) => folder.groupId === command.id);
+    const expectedSites = new Set(command.siteIds);
+    const expectedFolders = new Set(command.folderIds);
+    if (
+      sites.length !== expectedSites.size ||
+      folders.length !== expectedFolders.size ||
+      sites.some((site) => !expectedSites.has(site.id)) ||
+      folders.some((folder) => !expectedFolders.has(folder.id))
+    )
+      throw new AppError('navigation.groupContentsChanged');
+    for (const site of sites) tombstone('site', site.id);
+    for (const folder of folders) tombstone('folder', folder.id);
+    space.sites = space.sites.filter((site) => site.groupId !== command.id);
+    space.folders = space.folders.filter((folder) => folder.groupId !== command.id);
+    space.groups = space.groups.filter((group) => group.id !== command.id);
+    tombstone('group', command.id);
+    const fallback = ensureSpaceGroup(state, command.spaceId);
+    if (state.local.activeGroup[command.spaceId] === command.id)
+      state.local.activeGroup[command.spaceId] = fallback.id;
+    if (
+      command.spaceId === 'private' &&
+      state.local.activeSpace === 'private' &&
+      !isUserGroup(state, 'private', fallback)
+    )
+      state.local.activeSpace = 'normal';
+    delete state.local.selectedFolder[command.spaceId][command.id];
     return;
   }
   if (command.type === 'delete-group') {

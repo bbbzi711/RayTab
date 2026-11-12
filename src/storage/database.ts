@@ -11,6 +11,14 @@ import { type IDBPObjectStore } from 'idb';
 import { openRayDatabase, RAY_DATABASE_NAME, type RayDatabase } from './connection';
 import { decryptJson, encryptJson, type EncryptedEnvelope } from '@/security/crypto';
 import {
+  adoptLegacyEncryptedGroups,
+  assertEncryptedGroupBoundary,
+  indexEncryptedGroups,
+  isUserGroup,
+  transferGroup,
+  type GroupPrivacyTarget,
+} from './group-privacy';
+import {
   createInitialState,
   createLockedPrivateSpace,
   rayStateSchema,
@@ -40,6 +48,7 @@ export function createRepository(
 ) {
   let session: VaultSession | null = null;
   let sessionPassword: string | null = null;
+  let privateLocation: { groupId: string; folderId: string | null } | null = null;
   let sessionGeneration = 0;
   const dbPromise = openRayDatabase(name);
 
@@ -65,6 +74,7 @@ export function createRepository(
     sessionGeneration++;
     session = null;
     sessionPassword = null;
+    privateLocation = null;
     sessionEnvelope = undefined;
   }
   async function refreshSession(stored: Stored) {
@@ -91,8 +101,15 @@ export function createRepository(
       state.spaces.private = structuredClone(session.space);
       state.privateSettingOverrides = structuredClone(session.overrides);
       state.privateSecurity.locked = false;
-      if (!state.spaces.private.groups.some((item) => item.id === state.local.activeGroup.private))
-        state.local.activeGroup.private = state.spaces.private.groups[0].id;
+      const { groups, folders } = state.spaces.private;
+      const requestedGroup = privateLocation?.groupId ?? state.local.activeGroup.private;
+      const groupId = (groups.find((group) => group.id === requestedGroup) ?? groups[0]).id;
+      const folderId = privateLocation?.folderId;
+      state.local.activeGroup.private = groupId;
+      state.local.selectedFolder.private =
+        folderId && folders.some((folder) => folder.id === folderId && folder.groupId === groupId)
+          ? { [groupId]: folderId }
+          : {};
     } else if (state.privateSecurity.protected) {
       state.local.activeSpace = 'normal';
     }
@@ -147,6 +164,7 @@ export function createRepository(
     change: (draft: RayState) => void,
     assets: Map<string, Blob> = new Map(),
     expectedRevision?: number,
+    restorePassword?: string,
   ) {
     const db = await dbPromise;
     const stored = await readStored();
@@ -157,19 +175,39 @@ export function createRepository(
     const startingSession = session;
     const draft = materialize(raw);
     change(draft);
+    const protectOnRestore = Boolean(restorePassword && !raw.privateSecurity.protected);
+    if (protectOnRestore) {
+      for (const group of draft.spaces.private.groups)
+        if (group.hidden === undefined && isUserGroup(draft, 'private', group))
+          transferGroup(draft, { spaceId: 'private', groupId: group.id }, 'normal');
+      draft.privateSecurity = { protected: true, locked: false };
+      draft.local.activeSpace = 'normal';
+    }
     draft.revision++;
     const valid = rayStateSchema.parse(draft);
+    if (valid.privateSecurity.protected && !valid.privateSecurity.locked)
+      valid.encryptedGroupIndex = indexEncryptedGroups(valid);
+    assertEncryptedGroupBoundary(valid);
+    const savedAssets = new Map(assets);
+    if (session) {
+      const previousNormalIds = spaceResourceIds(raw.spaces.normal, raw.normalSettings);
+      for (const id of spaceResourceIds(valid.spaces.normal, valid.normalSettings)) {
+        const blob = session.resources.get(id);
+        if (blob && !previousNormalIds.has(id) && !savedAssets.has(id)) savedAssets.set(id, blob);
+      }
+    }
     let envelope = stored.envelope;
     let nextSession: VaultSession | undefined;
-    if (valid.privateSecurity.protected && session && sessionPassword) {
-      const password = sessionPassword;
+    const password = protectOnRestore ? restorePassword : session && sessionPassword;
+    if (valid.privateSecurity.protected && password) {
       nextSession = {
         space: structuredClone(valid.spaces.private),
         overrides: structuredClone(valid.privateSettingOverrides),
         resources: new Map(),
       };
       for (const id of privateResourceIds(valid)) {
-        const blob = assets.get(id) ?? session.resources.get(id) ?? (await db.get('resources', id));
+        const blob =
+          assets.get(id) ?? session?.resources.get(id) ?? (await db.get('resources', id));
         if (!blob) throw new AppError('messages.aPrivateSpaceImageIsMissingNoChangesWereSaved');
         nextSession.resources.set(id, blob);
       }
@@ -184,11 +222,19 @@ export function createRepository(
     }
     if (nextSession && session !== startingSession)
       throw new AppError('messages.thePrivateSpaceStateChangedTryAgain');
-    await persist(stored, valid, assets, envelope);
+    await persist(stored, valid, savedAssets, envelope);
+    if (protectOnRestore) {
+      clearSession();
+      onCommit({ revision: valid.revision, resourceIds: [...savedAssets.keys()] });
+      return read();
+    }
     const sessionChanged = nextSession && session !== startingSession;
     if (nextSession && !sessionChanged) {
       session = nextSession;
       sessionEnvelope = envelope?.ciphertext;
+      const groupId = valid.local.activeGroup.private;
+      // Keep the selected private group and folder in the unlocked session only.
+      privateLocation = { groupId, folderId: valid.local.selectedFolder.private[groupId] ?? null };
     }
     onCommit({ revision: valid.revision, resourceIds: [...assets.keys()] });
     return sessionChanged ? read() : valid;
@@ -200,11 +246,26 @@ export function createRepository(
     async resource(key: string) {
       return session?.resources.get(key) ?? (await dbPromise).get('resources', key);
     },
-    async protectPrivate(password: string) {
+    async protectPrivate(password: string, target?: GroupPrivacyTarget) {
       const stored = await readStored();
-      const state = stored.state;
+      const state = structuredClone(stored.state);
       if (state.privateSecurity.protected)
         throw new AppError('messages.thePrivateSpaceAlreadyHasAPassword');
+      if (target) {
+        for (const group of state.spaces.private.groups) {
+          if (target.spaceId === 'private' && target.groupId === group.id) continue;
+          if (isUserGroup(state, 'private', group))
+            transferGroup(state, { spaceId: 'private', groupId: group.id }, 'normal');
+        }
+        if (target.spaceId === 'normal') transferGroup(state, target, 'private');
+        else {
+          const group = state.spaces.private.groups.find((item) => item.id === target.groupId);
+          if (!group || !isUserGroup(state, 'private', group))
+            throw new AppError('messages.theDestinationGroupDoesNotExist');
+          group.hidden ??= true;
+        }
+        state.encryptedGroupIndex = indexEncryptedGroups(state);
+      }
       const resources = new Map<string, Blob>();
       const db = await dbPromise;
       for (const id of privateResourceIds(state)) {
@@ -230,19 +291,30 @@ export function createRepository(
       onCommit({ revision: next.revision, resourceIds: [] });
       return read();
     },
-    async unlockPrivate(password: string) {
+    async unlockPrivate(password: string, adoptGroups = false) {
       const generation = ++sessionGeneration;
       const stored = await readStored();
       let { envelope } = stored;
       if (!envelope) throw new AppError('messages.thePrivateSpaceHasNoEncryptedData');
       const plaintext = await decryptJson<unknown>(envelope, password);
       const unlocked = await deserializeSession(plaintext);
+      const adopt = adoptGroups && (stored.state.encryptedGroupIndex?.hasLegacyGroups ?? true);
+      if (adopt) {
+        const state = {
+          ...stored.state,
+          spaces: { ...stored.state.spaces, private: unlocked.space },
+        };
+        adoptLegacyEncryptedGroups(state);
+        stored.state.encryptedGroupIndex = indexEncryptedGroups(state);
+        assertEncryptedGroupBoundary(stored.state);
+      }
       if (
-        typeof plaintext === 'object' &&
-        plaintext !== null &&
-        (!('schemaVersion' in plaintext) ||
-          ('overrides' in plaintext && hasRetiredAppearanceSettings(plaintext.overrides)) ||
-          ('space' in plaintext && hasRetiredIconDisplay(plaintext.space)))
+        adopt ||
+        (typeof plaintext === 'object' &&
+          plaintext !== null &&
+          (!('schemaVersion' in plaintext) ||
+            ('overrides' in plaintext && hasRetiredAppearanceSettings(plaintext.overrides)) ||
+            ('space' in plaintext && hasRetiredIconDisplay(plaintext.space))))
       ) {
         envelope = await encryptJson(await serializeSession(unlocked), password);
         if (generation !== sessionGeneration)
@@ -258,6 +330,7 @@ export function createRepository(
         throw new AppError('messages.thePrivateSpaceStateChangedTryAgain');
       session = unlocked;
       sessionPassword = password;
+      privateLocation = null;
       sessionEnvelope = envelope.ciphertext;
       const state = await read();
       onCommit();
@@ -290,6 +363,7 @@ export function createRepository(
       next.spaces.private = payload.space;
       next.privateSettingOverrides = payload.overrides;
       next.privateSecurity = { protected: false, locked: false };
+      delete next.encryptedGroupIndex;
       next.local.activeGroup.private = payload.space.groups[0].id;
       next.revision++;
       await persist(stored, rayStateSchema.parse(next), payload.resources);
@@ -322,7 +396,8 @@ export function createRepository(
       {
         expectedRevision,
         range = 'all',
-      }: { expectedRevision?: number; range?: SpaceId | 'all' } = {},
+        protectWith,
+      }: { expectedRevision?: number; range?: SpaceId | 'all'; protectWith?: string } = {},
     ) {
       const valid = rayStateSchema.parse(state);
       return update(
@@ -340,6 +415,7 @@ export function createRepository(
         },
         assets,
         expectedRevision,
+        range !== 'normal' ? protectWith : undefined,
       );
     },
     async close() {

@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
-import { Slider } from 'radix-ui';
+import { Slider } from '@/components/ui/slider';
 import { useTranslation } from 'react-i18next';
 import Cropper from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
@@ -65,7 +65,8 @@ export default function IconCropDialog({
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent
-        className="icon-crop-dialog"
+        layout="custom"
+        className="left-1/2 w-[min(560px,calc(100vw-32px))] p-5.5 max-[480px]:w-[calc(100vw-20px)] max-[480px]:p-4 [@media(max-height:480px)]:max-h-[calc(100dvh-16px)] [@media(max-height:480px)]:px-4 [@media(max-height:480px)]:py-3.5 data-[state=open]:animate-none data-[state=closed]:animate-none"
         closeLabel={t('messages.close')}
         showCloseButton={!isSubmitting}
         onOpenAutoFocus={(event) => {
@@ -126,20 +127,16 @@ export default function IconCropDialog({
           </div>
           <div className="icon-crop-zoom">
             <label id={`${id}-zoom`}>{t('navigation.cropZoom')}</label>
-            <Slider.Root
-              className="icon-crop-slider"
+            <Slider
+              className="h-6 flex-1"
               value={[zoom]}
               onValueChange={([value]) => setZoom(value)}
               min={1}
               max={4}
               step={0.05}
               disabled={isSubmitting}
-            >
-              <Slider.Track className="icon-crop-slider-track">
-                <Slider.Range className="icon-crop-slider-range" />
-              </Slider.Track>
-              <Slider.Thumb className="icon-crop-slider-thumb" aria-labelledby={`${id}-zoom`} />
-            </Slider.Root>
+              thumbProps={{ 'aria-labelledby': `${id}-zoom` }}
+            />
             <output>{zoom.toFixed(2)}×</output>
           </div>
           <p className="site-edit-help">{t('navigation.cropPreservesBackground')}</p>

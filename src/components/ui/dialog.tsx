@@ -6,6 +6,22 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 
+const dialogOverlayClass =
+  'fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[6px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0';
+
+const dialogSurfaceClass =
+  'fixed z-50 rounded-xl border border-border bg-background text-foreground shadow-[var(--dialog-shadow)] outline-none';
+
+const centeredDialogClass = cn(
+  dialogSurfaceClass,
+  'top-1/2 left-[calc(50%+var(--dialog-center-offset))] grid max-h-[calc(100dvh-32px)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-hidden overflow-y-auto duration-200 *:min-w-0 *:max-w-full',
+  'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
+);
+const dialogLayoutClass =
+  'w-[calc(100%-2rem)] px-7.5 py-7 sm:max-w-lg max-[480px]:px-5 max-[480px]:py-5.5 max-[380px]:px-4 max-[380px]:py-4.5 [@media(max-height:480px)]:max-h-[calc(100dvh-20px)] [@media(max-height:480px)]:py-4';
+const dialogTitleClass = 'min-w-0 wrap-anywhere text-lg font-semibold tracking-tight';
+const dialogDescriptionClass = 'min-w-0 wrap-anywhere text-sm text-muted-foreground';
+
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
@@ -29,10 +45,7 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn(
-        'fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[6px] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        className,
-      )}
+      className={cn(dialogOverlayClass, className)}
       {...props}
     />
   );
@@ -45,25 +58,37 @@ function DialogContent({
   closeLabel,
   overlayClassName,
   variant = 'center',
+  layout = 'default',
   onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
   closeLabel?: string;
   overlayClassName?: string;
-  variant?: 'center' | 'workspace' | 'settings';
+  variant?: 'center' | 'workspace';
+  layout?: 'default' | 'custom';
 }) {
   const { t } = useTranslation();
   const label = closeLabel ?? t('messages.close');
+  const closeButton = showCloseButton && (
+    <DialogPrimitive.Close asChild>
+      <Button
+        data-slot="dialog-close"
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="dialog-close-button absolute top-4 right-4"
+        aria-label={label}
+      >
+        <XIcon aria-hidden="true" />
+      </Button>
+    </DialogPrimitive.Close>
+  );
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay
         className={cn(
-          variant === 'settings'
-            ? 'dialog-settings-overlay'
-            : variant === 'workspace'
-              ? 'dialog-workspace-overlay'
-              : undefined,
+          variant === 'workspace' ? 'bg-slate-950/24 backdrop-blur-xs' : undefined,
           overlayClassName,
         )}
       />
@@ -71,9 +96,8 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           variant === 'center'
-            ? 'ray-dialog fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 outline-none duration-200 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg'
-            : 'ray-workspace fixed z-50 outline-none',
-          variant === 'settings' && 'ray-settings',
+            ? cn(centeredDialogClass, layout === 'default' && dialogLayoutClass)
+            : cn(dialogSurfaceClass, 'ray-workspace'),
           className,
         )}
         {...props}
@@ -86,16 +110,7 @@ function DialogContent({
         }}
       >
         {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            aria-label={label}
-            className="dialog-close-button absolute top-4 right-4 grid h-9 w-9 place-items-center rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          >
-            <XIcon />
-            <span className="sr-only">{label}</span>
-          </DialogPrimitive.Close>
-        )}
+        {closeButton}
       </DialogPrimitive.Content>
     </DialogPortal>
   );
@@ -140,7 +155,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn('text-lg leading-none font-semibold', className)}
+      className={cn(dialogTitleClass, className)}
       {...props}
     />
   );
@@ -153,13 +168,18 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn(dialogDescriptionClass, className)}
       {...props}
     />
   );
 }
 
 export {
+  centeredDialogClass,
+  dialogDescriptionClass,
+  dialogLayoutClass,
+  dialogOverlayClass,
+  dialogTitleClass,
   Dialog,
   DialogClose,
   DialogContent,

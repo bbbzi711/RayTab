@@ -1,5 +1,7 @@
 {
   "title": "Settings",
+  "liveAppearance": "Live appearance",
+  "exampleSite": "Example site",
   "unlockPrivateForSync": "Unlock your private space before changing or saving a sync connection that includes it.",
   "close": "Close",
   "categories": "Settings categories",
@@ -19,7 +21,7 @@
     "widgets": "Search engines, time and greetings",
     "sync": "Connections, syncing and conflicts",
     "data": "Import bookmarks, back up and restore",
-    "general": "Preferences and private space"
+    "general": "Preferences, groups and encryption"
   },
   "sections": {
     "layout": "Layout",
@@ -61,9 +63,11 @@
   "chooseWallpaperFile": "Choose a wallpaper image.",
   "search": "Search",
   "clock": "Clock and greetings",
-  "privateProtection": "Private space protection",
-  "lockedHelp": "Private space is encrypted and locked. Unlock it to change or remove the password.",
-  "unlockedHelp": "Private sites, settings, and images are encrypted. Returning to personal space or reloading clears the unlocked session.",
+  "privateProtection": "Group encryption",
+  "enterPrivateSpace": "Enter private space",
+  "returnToPersonalSpace": "Return to personal space",
+  "lockedHelp": "Encrypted groups are locked. Unlock them to change or remove the shared password.",
+  "unlockedHelp": "Unlocked. Sites and images in encrypted groups are still stored as ciphertext.",
   "privateInheritance": "Private space preferences",
   "privateInheritanceHelp": "{{count}} preferences are customized. Restore them to follow your normal space; sites and groups stay as they are.",
   "language": "Language",
@@ -81,15 +85,9 @@
     "showGreeting": "Show greeting",
     "hour12": "12 hour time",
     "openInNewTab": "Open links and searches in a new tab",
-    "sidebarMode": "Sidebar display",
     "theme": "Theme",
     "solidColor": "Background color",
     "language": "Language"
-  },
-  "sidebarModes": {
-    "always": "Always visible",
-    "auto": "Auto hide",
-    "hidden": "Hidden"
   },
   "themes": {
     "system": "System",
@@ -244,7 +242,7 @@
   "privateInheritanceHelp_other": "{{count}} preferences are customized. Restore them to follow your normal space; sites and groups stay as they are.",
   "resetPrivateTitle": "Use normal space preferences?",
   "resetPrivateDescription": "Appearance and preferences will follow your normal space. Private sites, groups and password protection will be kept.",
-  "protectionHelp": "Set a password to encrypt private sites and images on this device.",
+  "protectionHelp": "Choose a group to encrypt in Manage groups. The first group sets the shared password.",
   "managePassword": "Manage password",
   "enableProtection": "Set up password protection",
   "dataTasks": {
@@ -288,7 +286,5 @@
   "deleteEngineTitle": "Delete “{{name}}”?",
   "deleteEngineDescription": "This search engine will be removed from the list.",
   "deleteActiveEngineDescription": "Search will use {{name}} after deletion.",
-  "deleteEngineDraftDescription": "Unsaved changes to this engine will also be discarded.",
-  "previewHome": "Preview home",
-  "returnToSettings": "Back to settings"
+  "deleteEngineDraftDescription": "Unsaved changes to this engine will also be discarded."
 }

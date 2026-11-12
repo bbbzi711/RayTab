@@ -1,6 +1,15 @@
 import { useEffect, useId, type ReactNode, type Ref } from 'react';
-import { Check, ChevronDown, FileUp } from 'lucide-react';
-import { Select, Slider, Switch } from 'radix-ui';
+import { FileUp } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import type { FieldError, UseFormRegisterReturn } from 'react-hook-form';
 
@@ -15,7 +24,7 @@ export function FormError({ error }: { error?: FieldError | { message?: string }
   const { t } = useTranslation();
   if (!error?.message) return null;
   return (
-    <p className="settings-form-error" role="alert">
+    <p className="m-0 wrap-anywhere text-xs text-destructive" role="alert">
       {['settings.', 'messages.', 'errors.', 'navigation.'].some((prefix) =>
         error.message!.startsWith(prefix),
       )
@@ -27,13 +36,17 @@ export function FormError({ error }: { error?: FieldError | { message?: string }
 
 export function FormSaveHint({ dirty }: { dirty: boolean }) {
   const { t } = useTranslation();
-  return dirty ? <p className="settings-form-save-hint">{t('settings.pendingSaveHelp')}</p> : null;
+  return dirty ? (
+    <p className="m-0 wrap-anywhere text-xs text-muted-foreground">
+      {t('settings.pendingSaveHelp')}
+    </p>
+  ) : null;
 }
 
 export function SettingsSection({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="settings-section">
-      {title && <h3>{title}</h3>}
+      {title && <h3 className="m-0 text-sm font-semibold text-foreground">{title}</h3>}
       <div className="settings-section-body">{children}</div>
     </section>
   );
@@ -102,15 +115,13 @@ export function Toggle({
       <div>
         <label htmlFor={id}>{label}</label>
       </div>
-      <Switch.Root
+      <Switch
         id={id}
-        className="settings-switch"
+        className="relative after:absolute after:-inset-y-2 after:-inset-x-0.5"
         checked={checked}
         onCheckedChange={onChange}
         disabled={disabled}
-      >
-        <Switch.Thumb className="settings-switch-thumb" />
-      </Switch.Root>
+      />
     </div>
   );
 }
@@ -123,6 +134,7 @@ export function SettingsSelect({
   disabled,
   name,
   triggerRef,
+  triggerClassName,
 }: {
   label: string;
   value: string;
@@ -131,6 +143,7 @@ export function SettingsSelect({
   disabled?: boolean;
   name?: string;
   triggerRef?: Ref<HTMLButtonElement>;
+  triggerClassName?: string;
 }) {
   const id = useId();
   return (
@@ -138,28 +151,22 @@ export function SettingsSelect({
       <div>
         <label htmlFor={id}>{label}</label>
       </div>
-      <Select.Root value={value} onValueChange={onChange} disabled={disabled} name={name}>
-        <Select.Trigger id={id} className="settings-select-trigger" ref={triggerRef}>
-          <Select.Value />
-          <Select.Icon>
-            <ChevronDown size={15} aria-hidden="true" />
-          </Select.Icon>
-        </Select.Trigger>
-        <Select.Portal>
-          <Select.Content className="settings-select-content" position="popper" sideOffset={6}>
-            <Select.Viewport>
-              {options.map(([option, text]) => (
-                <Select.Item className="settings-select-item" key={option} value={option}>
-                  <Select.ItemText>{text}</Select.ItemText>
-                  <Select.ItemIndicator>
-                    <Check size={14} aria-hidden="true" />
-                  </Select.ItemIndicator>
-                </Select.Item>
-              ))}
-            </Select.Viewport>
-          </Select.Content>
-        </Select.Portal>
-      </Select.Root>
+      <Select value={value} onValueChange={onChange} disabled={disabled} name={name}>
+        <SelectTrigger
+          id={id}
+          className={cn('min-w-33 max-w-[60%] max-[420px]:min-w-27.5', triggerClassName)}
+          ref={triggerRef}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map(([option, text]) => (
+            <SelectItem key={option} value={option}>
+              {text}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -189,24 +196,15 @@ export function RangeSetting({
       <div className="setting-range-label">
         <label id={id}>{label}</label>
       </div>
-      <Slider.Root
-        className="settings-slider"
+      <Slider
         value={[value]}
         min={min}
         max={max}
         step={step}
         onValueChange={([next]) => onPreview(next)}
         onValueCommit={([next]) => onCommit(next)}
-      >
-        <Slider.Track className="settings-slider-track">
-          <Slider.Range className="settings-slider-range" />
-        </Slider.Track>
-        <Slider.Thumb
-          className="settings-slider-thumb"
-          aria-labelledby={id}
-          aria-valuetext={format(value)}
-        />
-      </Slider.Root>
+        thumbProps={{ 'aria-labelledby': id, 'aria-valuetext': format(value) }}
+      />
       <output>{format(value)}</output>
     </div>
   );

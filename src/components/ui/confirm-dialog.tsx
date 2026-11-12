@@ -4,6 +4,15 @@ import { AlertDialog } from 'radix-ui';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import {
+  centeredDialogClass,
+  dialogDescriptionClass,
+  dialogLayoutClass,
+  dialogOverlayClass,
+  dialogTitleClass,
+  DialogFooter,
+  DialogHeader,
+} from '@/components/ui/dialog';
 
 export interface ConfirmOptions {
   title: string;
@@ -55,40 +64,25 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
       }}
     >
       <AlertDialog.Portal data-slot="dialog-portal">
-        <AlertDialog.Overlay
-          data-slot="dialog-overlay"
-          className={cn(
-            'fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[6px]',
-            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-            'data-[state=open]:animate-in data-[state=open]:fade-in-0',
-          )}
-        />
+        <AlertDialog.Overlay data-slot="dialog-overlay" className={dialogOverlayClass} />
         <AlertDialog.Content
           data-slot="dialog-content"
-          className={cn(
-            'ray-dialog fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] gap-4 outline-none duration-200',
-            'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-            'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95',
-            'sm:max-w-md',
-          )}
+          className={cn(centeredDialogClass, dialogLayoutClass, 'sm:max-w-md')}
         >
-          <div className="flex flex-col gap-2 text-center sm:text-left">
-            <AlertDialog.Title
-              data-slot="dialog-title"
-              className="text-lg leading-none font-semibold text-foreground"
-            >
+          <DialogHeader>
+            <AlertDialog.Title data-slot="dialog-title" className={dialogTitleClass}>
               {state.title}
             </AlertDialog.Title>
             {state.description && (
               <AlertDialog.Description
                 data-slot="dialog-description"
-                className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed"
+                className={cn(dialogDescriptionClass, 'leading-relaxed whitespace-pre-line')}
               >
                 {state.description}
               </AlertDialog.Description>
             )}
-          </div>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-2">
+          </DialogHeader>
+          <DialogFooter className="mt-2">
             <AlertDialog.Cancel asChild>
               <Button
                 type="button"
@@ -109,7 +103,7 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
                 {state.confirmText ?? t('messages.confirm')}
               </Button>
             </AlertDialog.Action>
-          </div>
+          </DialogFooter>
         </AlertDialog.Content>
       </AlertDialog.Portal>
     </AlertDialog.Root>

@@ -31,14 +31,15 @@ import {
 } from './merge';
 import { createProvider, type SyncConnection } from '../providers';
 import { resolveWebDavFileUrl } from '../providers/webdav';
-import { SyncProviderError } from '../providers/types';
+import { SyncProviderError, syncConnectionSchema } from '../providers/types';
 
-export type SyncConfig = {
-  connection: SyncConnection;
-  includePrivate: boolean;
-  privatePassword?: string;
-  automatic: boolean;
-};
+const storedSyncConfigSchema = z.object({
+  connection: syncConnectionSchema,
+  includePrivate: z.boolean(),
+  automatic: z.boolean(),
+});
+const syncPasswordSchema = z.string().optional();
+export type SyncConfig = z.infer<typeof storedSyncConfigSchema> & { privatePassword?: string };
 export type SyncStatus = {
   schemaVersion: 1;
   automaticPaused?: 'protected-private';
@@ -88,6 +89,22 @@ export class SyncBusyError extends AppError {
   }
 }
 
+export class InvalidSyncConfigError extends AppError {
+  constructor() {
+    super('errors.invalidInput');
+    this.name = 'InvalidSyncConfigError';
+  }
+}
+
+async function readStoredSyncConfig() {
+  const raw: unknown = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY];
+  return storedSyncConfigSchema.optional().safeParse(raw);
+}
+
+async function readStoredSyncPassword(): Promise<unknown> {
+  return (await browser.storage.session.get(SECRET_KEY))[SECRET_KEY];
+}
+
 export async function saveSyncConfig(config: SyncConfig) {
   return withSyncLock(async () => {
     if (
@@ -96,11 +113,14 @@ export async function saveSyncConfig(config: SyncConfig) {
       (await repository.read()).privateSecurity.protected
     )
       throw new AppError('messages.protectedPrivateAutomaticSyncUnavailable');
-    const previous = await loadSyncConfig();
+    const [previous, previousPassword] = await Promise.all([
+      readStoredSyncConfig(),
+      readStoredSyncPassword(),
+    ]);
     const nextTarget = syncTarget(config.connection);
     let previousTarget: string | undefined;
     try {
-      if (previous) previousTarget = syncTarget(previous.connection);
+      if (previous.success && previous.data) previousTarget = syncTarget(previous.data.connection);
     } catch (reason) {
       // An invalid saved address must remain replaceable with a valid connection.
       if (!(reason instanceof SyncProviderError && reason.code === 'invalid')) throw reason;
@@ -128,8 +148,8 @@ export async function saveSyncConfig(config: SyncConfig) {
       });
     } catch (reason) {
       try {
-        if (previous?.privatePassword)
-          await browser.storage.session.set({ [SECRET_KEY]: previous.privatePassword });
+        if (previousPassword !== undefined)
+          await browser.storage.session.set({ [SECRET_KEY]: previousPassword });
         else await browser.storage.session.remove(SECRET_KEY);
       } catch (rollbackReason) {
         throw new AggregateError(
@@ -158,13 +178,13 @@ function syncTarget(connection: SyncConnection) {
     connection.branch ?? '',
   ]);
 }
-export async function loadSyncConfig() {
-  const config = (await browser.storage.local.get(CONFIG_KEY))[CONFIG_KEY] as
-    Omit<SyncConfig, 'privatePassword'> | undefined;
-  if (!config) return undefined;
-  const privatePassword = (await browser.storage.session.get(SECRET_KEY))[SECRET_KEY] as
-    string | undefined;
-  return { ...config, privatePassword };
+export async function loadSyncConfig(): Promise<SyncConfig | undefined> {
+  const config = await readStoredSyncConfig();
+  if (!config.success) throw new InvalidSyncConfigError();
+  if (!config.data) return undefined;
+  const privatePassword = syncPasswordSchema.safeParse(await readStoredSyncPassword());
+  if (!privatePassword.success) throw new InvalidSyncConfigError();
+  return { ...config.data, privatePassword: privatePassword.data };
 }
 export async function clearSyncConfig() {
   return withSyncLock(async () => {
@@ -372,6 +392,7 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
       await repository.restore(restored.state, restored.resources, {
         expectedRevision: snapshot.state.revision,
         range,
+        ...(restored.preserveGroupEncryption ? { protectWith: config.privatePassword } : {}),
       });
       await saveSuccess(remote, remoteFile?.version ?? null);
       return { document: remote, conflicts: [] };
@@ -422,6 +443,7 @@ async function synchronizeUnlocked(mode: 'auto' | 'push' | 'pull') {
     await repository.restore(restored.state, restored.resources, {
       expectedRevision: snapshot.state.revision,
       range,
+      ...(restored.preserveGroupEncryption ? { protectWith: config.privatePassword } : {}),
     });
     await saveSuccess(document, version, conflicts, recovery);
     return { document, conflicts, recovery };

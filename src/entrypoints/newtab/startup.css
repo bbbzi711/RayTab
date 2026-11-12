@@ -15,6 +15,11 @@ body {
   inset: 0;
   z-index: 0;
   pointer-events: none;
+}
+.page-background,
+.settings-wallpaper {
+  background-color: var(--wallpaper-color, transparent);
+  background-image: var(--wallpaper-gradient, none);
   background-position: center;
   background-size: cover;
 }
@@ -24,6 +29,10 @@ body {
   inset: 0;
 }
 .page-background-image {
+  background-image: var(--wallpaper-photo, none);
   background-position: center;
   background-size: cover;
+}
+.page-background-overlay {
+  background-color: var(--wallpaper-shade, transparent);
 }

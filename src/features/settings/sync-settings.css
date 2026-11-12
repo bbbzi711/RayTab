@@ -11,12 +11,6 @@
   gap: 16px;
   min-width: 0;
 }
-.sync-overview-heading {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 16px;
-  align-items: start;
-}
 .sync-overview-icon {
   display: grid;
   place-items: center;
@@ -26,14 +20,6 @@
   border-radius: 12px;
   background: var(--preferences-field);
   color: var(--preferences-muted);
-}
-.sync-overview h2,
-.sync-connection-editor > h2 {
-  margin: 0 0 6px;
-  color: var(--preferences-text);
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 26px;
 }
 .sync-last-success {
   margin: 0;
@@ -50,22 +36,8 @@
   padding-top: 24px;
   border-top: 1px solid var(--preferences-line);
 }
-.sync-connection-editor > h2 {
-  margin: 0;
-  font-size: 15px;
-  line-height: 22px;
-}
 .sync-connection-editor .settings-form fieldset {
   gap: 20px;
-}
-.sync-connection-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px 16px;
-  min-width: 0;
-}
-.sync-field-wide {
-  grid-column: 1 / -1;
 }
 .sync-connection-options {
   display: grid;
@@ -118,16 +90,9 @@
   margin: 0;
 }
 @media (max-width: 560px) {
-  .sync-overview-heading {
-    grid-template-columns: 40px minmax(0, 1fr);
-    gap: 12px;
-  }
   .sync-overview-icon {
     width: 40px;
     height: 40px;
     border-radius: 10px;
-  }
-  .sync-connection-fields {
-    grid-template-columns: minmax(0, 1fr);
   }
 }

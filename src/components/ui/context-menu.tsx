@@ -2,7 +2,15 @@ import * as React from 'react';
 import { cn } from 'cn';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
-import './menu.css';
+import {
+  menuCheckableItemClass,
+  menuIndicatorClass,
+  menuItemClass,
+  menuLabelClass,
+  menuSeparatorClass,
+  menuShortcutClass,
+  menuSurfaceClass,
+} from './menu-styles';
 
 function ContextMenu({ ...props }: React.ComponentProps<typeof ContextMenuPrimitive.Root>) {
   return <ContextMenuPrimitive.Root data-slot="context-menu" {...props} />;
@@ -67,7 +75,7 @@ function ContextMenuSubTrigger({
     <ContextMenuPrimitive.SubTrigger
       data-slot="context-menu-sub-trigger"
       data-inset={inset}
-      className={cn('menu-item', className)}
+      className={cn(menuItemClass, className)}
       {...props}
     >
       {children}
@@ -84,7 +92,7 @@ function ContextMenuSubContent({
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.SubContent
         data-slot="context-menu-sub-content"
-        className={cn('menu-surface', className)}
+        className={cn(menuSurfaceClass, className)}
         {...props}
       />
     </ContextMenuPrimitive.Portal>
@@ -99,7 +107,7 @@ function ContextMenuContent({
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
         data-slot="context-menu-content"
-        className={cn('menu-surface', className)}
+        className={cn(menuSurfaceClass, className)}
         {...props}
       />
     </ContextMenuPrimitive.Portal>
@@ -120,7 +128,7 @@ function ContextMenuItem({
       data-slot="context-menu-item"
       data-inset={inset}
       data-variant={variant}
-      className={cn('menu-item', className)}
+      className={cn(menuItemClass, className)}
       {...props}
     />
   );
@@ -135,11 +143,11 @@ function ContextMenuCheckboxItem({
   return (
     <ContextMenuPrimitive.CheckboxItem
       data-slot="context-menu-checkbox-item"
-      className={cn('menu-item menu-item--checkable', className)}
+      className={cn(menuItemClass, menuCheckableItemClass, className)}
       checked={checked}
       {...props}
     >
-      <span className="menu-indicator">
+      <span className={menuIndicatorClass}>
         <ContextMenuPrimitive.ItemIndicator>
           <CheckIcon />
         </ContextMenuPrimitive.ItemIndicator>
@@ -157,10 +165,10 @@ function ContextMenuRadioItem({
   return (
     <ContextMenuPrimitive.RadioItem
       data-slot="context-menu-radio-item"
-      className={cn('menu-item menu-item--checkable', className)}
+      className={cn(menuItemClass, menuCheckableItemClass, className)}
       {...props}
     >
-      <span className="menu-indicator">
+      <span className={menuIndicatorClass}>
         <ContextMenuPrimitive.ItemIndicator>
           <CheckIcon />
         </ContextMenuPrimitive.ItemIndicator>
@@ -181,7 +189,7 @@ function ContextMenuLabel({
     <ContextMenuPrimitive.Label
       data-slot="context-menu-label"
       data-inset={inset}
-      className={cn('menu-label', className)}
+      className={cn(menuLabelClass, className)}
       {...props}
     />
   );
@@ -194,7 +202,7 @@ function ContextMenuSeparator({
   return (
     <ContextMenuPrimitive.Separator
       data-slot="context-menu-separator"
-      className={cn('menu-separator', className)}
+      className={cn(menuSeparatorClass, className)}
       {...props}
     />
   );
@@ -202,7 +210,11 @@ function ContextMenuSeparator({
 
 function ContextMenuShortcut({ className, ...props }: React.ComponentProps<'span'>) {
   return (
-    <span data-slot="context-menu-shortcut" className={cn('menu-shortcut', className)} {...props} />
+    <span
+      data-slot="context-menu-shortcut"
+      className={cn(menuShortcutClass, className)}
+      {...props}
+    />
   );
 }
 

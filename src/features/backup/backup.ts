@@ -14,6 +14,7 @@ import {
 } from '@/storage/model';
 import { upgradeSettings, upgradeV4Space } from '@/storage/upgrade-local';
 import { reconcileMergedContainers, type ContainerRecovery } from '@/storage/merge-containers';
+import { assertEncryptedGroupBoundary, indexEncryptedGroups } from '@/storage/group-privacy';
 
 const resourceSchema = z.object({
   id: z.string().min(1),
@@ -140,6 +141,7 @@ export async function restoreBackup(
   const next = rayStateSchema.parse(structuredClone(current));
   const resources = new Map<string, Blob>();
   const recoveries: Partial<Record<SpaceId, ContainerRecovery>> = {};
+  let preserveGroupEncryption = false;
   if (document.spaces.normal) {
     if (mode === 'replace') next.spaces.normal = document.spaces.normal.data;
     else {
@@ -153,6 +155,9 @@ export async function restoreBackup(
   if (document.spaces.private) {
     const valid = await privateBackupPayload(document, privatePassword);
     if (!valid) throw new AppError('messages.theBackupFormatIsInvalidOrItsVersionIsUnsupported');
+    preserveGroupEncryption =
+      document.spaces.private.protected &&
+      valid.data.groups.some((group) => group.hidden !== undefined);
     if (mode === 'replace') next.spaces.private = valid.data;
     else {
       const merged = mergeSpace(next.spaces.private, valid.data);
@@ -166,7 +171,13 @@ export async function restoreBackup(
     if (!next.spaces[spaceId].groups.some((item) => item.id === next.local.activeGroup[spaceId]))
       next.local.activeGroup[spaceId] = next.spaces[spaceId].groups[0].id;
   }
-  return { state: rayStateSchema.parse(next), resources, recoveries };
+  assertEncryptedGroupBoundary(
+    next,
+    document.spaces.private && (preserveGroupEncryption || next.privateSecurity.protected)
+      ? indexEncryptedGroups(next)
+      : undefined,
+  );
+  return { state: rayStateSchema.parse(next), resources, recoveries, preserveGroupEncryption };
 }
 
 export function backupSummary(document: BackupDocument) {
