@@ -1,6 +1,13 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
 
+const icons = {
+  16: 'icons/raytab-sun-16.png',
+  32: 'icons/raytab-sun-32.png',
+  48: 'icons/raytab-sun-48.png',
+  128: 'icons/raytab-sun-128.png',
+};
+
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
@@ -43,12 +50,10 @@ export default defineConfig({
         description: '__MSG_openRayTab__',
       },
     },
-    icons: {
-      16: 'icons/icon16.png',
-      32: 'icons/icon32.png',
-      48: 'icons/icon48.png',
-      128: 'icons/icon128.png',
-    },
+    icons,
+    ...(manifestVersion === 3
+      ? { action: { default_icon: icons } }
+      : { browser_action: { default_icon: icons } }),
   }),
   vite: () => ({
     plugins: [tailwindcss()],
