@@ -66,6 +66,14 @@ export default function App() {
     defaultValues: { password: '' },
   });
   const navigationRef = useRef<NavigationHandle>(null);
+  // Keep one gesture across normal/private NavigationPage remounts.
+  const groupWheelGesture = useRef({
+    at: 0,
+    direction: 0,
+    delta: 0,
+    switched: false,
+    scrolling: false,
+  });
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const railSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<SettingsHandle>(null);
@@ -199,6 +207,66 @@ export default function App() {
         toast.error(errorMessage(reason));
       }
     });
+
+  const onGroupWheel = (event: WheelEvent) => {
+    if (
+      event.defaultPrevented ||
+      !Number.isFinite(event.deltaY) ||
+      !Number.isFinite(event.deltaX) ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      !event.deltaY ||
+      Math.abs(event.deltaY) <= Math.abs(event.deltaX)
+    )
+      return;
+    const tabs = [
+      ...groupTabs.filter((group) => !group.hidden),
+      ...(showHidden ? groupTabs.filter((group) => group.hidden) : []),
+    ];
+    const index = tabs.findIndex(
+      (group) => group.spaceId === displayedSpace && group.id === displayedGroup?.id,
+    );
+    if (index < 0 || tabs.length < 2) return;
+    const direction = Math.sign(event.deltaY);
+    const now = performance.now();
+    const gesture = groupWheelGesture.current;
+    if (now - gesture.at > 200 || direction !== gesture.direction) {
+      gesture.delta = 0;
+      gesture.switched = false;
+      gesture.scrolling = false;
+    }
+    gesture.at = now;
+    gesture.direction = direction;
+    // A content-scroll burst must never turn into a group switch at its boundary.
+    if (gesture.scrolling) return;
+    if (!gesture.switched) {
+      for (
+        let node = event.target instanceof Element ? event.target : null;
+        node && node !== event.currentTarget;
+        node = node.parentElement
+      ) {
+        if (!/^(auto|scroll)$/.test(getComputedStyle(node).overflowY)) continue;
+        const remaining = node.scrollHeight - node.clientHeight - node.scrollTop;
+        if (direction > 0 ? remaining > 1 : node.scrollTop > 1) {
+          gesture.scrolling = true;
+          return;
+        }
+      }
+    }
+    const target = tabs[index + direction];
+    // Clamp at the first/last visible group; never wrap unexpectedly.
+    if (!target && !gesture.switched) return;
+    event.preventDefault();
+    if (gesture.switched) return;
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1;
+    gesture.delta += Math.abs(event.deltaY) * unit;
+    if (gesture.delta < 40) return;
+    // Consume the entire touchpad/inertia burst, not just a timed cooldown.
+    gesture.switched = true;
+    void openGroup(target);
+  };
 
   const toggleHiddenGroups = async () => {
     if (showHidden && currentGroup?.hidden) {
@@ -556,6 +624,7 @@ export default function App() {
                       showHidden={showHidden}
                       legacyLocked={legacyLocked}
                       onSelectGroup={openGroup}
+                      onGroupWheel={onGroupWheel}
                       onToggleHidden={toggleHiddenGroups}
                       onDeleteGroup={deleteGroup}
                     />

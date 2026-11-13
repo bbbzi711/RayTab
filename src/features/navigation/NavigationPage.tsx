@@ -89,6 +89,7 @@ export interface NavigationPageProps {
   showHidden: boolean;
   legacyLocked: boolean;
   onSelectGroup: (group?: GroupTab) => void;
+  onGroupWheel: (event: WheelEvent) => void;
   onToggleHidden: () => void;
   onDeleteGroup: (group: GroupTab) => void;
   groupsCollapsed: boolean;
@@ -113,6 +114,7 @@ export function NavigationPage({
   showHidden,
   legacyLocked,
   onSelectGroup,
+  onGroupWheel,
   onToggleHidden,
   onDeleteGroup,
   groupsCollapsed,
@@ -697,6 +699,29 @@ export function NavigationPage({
     );
   };
 
+  useEffect(() => {
+    const home = groupStrip.current?.closest<HTMLElement>('.home-shell');
+    if (!home || !active || activeDrag) return;
+    const onWheel = (event: WheelEvent) => {
+      // The homepage switches groups; the rail and form controls keep native scrolling.
+      if (
+        !(event.target instanceof Element) ||
+        event.target.closest(
+          '.home-group-rail, input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="slider"], [role="spinbutton"]',
+        ) ||
+        document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]',
+        )
+      )
+        return;
+      const alreadyPrevented = event.defaultPrevented;
+      onGroupWheel(event);
+      if (!alreadyPrevented && event.defaultPrevented) clearPendingClick();
+    };
+    home.addEventListener('wheel', onWheel, { passive: false });
+    return () => home.removeEventListener('wheel', onWheel);
+  }, [active, activeDrag, onGroupWheel]);
+
   return (
     <DndContext
       sensors={sensors}
@@ -707,67 +732,71 @@ export function NavigationPage({
       onDragCancel={handleDragCancel}
     >
       <div className="flex min-h-0 w-full flex-1 flex-col items-center text-[color:var(--home-tabs-color)]">
-        <nav aria-label={t('messages.groupNavigation')} className="home-group-nav">
-          <div className="home-group-header">
-            <div className="home-group-brand" title="RayTab">
-              <RayTabMark className="size-6" />
+        <div className="home-group-rail">
+          <nav aria-label={t('messages.groupNavigation')} className="home-group-nav">
+            <div className="home-group-header">
+              <div className="home-group-brand" title="RayTab">
+                <RayTabMark className="size-6" />
+              </div>
             </div>
-          </div>
-          <div ref={groupStrip} className="home-group-strip">
-            {visibleTabs.map(renderGroupTab)}
-            {showHidden && legacyLocked && (
-              <Button
-                type="button"
-                variant="navigation"
-                size="rail"
-                className={groupTabClass}
-                aria-label={t('navigation.unlockLegacyGroups')}
-                onClick={() => onSelectGroup()}
-              >
-                <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="home-group-name truncate">
-                  {t('navigation.unlockLegacyGroups')}
-                </span>
-              </Button>
-            )}
-            <Tooltip content={t('messages.addGroup')} side="right">
-              <Button
-                type="button"
-                variant="navigation"
-                size="rail-action"
-                className="home-add-group"
-                aria-label={t('messages.addGroup')}
-                onClick={() => setNameTarget({ type: 'group' })}
-              >
-                <Plus className="size-5" aria-hidden="true" />
-              </Button>
-            </Tooltip>
-          </div>
-          <div className="home-group-footer">
-            <Tooltip
-              content={t(groupsCollapsed ? 'navigation.expandGroups' : 'navigation.collapseGroups')}
-              side="right"
-            >
-              <Button
-                type="button"
-                variant="navigation"
-                size="rail-action"
-                aria-label={t(
+            <div ref={groupStrip} className="home-group-strip">
+              {visibleTabs.map(renderGroupTab)}
+              {showHidden && legacyLocked && (
+                <Button
+                  type="button"
+                  variant="navigation"
+                  size="rail"
+                  className={groupTabClass}
+                  aria-label={t('navigation.unlockLegacyGroups')}
+                  onClick={() => onSelectGroup()}
+                >
+                  <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
+                  <span className="home-group-name truncate">
+                    {t('navigation.unlockLegacyGroups')}
+                  </span>
+                </Button>
+              )}
+              <Tooltip content={t('messages.addGroup')} side="right">
+                <Button
+                  type="button"
+                  variant="navigation"
+                  size="rail-action"
+                  className="home-add-group"
+                  aria-label={t('messages.addGroup')}
+                  onClick={() => setNameTarget({ type: 'group' })}
+                >
+                  <Plus className="size-5" aria-hidden="true" />
+                </Button>
+              </Tooltip>
+            </div>
+            <div className="home-group-footer">
+              <Tooltip
+                content={t(
                   groupsCollapsed ? 'navigation.expandGroups' : 'navigation.collapseGroups',
                 )}
-                aria-expanded={!groupsCollapsed}
-                onClick={onToggleGroups}
+                side="right"
               >
-                {groupsCollapsed ? (
-                  <PanelLeftOpen className="size-4" />
-                ) : (
-                  <PanelLeftClose className="size-4" />
-                )}
-              </Button>
-            </Tooltip>
-            {settingsAction}
-          </div>
-        </nav>
+                <Button
+                  type="button"
+                  variant="navigation"
+                  size="rail-action"
+                  aria-label={t(
+                    groupsCollapsed ? 'navigation.expandGroups' : 'navigation.collapseGroups',
+                  )}
+                  aria-expanded={!groupsCollapsed}
+                  onClick={onToggleGroups}
+                >
+                  {groupsCollapsed ? (
+                    <PanelLeftOpen className="size-4" />
+                  ) : (
+                    <PanelLeftClose className="size-4" />
+                  )}
+                </Button>
+              </Tooltip>
+              {settingsAction}
+            </div>
+          </nav>
+        </div>
 
         <div
           data-testid="site-navigation"

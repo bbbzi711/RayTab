@@ -20,15 +20,20 @@ body {
 .desktop-workspace--navigation .desktop-navigation {
   margin-top: 40px;
 }
+.home-group-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  width: var(--group-rail-width);
+}
 .home-group-nav {
   --navigation-text: color-mix(in srgb, var(--home-tabs-color) 68%, transparent);
   --navigation-hover-text: var(--home-tabs-color);
   --navigation-selected-text: var(--home-tabs-color);
   --navigation-hover: color-mix(in srgb, var(--home-tabs-color) 8%, transparent);
   --navigation-selection: color-mix(in srgb, var(--home-tabs-color) 15%, transparent);
-  position: fixed;
+  position: absolute;
   inset: 0 auto 0 0;
-  z-index: 20;
   display: flex;
   width: var(--group-rail-width);
   flex-direction: column;
@@ -95,7 +100,7 @@ body {
 .home-shell[data-navigation='true'] .home-settings-trigger {
   display: none;
 }
-.home-shell[data-sidebar-mode='hidden'] .home-group-nav {
+.home-shell[data-sidebar-mode='hidden'] .home-group-rail {
   display: none;
 }
 .home-shell[data-sidebar-mode='hidden'] .home-settings-trigger {
@@ -104,8 +109,11 @@ body {
 .home-shell[data-sidebar-mode='auto'] .home-group-nav {
   transform: translateX(calc(-100% + 5px));
 }
-.home-shell[data-sidebar-mode='auto'] .home-group-nav:hover,
-.home-shell[data-sidebar-mode='auto'] .home-group-nav:focus-within {
+.home-shell[data-sidebar-mode='auto'] .home-group-rail {
+  width: 32px;
+}
+.home-shell[data-sidebar-mode='auto'] .home-group-rail:hover .home-group-nav,
+.home-shell[data-sidebar-mode='auto'] .home-group-rail:focus-within .home-group-nav {
   transform: translateX(0);
 }
 .home-settings-drawer {
