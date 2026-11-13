@@ -29,7 +29,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await expect(editor).not.toBeVisible();
   const site = newTab.getByRole('link', { name: '备份图标网站', exact: true });
   await expect(site.locator('img')).toBeVisible();
-  const settings = await openSettings(newTab, '数据与备份');
+  const settings = await openSettings(newTab, '数据备份');
   await settings.getByRole('button', { name: '导出备份', exact: true }).click();
   await settings.getByRole('combobox', { name: '导出范围', exact: true }).click();
   await newTab.getByRole('option', { name: '普通空间', exact: true }).click();
@@ -51,7 +51,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await newTab.getByRole('menuitem', { name: '删除', exact: true }).click();
   await newTab.getByRole('alertdialog').getByRole('button', { name: '删除', exact: true }).click();
   await expect(site).not.toBeVisible();
-  const restore = await openSettings(newTab, '数据与备份');
+  const restore = await openSettings(newTab, '数据备份');
   await restore.getByRole('button', { name: '恢复备份', exact: true }).click();
   await restore.getByLabel('备份文件', { exact: true }).setInputFiles(backupPath);
   await restore.getByRole('button', { name: '预览备份', exact: true }).click();

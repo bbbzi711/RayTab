@@ -67,6 +67,7 @@ export default function App() {
   });
   const navigationRef = useRef<NavigationHandle>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const railSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsRef = useRef<SettingsHandle>(null);
   const settingsExitPending = useRef(false);
   const passwordTriggerRef = useRef<HTMLElement | null>(null);
@@ -85,6 +86,7 @@ export default function App() {
   const protectPrivate = useRayTabStore((store) => store.protectPrivate);
   useEffect(startRayTabStore, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [groupsCollapsed, setGroupsCollapsed] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [deferHiddenSelection, setDeferHiddenSelection] = useState(false);
   const [passwordRequest, setPasswordRequest] = useState<PasswordRequest | null>(null);
@@ -115,7 +117,10 @@ export default function App() {
   const openSettings = () => setSettingsOpen(true);
   const showHome = () => {
     setSettingsOpen(false);
-    requestAnimationFrame(() => settingsButtonRef.current?.focus());
+    requestAnimationFrame(() => {
+      const rail = railSettingsButtonRef.current;
+      (rail?.getClientRects().length ? rail : settingsButtonRef.current)?.focus();
+    });
   };
   const leaveSettings = async (leave: () => void | Promise<void>) => {
     if (settingsExitPending.current) return false;
@@ -365,7 +370,7 @@ export default function App() {
       toast.error(errorMessage(reason));
     }
   };
-  const settingsActionLabel = settingsOpen ? t('messages.backToHome') : settingsLabel;
+  const settingsActionLabel = settingsOpen ? t('messages.closeSettings') : settingsLabel;
   const utilityButtonClass =
     'size-11 text-current opacity-85 hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-current';
   const desktopActions: NavigationAction[] = [
@@ -406,7 +411,10 @@ export default function App() {
   return (
     <TooltipProvider delayDuration={200}>
       <main
-        className="relative isolate min-h-dvh"
+        className="home-shell relative isolate min-h-dvh"
+        data-navigation={navigationVisible}
+        data-sidebar-mode={settings.sidebarMode}
+        data-groups-collapsed={groupsCollapsed}
         data-theme={settings.theme}
         style={
           {
@@ -417,24 +425,13 @@ export default function App() {
             '--home-cards-color': textColors.cards,
           } as React.CSSProperties
         }
-        onKeyDown={(event) => {
-          if (
-            settingsOpen &&
-            event.key === 'Escape' &&
-            !event.defaultPrevented &&
-            !event.nativeEvent.isComposing &&
-            !document.querySelector(
-              '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]',
-            )
-          ) {
-            event.preventDefault();
-            void closeSettings();
-          }
-        }}
       >
         <Background settings={settings} spaceId="normal" />
-        <header className="absolute inset-x-0 top-0 z-40 flex h-14 items-center justify-end px-3 text-[color:var(--home-tabs-color)] sm:px-6 [&_svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.65)]">
-          <div className="flex items-center gap-1">
+        <header
+          inert={settingsOpen}
+          className="pointer-events-none absolute inset-x-0 top-0 z-40 flex h-14 items-center justify-end px-3 text-[color:var(--home-tabs-color)] sm:px-6 [&_svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.65)]"
+        >
+          <div className="pointer-events-auto flex items-center gap-1">
             <Tooltip content={homeModeLabel} side="bottom">
               <Button
                 type="button"
@@ -447,18 +444,22 @@ export default function App() {
                 <HomeModeIcon className="size-5" aria-hidden="true" />
               </Button>
             </Tooltip>
-            <Tooltip content={settingsActionLabel} side="bottom">
+            <Tooltip content={settingsActionLabel} side={settingsOpen ? 'left' : 'bottom'}>
               <Button
                 ref={settingsButtonRef}
                 type="button"
                 variant="link"
                 size="icon-lg"
-                className={cn(utilityButtonClass, 'aria-expanded:opacity-100')}
+                className={cn(
+                  utilityButtonClass,
+                  'home-settings-trigger aria-expanded:opacity-100',
+                )}
                 aria-label={settingsActionLabel}
+                aria-controls={settingsOpen ? 'raytab-settings' : undefined}
                 aria-expanded={settingsOpen}
                 onClick={settingsOpen ? closeSettings : openSettings}
               >
-                <Settings className="size-5" aria-hidden="true" />
+                <Settings className="size-5 shrink-0" aria-hidden="true" />
               </Button>
             </Tooltip>
           </div>
@@ -467,7 +468,7 @@ export default function App() {
         <ContextMenu>
           <ContextMenuTrigger asChild>
             <div
-              className={cn('relative text-white', settingsOpen && 'invisible pointer-events-none')}
+              className="relative text-white"
               inert={settingsOpen}
               onContextMenuCapture={(event) => {
                 const target = event.target as HTMLElement;
@@ -531,6 +532,25 @@ export default function App() {
                       active={
                         navigationVisible && !!onboardingComplete && !settingsOpen && !unlockOpen
                       }
+                      groupsCollapsed={groupsCollapsed}
+                      onToggleGroups={() => setGroupsCollapsed((value) => !value)}
+                      settingsAction={
+                        <Tooltip content={settingsLabel} side="right">
+                          <Button
+                            ref={railSettingsButtonRef}
+                            type="button"
+                            variant="navigation"
+                            size="rail"
+                            className="home-rail-settings"
+                            aria-label={settingsLabel}
+                            aria-expanded={settingsOpen}
+                            onClick={openSettings}
+                          >
+                            <Settings className="size-5" aria-hidden="true" />
+                            <span className="home-group-name">{settingsLabel}</span>
+                          </Button>
+                        </Tooltip>
+                      }
                       groupTabs={groupTabs}
                       showGrid={Boolean(displayedGroup)}
                       showHidden={showHidden}
@@ -548,11 +568,30 @@ export default function App() {
             <NavigationMenuItems actions={desktopActions} />
           </ContextMenuContent>
         </ContextMenu>
-        {settingsOpen && (
-          <div className="fixed inset-x-2 top-14 bottom-2 z-30 m-auto flex max-h-[720px] max-w-[1120px] flex-col overflow-hidden rounded-xl bg-background text-foreground shadow-[var(--dialog-shadow)] sm:inset-x-8 sm:top-20 sm:bottom-8">
+        <Dialog
+          open={settingsOpen}
+          onOpenChange={(open) => {
+            if (open) openSettings();
+            else void closeSettings();
+          }}
+        >
+          <DialogContent
+            variant="drawer"
+            layout="custom"
+            showCloseButton={false}
+            aria-describedby={undefined}
+            onCloseAutoFocus={(event) => event.preventDefault()}
+            onEscapeKeyDown={(event) => {
+              if (event.isComposing) event.preventDefault();
+            }}
+            id="raytab-settings"
+            aria-label={settingsLabel}
+            className="settings-sidebar home-settings-drawer text-foreground outline-none"
+          >
+            <DialogTitle className="sr-only">{settingsLabel}</DialogTitle>
             <Suspense
               fallback={
-                <p className="p-6" role="status">
+                <p className="p-6 text-sm text-muted-foreground" role="status">
                   {t('settings.loading')}
                 </p>
               }
@@ -562,6 +601,7 @@ export default function App() {
                 importSpaceId={displayedSpace}
                 importGroupId={displayedGroup?.id}
                 ref={settingsRef}
+                onClose={closeSettings}
                 onUnlockGroups={() => openSettingsPassword({ kind: 'settings' })}
                 groupManagement={
                   <GroupManagement
@@ -577,8 +617,8 @@ export default function App() {
                 }
               />
             </Suspense>
-          </div>
-        )}
+          </DialogContent>
+        </Dialog>
         {error && (
           <div className="load-error" role="alert">
             <span>{storedErrorMessage(error)}</span>

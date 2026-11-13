@@ -1,7 +1,7 @@
 import { expect, test } from '../fixtures';
 import { openSettings, failNextWrite, noHorizontalOverflow, exportNormalBackup } from '../helpers';
 test('导入预览去重且栏目切换保留文件，保存失败重试后重载只导入一次', async ({ newTab }) => {
-  const settings = await openSettings(newTab, '数据与备份');
+  const settings = await openSettings(newTab, '数据备份');
   await expect(settings.getByRole('button', { name: '预览文件', exact: true })).not.toBeVisible();
   await expect(
     settings.getByRole('button', { name: '导出所选备份', exact: true }),

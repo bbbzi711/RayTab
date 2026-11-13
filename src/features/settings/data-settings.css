@@ -12,9 +12,9 @@
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr) 18px;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   width: 100%;
-  padding: 24px 6px;
+  padding: 20px 6px;
   border: 0;
   border-bottom: 1px solid var(--preferences-line);
   border-radius: 0;
@@ -64,9 +64,8 @@
 .data-settings .setting-control-row,
 .data-settings .data-input-field {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
-  align-items: center;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 .data-settings .data-form-actions {
   display: flex;
@@ -133,15 +132,4 @@
 .data-preview-actions {
   padding-top: 18px;
   border-top: 1px solid var(--preferences-line);
-}
-@media (max-width: 560px) {
-  .data-task-link {
-    gap: 12px;
-    padding-block: 20px;
-  }
-  .data-settings .setting-control-row,
-  .data-settings .data-input-field {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
 }

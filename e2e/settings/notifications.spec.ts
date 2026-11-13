@@ -34,7 +34,7 @@ for (const viewport of [
     await newTab.setViewportSize(viewport);
     await newTab.getByRole('button', { name: '设置', exact: true }).click();
     const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
-    await settings.getByRole('button', { name: '同步', exact: true }).click();
+    await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
     await settings.getByRole('button', { name: '配置同步', exact: true }).click();
     await settings.getByLabel('服务器地址', { exact: true }).fill('https://dav.example.test/');
     await settings.getByRole('switch', { name: '自动双向同步', exact: true }).click();

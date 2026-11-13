@@ -1,6 +1,6 @@
 import { storedState } from './inspect';
 import { RAY_DATABASE_NAME } from '../../src/storage/connection';
-import { noHorizontalOverflow } from '../helpers';
+import { encryptGroup, noHorizontalOverflow, openSettings, unlockGroup } from '../helpers';
 import type { Page } from '@playwright/test';
 import type { BackupDocument } from '../../src/features/backup/backup';
 import type { RayState } from '../../src/storage/model';
@@ -8,13 +8,6 @@ import { expect, test } from '../fixtures';
 
 const icon = (color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="${color}"/></svg>`;
-
-async function settings(page: Page, category: string) {
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '设置', exact: true });
-  await dialog.getByRole('button', { name: category, exact: true }).click();
-  return dialog;
-}
 
 type ResourceEvidence = { reads: Record<string, number>; created: string[]; revoked: string[] };
 
@@ -55,6 +48,7 @@ async function prepareResources(page: Page) {
           icon: { source: 'resource', resourceId: 'shared-icon' },
           order: index,
         }));
+        Object.assign(state.spaces.private.groups[0], { name: '私密资源分组', hidden: false });
         state.spaces.private.sites = [
           {
             ...site,
@@ -196,11 +190,11 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   expect(await second.getAttribute('src')).toBe(original);
   const wallpaper = await newTab
     .getByTestId('wallpaper-image')
-    .evaluate((element: HTMLElement) => element.style.backgroundImage);
+    .evaluate((element: HTMLElement) => getComputedStyle(element).backgroundImage);
   const baseline = await evidence(newTab);
   expect(baseline.reads['shared-icon']).toBe(1);
   expect(baseline.reads['shared-wallpaper']).toBe(1);
-  const widgets = await settings(newTab, '搜索与时钟');
+  const widgets = await openSettings(newTab, '时间日期');
   await widgets.getByRole('switch', { name: '显示时钟', exact: true }).click();
   await expect.poll(async () => (await storedState(newTab)).normalSettings.showClock).toBe(false);
   await newTab.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -210,7 +204,7 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   expect(
     await newTab
       .getByTestId('wallpaper-image')
-      .evaluate((element: HTMLElement) => element.style.backgroundImage),
+      .evaluate((element: HTMLElement) => getComputedStyle(element).backgroundImage),
   ).toBe(wallpaper);
   expect(await evidence(newTab)).toEqual(baseline);
 
@@ -240,7 +234,7 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   };
   const other = await context.newPage();
   await other.goto(`chrome-extension://${extensionId}/newtab.html`);
-  const restore = await settings(other, '数据与备份');
+  const restore = await openSettings(other, '数据备份');
   await restore.getByRole('button', { name: '恢复备份', exact: true }).click();
   await restore.getByLabel('备份文件', { exact: true }).setInputFiles({
     name: 'same-id-new-bytes.json',
@@ -272,21 +266,15 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
 
 test('私密空间锁定后释放共享缓存中的图片 URL', async ({ newTab }) => {
   await prepareResources(newTab);
-  const general = await settings(newTab, '通用');
-  await general.getByText('设置密码保护', { exact: true }).click();
-  await general.getByLabel('密码', { exact: true }).fill('private-resource-test');
-  await general.getByRole('button', { name: '启用密码保护', exact: true }).click();
-  await expect(general.getByText(/私密空间已加密并锁定/)).toBeVisible();
-  await general.getByRole('button', { name: '关闭', exact: true }).click();
-  await newTab.getByRole('button', { name: '私密空间', exact: true }).click();
-  const unlock = newTab.getByRole('dialog', { name: '解锁私密空间', exact: true });
-  await unlock.getByLabel('输入私密空间密码', { exact: true }).fill('private-resource-test');
-  await unlock.getByRole('button', { name: '解锁', exact: true }).click();
+  const group = '私密资源分组';
+  await encryptGroup(newTab, group, 'private-resource-test');
+  await unlockGroup(newTab, group, 'private-resource-test');
+  const unlock = newTab.getByRole('dialog', { name: '解锁私密分组', exact: true });
   const image = newTab.getByRole('link', { name: '私密图片网站', exact: true }).locator('img');
   await expect(image).toBeVisible();
   const url = await image.getAttribute('src');
   expect(url).toMatch(/^blob:/);
-  await newTab.getByRole('button', { name: '普通空间', exact: true }).click();
+  await newTab.getByRole('button', { name: '主页', exact: true }).click();
   await expect(image).not.toBeVisible();
   await expect
     .poll(async () => (await evidence(newTab)).revoked.filter((entry) => entry === url).length)
@@ -301,7 +289,7 @@ test('私密空间锁定后释放共享缓存中的图片 URL', async ({ newTab 
       }
     }, url),
   ).toBe(false);
-  await newTab.getByRole('button', { name: '私密空间', exact: true }).click();
+  await newTab.getByRole('button', { name: group, exact: true }).click();
   await expect(unlock).toBeVisible();
-  await expect(unlock.getByLabel('输入私密空间密码', { exact: true })).toHaveValue('');
+  await expect(unlock.getByLabel('输入私密分组密码', { exact: true })).toHaveValue('');
 });

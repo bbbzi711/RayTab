@@ -1,12 +1,13 @@
 {
   "navigation": {
+    "collapseGroups": "收起分组栏",
+    "expandGroups": "展开分组栏",
     "deleteNamedGroup": "删除分组「{{name}}」",
     "deleteEmptyGroupHelp": "这个分组是空的。确认后会从分组栏移除。",
     "deleteGroupContentsHelp": "没有可接收内容的其他分组。继续会一并删除这个分组内的网站和文件夹。",
     "deleteGroupContents": "删除分组及内容",
     "groupContentsChanged": "分组里的内容已变化，请重新确认删除。",
     "noWritableGroups": "请先在首页创建一个可用分组。",
-    "manageGroups": "分组管理",
     "groupPrivacyHelp": "隐藏只影响标签显示。加密保护分组内容，分组名称仍用于显示标签。三连击第一个未隐藏、未加密的标签也可以展开或收起。",
     "hideHiddenGroups": "收起隐藏分组",
     "showHiddenGroups": "显示隐藏分组",

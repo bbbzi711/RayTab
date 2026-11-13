@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import { expect, test } from '../fixtures';
-import { readSiteImage, openIconOptions } from '../helpers';
+import { addGroup, encryptGroup, unlockGroup, readSiteImage, openIconOptions } from '../helpers';
 import { artworkSource } from '../artwork';
 test('自动图标跳过低清和损坏候选，矢量与实色底板保存后保留', async ({ newTab }) => {
   const png = async (size: number) =>
@@ -152,7 +152,10 @@ test('私密空间直接读取 PWA 高清图标，不向公共服务发送域名
       body: '<html><head><title>本地 PWA 图标</title><link rel="manifest" href="/app.webmanifest"><link rel="icon" href="/favicon.ico" sizes="16x16"></head></html>',
     });
   });
-  await newTab.getByRole('button', { name: '私密空间', exact: true }).click();
+  const group = '私密PWA验收组';
+  await addGroup(newTab, group);
+  await encryptGroup(newTab, group, 'private-icons-password');
+  await unlockGroup(newTab, group, 'private-icons-password');
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
   await openIconOptions(editor);

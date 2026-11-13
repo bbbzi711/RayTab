@@ -39,8 +39,8 @@ test('简洁模式桌面空白可打开设置，搜索输入保留原生右键�
   await openDesktopMenu(newTab);
   await newTab.getByRole('menuitem', { name: '设置', exact: true }).click();
   const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
-  await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
-  await expect(settings.getByRole('combobox', { name: '主题', exact: true })).toBeVisible();
+  await settings.getByRole('tab', { name: '主题壁纸', exact: true }).click();
+  await expect(settings.getByRole('toolbar', { name: '主题', exact: true })).toBeVisible();
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   const input = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
   const prevented = await input.evaluate((element) => {
@@ -142,6 +142,9 @@ for (const viewport of [
     await navigation.hover();
     await newTab.mouse.wheel(0, 100_000);
     const last = newTab.getByRole('link', { name: '批量网站 499', exact: true });
+    // Wheel events finish asynchronously. Measure only after the bottom row has
+    // entered the viewport, otherwise the centering delta uses its old position.
+    await expect(last).toBeInViewport();
     // The add-site tile follows the last website. Center the website within the
     // scroll region instead of requiring it to align with the absolute bottom.
     const lastBounds = (await last.boundingBox())!;
@@ -174,7 +177,7 @@ for (const viewport of [
     await folder.getByRole('button', { name: '关闭', exact: true }).click();
     await newTab.getByRole('button', { name: '设置', exact: true }).click();
     const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
-    await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
+    await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
     await settings.getByRole('switch', { name: '显示网站标题', exact: true }).click();
     await expect(
       settings.getByRole('switch', { name: '显示网站标题', exact: true }),
@@ -191,7 +194,7 @@ for (const viewport of [
       'https://example.test/stress/499',
     );
     await newTab.getByRole('button', { name: '设置', exact: true }).click();
-    await settings.getByRole('button', { name: '图标与布局', exact: true }).click();
+    await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
     await expect(
       settings.getByRole('switch', { name: '显示网站标题', exact: true }),
     ).not.toBeChecked();

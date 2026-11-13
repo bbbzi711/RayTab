@@ -6,10 +6,12 @@ import {
   useImperativeHandle,
   useRef,
   type Ref,
+  type ReactNode,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { RayTabMark } from '@/components/ui/raytab-mark';
 import { toast } from 'sonner';
 import { errorMessage } from '@/lib/errors';
 import { NavigationMenuItems, type NavigationAction } from './NavigationMenu';
@@ -34,6 +36,10 @@ import {
   ArrowDown,
   ArrowUp,
   FolderOpen,
+  House,
+  Layers3,
+  PanelLeftClose,
+  PanelLeftOpen,
   LockKeyhole,
   Plus,
   ListChecks,
@@ -85,15 +91,15 @@ export interface NavigationPageProps {
   onSelectGroup: (group?: GroupTab) => void;
   onToggleHidden: () => void;
   onDeleteGroup: (group: GroupTab) => void;
+  groupsCollapsed: boolean;
+  onToggleGroups: () => void;
+  settingsAction?: ReactNode;
   ref?: Ref<NavigationHandle>;
 }
 
 const byOrder = (a: { order: number; id: string }, b: { order: number; id: string }) =>
   a.order - b.order || a.id.localeCompare(b.id);
-const groupTabClass =
-  'relative h-10 max-w-40 justify-start px-2.5 text-current opacity-75 hover:no-underline hover:opacity-100 focus-visible:ring-current aria-pressed:font-semibold aria-pressed:opacity-100 aria-pressed:after:absolute aria-pressed:after:inset-x-2.5 aria-pressed:after:bottom-1 aria-pressed:after:h-0.5 aria-pressed:after:rounded-full aria-pressed:after:bg-current';
-const groupStripClass =
-  'flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain px-0.5 py-0.5';
+const groupTabClass = 'home-group-tab min-w-0 focus-visible:ring-current';
 
 type RootItem = { kind: 'folder'; folder: Folder } | { kind: 'site'; site: Site };
 
@@ -109,6 +115,9 @@ export function NavigationPage({
   onSelectGroup,
   onToggleHidden,
   onDeleteGroup,
+  groupsCollapsed,
+  onToggleGroups,
+  settingsAction,
 }: NavigationPageProps) {
   const space = useRayTabStore((store) => store.state?.spaces[spaceId])!;
   const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, 'normal')))!;
@@ -366,12 +375,15 @@ export function NavigationPage({
     });
   };
 
+  const iconPixels = settings.cardSize * settings.iconSizeRatio;
+  // Keep the saved icon size, but don't add a second invisible gutter inside each tile.
+  const tilePixels = Math.max(44, iconPixels);
   const gridStyle = {
-    '--site-card-size': `${settings.cardSize}px`,
-    '--site-icon-size': `${settings.cardSize * settings.iconSizeRatio}px`,
+    '--site-card-size': `${tilePixels}px`,
+    '--site-icon-size': `${iconPixels}px`,
     '--site-grid-gap': `${settings.iconSpacing}px`,
     '--site-icon-radius': `${settings.iconRadius}%`,
-    maxWidth: `${settings.cardSize * settings.maxCardsPerRow + settings.iconSpacing * (settings.maxCardsPerRow - 1) + 16}px`,
+    maxWidth: `${tilePixels * settings.maxCardsPerRow + settings.iconSpacing * (settings.maxCardsPerRow - 1) + 16}px`,
     margin: '0 auto',
   } as React.CSSProperties;
 
@@ -543,18 +555,19 @@ export function NavigationPage({
       tab.spaceId === spaceId ? orderedGroups.findIndex((group) => group.id === tab.id) : -1;
     const editable = orderedGroups[groupIndex];
     const key = `${tab.spaceId}:${tab.id}`;
+    const GroupIcon = tab.encrypted ? LockKeyhole : tab === firstGestureGroup ? House : Layers3;
     const button = (
       <Button
         type="button"
-        variant="link"
-        size="sm"
+        variant="navigation"
+        size="rail"
         aria-label={tab.name}
         aria-pressed={tab.spaceId === spaceId && tab.id === activeGroup.id}
         className={cn(groupTabClass, 'shrink-0')}
         onClick={(event) => activateTab(event, tab)}
       >
-        {tab.encrypted && <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />}
-        <span className="truncate">{tab.name}</span>
+        <GroupIcon className="size-5" aria-hidden="true" />
+        <span className="home-group-name truncate">{tab.name}</span>
       </Button>
     );
     if (!editable)
@@ -694,38 +707,66 @@ export function NavigationPage({
       onDragCancel={handleDragCancel}
     >
       <div className="flex min-h-0 w-full flex-1 flex-col items-center text-[color:var(--home-tabs-color)]">
-        <nav
-          aria-label={t('messages.groupNavigation')}
-          className="mx-auto flex w-full shrink-0 items-center justify-center gap-1 px-2 pb-2 text-shadow-[0_1px_3px_rgb(0_0_0/0.7)] [&_svg]:drop-shadow-[0_1px_2px_rgb(0_0_0/0.65)]"
-          style={{ maxWidth: gridStyle.maxWidth }}
-        >
-          <div ref={groupStrip} className={groupStripClass}>
+        <nav aria-label={t('messages.groupNavigation')} className="home-group-nav">
+          <div className="home-group-header">
+            <div className="home-group-brand" title="RayTab">
+              <RayTabMark className="size-6" />
+            </div>
+          </div>
+          <div ref={groupStrip} className="home-group-strip">
             {visibleTabs.map(renderGroupTab)}
             {showHidden && legacyLocked && (
               <Button
                 type="button"
-                variant="link"
-                size="sm"
+                variant="navigation"
+                size="rail"
                 className={groupTabClass}
+                aria-label={t('navigation.unlockLegacyGroups')}
                 onClick={() => onSelectGroup()}
               >
                 <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />
-                {t('navigation.unlockLegacyGroups')}
+                <span className="home-group-name truncate">
+                  {t('navigation.unlockLegacyGroups')}
+                </span>
               </Button>
             )}
+            <Tooltip content={t('messages.addGroup')} side="right">
+              <Button
+                type="button"
+                variant="navigation"
+                size="rail-action"
+                className="home-add-group"
+                aria-label={t('messages.addGroup')}
+                onClick={() => setNameTarget({ type: 'group' })}
+              >
+                <Plus className="size-5" aria-hidden="true" />
+              </Button>
+            </Tooltip>
           </div>
-          <Tooltip content={t('messages.addGroup')}>
-            <Button
-              type="button"
-              variant="link"
-              size="icon"
-              className="size-10 shrink-0 text-current opacity-80 hover:opacity-100 focus-visible:ring-current"
-              aria-label={t('messages.addGroup')}
-              onClick={() => setNameTarget({ type: 'group' })}
+          <div className="home-group-footer">
+            <Tooltip
+              content={t(groupsCollapsed ? 'navigation.expandGroups' : 'navigation.collapseGroups')}
+              side="right"
             >
-              <Plus aria-hidden="true" />
-            </Button>
-          </Tooltip>
+              <Button
+                type="button"
+                variant="navigation"
+                size="rail-action"
+                aria-label={t(
+                  groupsCollapsed ? 'navigation.expandGroups' : 'navigation.collapseGroups',
+                )}
+                aria-expanded={!groupsCollapsed}
+                onClick={onToggleGroups}
+              >
+                {groupsCollapsed ? (
+                  <PanelLeftOpen className="size-4" />
+                ) : (
+                  <PanelLeftClose className="size-4" />
+                )}
+              </Button>
+            </Tooltip>
+            {settingsAction}
+          </div>
         </nav>
 
         <div

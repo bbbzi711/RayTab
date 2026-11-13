@@ -1,12 +1,13 @@
 {
   "navigation": {
+    "collapseGroups": "Collapse groups",
+    "expandGroups": "Expand groups",
     "deleteNamedGroup": "Delete group “{{name}}”",
     "deleteEmptyGroupHelp": "This group is empty. Confirm to remove it from the group bar.",
     "deleteGroupContentsHelp": "There is no other eligible group for these contents. Continuing deletes this group and all of its sites and folders.",
     "deleteGroupContents": "Delete group and contents",
     "groupContentsChanged": "The contents of the group changed. Review the group and confirm deletion again.",
     "noWritableGroups": "Create an available group on the home page first.",
-    "manageGroups": "Manage groups",
     "groupPrivacyHelp": "Hiding controls tab visibility. Encryption protects group contents, and group names remain available for the tab labels. Triple-click the first visible, unencrypted tab to show or hide hidden groups.",
     "hideHiddenGroups": "Hide hidden groups",
     "showHiddenGroups": "Show hidden groups",

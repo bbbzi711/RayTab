@@ -35,7 +35,7 @@ async function syncState(background: Worker) {
 async function openSync(page: Page) {
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settings = page.getByRole('dialog', { name: '设置', exact: true });
-  await settings.getByRole('button', { name: '同步', exact: true }).click();
+  await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
   return settings;
 }
 

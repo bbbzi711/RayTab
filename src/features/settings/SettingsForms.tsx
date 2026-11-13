@@ -215,7 +215,7 @@ export function SearchEngineSettings({
     if (!id) editor.current?.querySelector('summary')?.focus();
   };
   return (
-    <details className="search-engine-disclosure">
+    <details className="settings-disclosure">
       <summary role="button">
         <Settings2 className="ui-icon-action" aria-hidden="true" />
         <span>{t('settings.manageSearchEngines')}</span>
@@ -311,7 +311,7 @@ export function SearchEngineSettings({
           ))}
         </div>
         <details
-          className="search-engine-disclosure"
+          className="settings-disclosure"
           ref={editor}
           open={editorOpen}
           onToggle={(event) => setEditorOpen(event.currentTarget.open)}

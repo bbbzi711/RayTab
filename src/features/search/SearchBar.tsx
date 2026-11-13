@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { toast } from 'sonner';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, X } from 'lucide-react';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import { BROWSER_SEARCH_ENGINE, type SpaceId } from '@/storage/model';
 import { searchWithBrowser } from './browser-search';
@@ -164,11 +164,11 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
         <Button
           type="submit"
           aria-label={t('messages.search')}
-          variant="ghost"
+          variant="secondary"
           size="icon"
-          className={searchActionClass}
+          className="rounded-full"
         >
-          <Search className="ui-icon-action" aria-hidden="true" />
+          <ArrowRight className="ui-icon-action" aria-hidden="true" />
         </Button>
       </Tooltip>
     </form>

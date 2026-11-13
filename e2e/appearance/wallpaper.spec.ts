@@ -1,13 +1,21 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from '../fixtures';
+import { addSite, expect, test } from '../fixtures';
 import { cacheInfo } from '../storage/inspect';
 import { paintedArtwork } from '../artwork';
+import { addGroup, encryptGroup, unlockGroup } from '../helpers';
+import { RAY_DATABASE_NAME } from '../../src/storage/connection';
 
-async function wallpaperSettings(page: Page) {
+async function wallpaperSettings(page: Page, source: 'online' | 'local' = 'online') {
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settings = page.getByRole('dialog', { name: '设置', exact: true });
-  await settings.getByRole('button', { name: '壁纸与主题', exact: true }).click();
+  await settings.getByRole('tab', { name: '主题壁纸', exact: true }).click();
+  await settings.getByRole('button', { name: '更换壁纸', exact: true }).click();
+  await settings.getByRole('combobox', { name: '壁纸来源', exact: true }).click();
+  await page.getByRole('option', { name: '自定义', exact: true }).click();
+  await settings
+    .getByRole('button', { name: source === 'online' ? '图片网址' : '上传图片', exact: true })
+    .click();
   return settings;
 }
 
@@ -41,7 +49,11 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
     Object.assign(window, { wallpaperStartupEvidence: evidence });
     const observer = new MutationObserver(() => {
       const image = document.querySelector<HTMLElement>('[data-testid="wallpaper-image"]');
-      if (image?.style.backgroundImage && !document.getElementById('root')?.childElementCount) {
+      if (
+        image &&
+        getComputedStyle(image).backgroundImage !== 'none' &&
+        !document.getElementById('root')?.childElementCount
+      ) {
         evidence.beforeReact = true;
         evidence.fullyVisible =
           image.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
@@ -74,7 +86,7 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   expect(requests).toBe(1);
   const previous = await newTab
     .getByTestId('wallpaper-image')
-    .evaluate((element: HTMLElement) => element.style.backgroundImage);
+    .evaluate((element: HTMLElement) => getComputedStyle(element).backgroundImage);
   await context.setOffline(false);
   await context.route('https://wallpaper-acceptance.example.test/failure.svg', (route) =>
     route.abort(),
@@ -90,7 +102,7 @@ test('在线壁纸缓存先于 React 显示，离线重载不请求图片，换�
   expect(
     await newTab
       .getByTestId('wallpaper-image')
-      .evaluate((element: HTMLElement) => element.style.backgroundImage),
+      .evaluate((element: HTMLElement) => getComputedStyle(element).backgroundImage),
   ).toBe(previous);
   expect(await cacheInfo(newTab)).toEqual({ source: url, color: '#a4c9dc', hasBlob: true });
   await edit.getByRole('button', { name: '关闭', exact: true }).click();
@@ -158,15 +170,18 @@ test('壁纸显示成功但缓存写入失败时明确通知，重试后才算�
     if (!fault || typeof fault !== 'object') throw new Error('Missing cache fault fixture');
     Reflect.set(fault, 'blocked', false);
   });
-  await settings.getByRole('button', { name: '搜索与时钟', exact: true }).click();
+  await settings.getByRole('tab', { name: '时间日期', exact: true }).click();
   await settings.getByRole('switch', { name: '显示时钟', exact: true }).click();
   await expect
     .poll(() => cacheInfo(newTab))
     .toEqual({ source: url, color: '#a4c9dc', hasBlob: true });
 });
 
-test('上传壁纸只保存一份原图，私密壁纸不会写入普通启动缓存', async ({ newTab, context }) => {
-  const settings = await wallpaperSettings(newTab);
+test('全局壁纸跨普通和加密分组一致，上传只存一份且启动缓存不含私密网站', async ({
+  newTab,
+  context,
+}) => {
+  const settings = await wallpaperSettings(newTab, 'local');
   await settings.getByLabel('本地壁纸', { exact: true }).setInputFiles({
     name: 'wallpaper.svg',
     mimeType: 'image/svg+xml',
@@ -182,30 +197,69 @@ test('上传壁纸只保存一份原图，私密壁纸不会写入普通启动�
   expect(normal?.source).toMatch(/^resource:/);
   await expect(settings.getByLabel('本地壁纸', { exact: true })).toHaveValue('');
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
-  await newTab.getByRole('button', { name: '私密空间', exact: true }).click();
-  await context.route('https://private-wallpaper.example.test/secret.svg', (route) =>
+  const group = '全局壁纸加密验收组';
+  const password = 'global-wallpaper-password';
+  await addGroup(newTab, group);
+  await encryptGroup(newTab, group, password);
+  await unlockGroup(newTab, group, password);
+  await addSite(
+    newTab,
+    '壁纸不能泄漏的私密网站',
+    'https://private-wallpaper-site.example.test/secret',
+  );
+  expect(await cacheInfo(newTab)).toEqual(normal);
+  await context.route('https://global-wallpaper.example.test/shared.svg', (route) =>
     route.fulfill({
       contentType: 'image/svg+xml',
       body: '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800"><rect width="1280" height="800" fill="#e78f86"/></svg>',
     }),
   );
-  const privateSettings = await wallpaperSettings(newTab);
-  await privateSettings
+  // The user explicitly selected global appearance, including changes made here.
+  const sharedSettings = await wallpaperSettings(newTab);
+  await sharedSettings
     .getByLabel('在线壁纸地址', { exact: true })
-    .fill('https://private-wallpaper.example.test/secret.svg');
-  await privateSettings.getByRole('button', { name: '使用在线壁纸', exact: true }).click();
+    .fill('https://global-wallpaper.example.test/shared.svg');
+  await sharedSettings.getByRole('button', { name: '使用在线壁纸', exact: true }).click();
   await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(231, 143, 134)');
-  expect(await cacheInfo(newTab)).toEqual(normal);
-  expect(await newTab.evaluate(() => localStorage.getItem('raytab-startup-meta'))).not.toContain(
-    'private-wallpaper',
-  );
-  await privateSettings.getByRole('button', { name: '关闭', exact: true }).click();
-  await newTab.getByRole('button', { name: '普通空间', exact: true }).click();
-  await expect(newTab.getByTestId('wallpaper')).toHaveCSS(
-    'background-color',
-    `rgb(${normal!.color
-      .match(/\w\w/g)!
-      .map((channel) => parseInt(channel, 16))
-      .join(', ')})`,
-  );
+  await expect
+    .poll(() => cacheInfo(newTab))
+    .toMatchObject({
+      source: 'https://global-wallpaper.example.test/shared.svg',
+      hasBlob: true,
+    });
+  const globalCache = await cacheInfo(newTab);
+  await sharedSettings.getByRole('button', { name: '关闭', exact: true }).click();
+  await newTab.getByRole('button', { name: '主页', exact: true }).click();
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(231, 143, 134)');
+  expect(await cacheInfo(newTab)).toEqual(globalCache);
+  await newTab.reload();
+  await expect(newTab.getByTestId('wallpaper')).toHaveCSS('background-color', 'rgb(231, 143, 134)');
+  await expect(
+    newTab.getByRole('link', { name: '壁纸不能泄漏的私密网站', exact: true }),
+  ).not.toBeVisible();
+  const startup = await newTab.evaluate(async (databaseName) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(databaseName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+        const request = db.transaction('wallpapers').objectStore('wallpapers').getAllKeys();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return { keys, local: Object.values(localStorage).join('\n') };
+    } finally {
+      db.close();
+    }
+  }, RAY_DATABASE_NAME);
+  expect(startup.keys).toEqual(['current']);
+  expect(startup.local).not.toContain('private-wallpaper-site');
+  expect(startup.local).not.toContain('壁纸不能泄漏的私密网站');
+  expect(startup.local).not.toContain(password);
+  await unlockGroup(newTab, group, password);
+  await expect(
+    newTab.getByRole('link', { name: '壁纸不能泄漏的私密网站', exact: true }),
+  ).toHaveAttribute('href', 'https://private-wallpaper-site.example.test/secret');
 });

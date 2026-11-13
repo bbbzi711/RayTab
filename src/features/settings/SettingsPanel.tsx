@@ -10,31 +10,37 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { Cloud, Database, Grid2X2, Palette, SlidersHorizontal, Clock3 } from 'lucide-react';
+import {
+  Check,
+  SlidersHorizontal,
+  Grid2X2,
+  Palette,
+  Search,
+  Clock3,
+  PanelLeft,
+  Cloud,
+  Database,
+  X,
+} from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { RayTabMark } from '@/components/ui/raytab-mark';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import { errorMessage } from '@/lib/errors';
-import { gradientPresets, nextFeaturedPhoto } from '@/features/appearance/wallpapers';
 import { effectiveSettings, type SpaceId, type SpaceSettings } from '@/storage/model';
-import {
-  LocalWallpaperForm,
-  PasswordForm,
-  SearchEngineSettings,
-  WallpaperForm,
-  type SaveSettings,
-} from './SettingsForms';
+import { PasswordForm, SearchEngineSettings, type SaveSettings } from './SettingsForms';
 import {
   RangeSetting,
   SettingsSection,
   SettingsSelect,
+  ThemeSetting,
   Toggle,
   type DraftReporter,
 } from './SettingsControls';
-import { SettingsPreview } from './SettingsPreview';
+import { WallpaperSettings } from './WallpaperSettings';
 import './settings.css';
 
 const DataSettings = lazy(() =>
@@ -45,20 +51,33 @@ const SyncSettings = lazy(() =>
 );
 
 const tabs = [
-  ['general', SlidersHorizontal],
-  ['icons', Grid2X2],
-  ['appearance', Palette],
-  ['widgets', Clock3],
-  ['sync', Cloud],
-  ['data', Database],
+  'general',
+  'icons',
+  'wallpaper',
+  'search',
+  'clock',
+  'sidebar',
+  'sync',
+  'data',
 ] as const;
-type SettingsTab = (typeof tabs)[number][0];
+const tabIcons = {
+  general: SlidersHorizontal,
+  icons: Grid2X2,
+  wallpaper: Palette,
+  search: Search,
+  clock: Clock3,
+  sidebar: PanelLeft,
+  sync: Cloud,
+  data: Database,
+};
+type SettingsTab = (typeof tabs)[number];
 
 export type SettingsHandle = { canClose: () => Promise<boolean> };
 
 export default function SettingsPanel({
   spaceId,
   ref,
+  onClose,
   onUnlockGroups,
   groupManagement,
   importSpaceId,
@@ -66,6 +85,7 @@ export default function SettingsPanel({
 }: {
   spaceId: SpaceId;
   ref?: Ref<SettingsHandle>;
+  onClose: () => void;
   onUnlockGroups: () => void;
   groupManagement: ReactNode;
   importSpaceId: SpaceId;
@@ -81,6 +101,9 @@ export default function SettingsPanel({
   const clearPreview = useRayTabStore((store) => store.clearSettingsPreview);
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const privateLocked = useRayTabStore((store) => store.state?.privateSecurity.locked);
+  const privateOverrideCount = useRayTabStore(
+    (store) => Object.keys(store.state?.privateSettingOverrides ?? {}).length,
+  );
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [visited, setVisited] = useState<Set<SettingsTab>>(() => new Set(['general']));
   const [drafts, setDrafts] = useState<Record<string, { dirty: boolean; busy: boolean }>>({});
@@ -91,12 +114,24 @@ export default function SettingsPanel({
   const queue = useRef<Promise<void>>(Promise.resolve());
   const [confirm, confirmation] = useConfirm();
   const content = useRef<HTMLDivElement>(null);
-  const category = useRef<HTMLButtonElement>(null);
-  const language = useRef<HTMLButtonElement>(null);
+  const tabRefs = useRef<Record<SettingsTab, HTMLButtonElement | null>>({
+    general: null,
+    icons: null,
+    wallpaper: null,
+    search: null,
+    clock: null,
+    sidebar: null,
+    sync: null,
+    data: null,
+  });
   const currentTab = useRef<SettingsTab>('general');
   const scrollPositions = useRef<Partial<Record<SettingsTab, number>>>({});
   const hasDraft = Object.values(drafts).some((draft) => draft.dirty);
   const busy = saving || Object.values(drafts).some((draft) => draft.busy);
+
+  useEffect(() => {
+    tabRefs.current.general?.focus({ preventScroll: true });
+  }, []);
 
   const changeTab = useCallback((tab: SettingsTab) => {
     if (content.current) scrollPositions.current[currentTab.current] = content.current.scrollTop;
@@ -104,22 +139,18 @@ export default function SettingsPanel({
     setActiveTab(tab);
     setVisited((current) => new Set([...current, tab]));
   }, []);
+
   useLayoutEffect(() => {
     content.current?.scrollTo({ top: scrollPositions.current[activeTab] ?? 0 });
   }, [activeTab]);
-  useEffect(() => {
-    const revealCategory = () =>
-      category.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
-    revealCategory();
-    window.addEventListener('resize', revealCategory);
-    return () => window.removeEventListener('resize', revealCategory);
-  }, [activeTab]);
+
   useEffect(
     () => () => {
       clearPreview(spaceId);
     },
     [spaceId, clearPreview],
   );
+
   const report: DraftReporter = useCallback((id, dirty, busy) => {
     setDrafts((current) =>
       current[id]?.dirty === dirty && current[id]?.busy === busy
@@ -127,6 +158,7 @@ export default function SettingsPanel({
         : { ...current, [id]: { dirty, busy } },
     );
   }, []);
+
   const persistSettings = useCallback(
     async (patch: Partial<SpaceSettings>, assets?: Map<string, Blob>, retryable = false) => {
       if (retryable || 'background' in patch) previewSettings(spaceId, patch);
@@ -156,12 +188,14 @@ export default function SettingsPanel({
     },
     [spaceId, dispatch, previewSettings, clearPreview],
   );
+
   const save: SaveSettings = persistSettings;
   const update = (patch: Partial<SpaceSettings>) =>
     void persistSettings(patch, undefined, true).catch((reason: unknown) =>
       toast.error(errorMessage(reason)),
     );
   const preview = (patch: Partial<SpaceSettings>) => previewSettings(spaceId, patch);
+
   const canClose = async () => {
     if (busy) {
       toast.info(t('settings.waitForSave'));
@@ -183,11 +217,9 @@ export default function SettingsPanel({
     clearPreview(spaceId);
     return true;
   };
+
   useImperativeHandle(ref, () => ({ canClose }));
-  useEffect(() => {
-    language.current?.focus({ preventScroll: true });
-  }, []);
-  const showPreview = activeTab === 'icons' || activeTab === 'appearance';
+
   const numberRange = (
     key: 'maxCardsPerRow' | 'iconSpacing' | 'overlay' | 'iconRadius',
     min: number,
@@ -206,6 +238,7 @@ export default function SettingsPanel({
       onCommit={(value) => update({ [key]: value })}
     />
   );
+
   const toggle = (
     key:
       | 'showSiteTitle'
@@ -223,10 +256,12 @@ export default function SettingsPanel({
       onChange={(value) => update({ [key]: value })}
     />
   );
+
   const iconSizePatch = (size: number) => {
     const cardSize = Math.max(80, Math.min(160, Math.round((size * 2) / 5) * 5));
     return { cardSize, iconSizeRatio: Math.max(0.28, size / cardSize) };
   };
+
   const retry = () => {
     const pending = useRayTabStore.getState().settingsPreview;
     const patch = { ...failedPatch };
@@ -238,288 +273,351 @@ export default function SettingsPanel({
     );
   };
 
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    const currentIndex = tabs.indexOf(activeTab);
+    let nextIndex = -1;
+    if (event.key === 'ArrowDown') {
+      nextIndex = (currentIndex + 1) % tabs.length;
+    } else if (event.key === 'ArrowUp') {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = tabs.length - 1;
+    }
+    if (nextIndex >= 0) {
+      event.preventDefault();
+      const nextTab = tabs[nextIndex];
+      changeTab(nextTab);
+      tabRefs.current[nextTab]?.focus();
+    }
+  };
+
+  const resetPrivatePreferences = async () => {
+    if (busy || hasDraft) return;
+    if (
+      !(await confirm({
+        title: t('settings.resetPrivateTitle'),
+        description: t('settings.resetPrivateDescription'),
+        confirmText: t('settings.followNormal'),
+        variant: 'destructive',
+      }))
+    )
+      return;
+    const overrides = useRayTabStore.getState().state?.privateSettingOverrides;
+    if (!overrides || !Object.keys(overrides).length) return;
+    setSaving(true);
+    const reset = () =>
+      dispatch({
+        type: 'reset-private-setting',
+        keys: Object.keys(overrides) as (keyof SpaceSettings)[],
+      });
+    const operation = queue.current.then(reset, reset);
+    queue.current = operation;
+    try {
+      await operation;
+      clearPreview(spaceId);
+      setFailedPatch({});
+      setFailure(undefined);
+      setHasSaved(true);
+    } catch (reason) {
+      setFailure(errorMessage(reason));
+      toast.error(errorMessage(reason));
+    } finally {
+      if (queue.current === operation) setSaving(false);
+    }
+  };
+
+  const panel = (tab: SettingsTab, children: ReactNode) =>
+    visited.has(tab) && (
+      <div
+        key={tab}
+        id={`settings-tabpanel-${tab}`}
+        role="tabpanel"
+        aria-labelledby={`settings-tab-${tab}`}
+        className="settings-panel-content"
+        hidden={activeTab !== tab}
+        tabIndex={0}
+      >
+        {children}
+      </div>
+    );
+
   return (
-    <section aria-labelledby="raytab-settings-title" className="flex min-h-0 flex-1 flex-col">
-      <h1 id="raytab-settings-title" className="sr-only">
-        {t('settings.title')}
-      </h1>
-      <div className="settings-layout">
-        <aside className="settings-sidebar">
-          <div className="settings-brand">
-            <div className="settings-brand-copy">
-              <span className="settings-brand-name">{t('settings.title')}</span>
-            </div>
-          </div>
-          <nav className="settings-tabs" aria-label={t('settings.categories')}>
-            {tabs.map(([tab, Icon]) => (
-              <Button
-                type="button"
-                variant="ghost"
-                key={tab}
-                ref={activeTab === tab ? category : undefined}
-                aria-current={activeTab === tab ? 'page' : undefined}
-                className="min-h-10 justify-start gap-2.5 px-3 aria-[current=page]:bg-accent aria-[current=page]:font-semibold aria-[current=page]:text-[var(--preferences-accent)] max-[760px]:min-h-11"
-                title={t('settings.tabs.' + tab)}
-                onClick={() => changeTab(tab)}
-              >
-                <Icon className="ui-icon-action" aria-hidden="true" />
-                <span>{t('settings.tabs.' + tab)}</span>
+    <div className="settings-panel-root relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="settings-header shrink-0">
+        <div className="settings-brand" aria-label="RayTab">
+          <span className="settings-brand-mark" aria-hidden="true">
+            <RayTabMark className="size-4" />{' '}
+          </span>
+          <span>RayTab</span>
+        </div>
+        <div className="settings-heading">
+          <h1 className="m-0 text-[15px] font-semibold leading-6">
+            <span className="sr-only">{t('settings.title')} · </span>
+            {t('settings.tabs.' + activeTab)}
+          </h1>
+          <p className="m-0 text-[11px] leading-[18px] text-muted-foreground">
+            {t('settings.categoryDescriptions.' + activeTab)}
+          </p>
+          <div
+            className="settings-autosave"
+            role="status"
+            aria-label={t('settings.saveStatus')}
+            aria-live="polite"
+            title={t('settings.autoSaveHelp')}
+          >
+            {!busy && !failure && !hasDraft && !Object.keys(failedPatch).length && (
+              <Check className="size-3" aria-hidden="true" />
+            )}
+            <span>
+              {t(
+                busy
+                  ? 'settings.saving'
+                  : failure || Object.keys(failedPatch).length
+                    ? 'settings.unsaved'
+                    : hasDraft
+                      ? 'settings.pendingChanges'
+                      : hasSaved
+                        ? 'settings.saved'
+                        : 'settings.autoSave',
+              )}
+            </span>
+            {Object.keys(failedPatch).length > 0 && (
+              <Button type="button" variant="ghost" size="xs" disabled={saving} onClick={retry}>
+                {t('settings.retry')}
               </Button>
-            ))}
-          </nav>
-        </aside>
-        <div className="settings-main">
-          <header className="settings-workspace-header">
-            <div className="settings-header-line">
-              <h2 className="text-xl font-semibold tracking-tight max-[420px]:mr-auto [@media(max-height:480px)]:text-lg">
-                {t('settings.tabs.' + activeTab)}
-              </h2>
-              <div
-                className="settings-autosave"
-                role="status"
-                aria-label={t('settings.saveStatus')}
-                aria-live="polite"
-                title={t('settings.autoSaveHelp')}
+            )}
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="settings-close"
+          aria-label={t('settings.close')}
+          onClick={onClose}
+        >
+          <X className="ui-icon-action" aria-hidden="true" />
+        </Button>
+      </header>
+
+      <div className="settings-workspace grid min-h-0 min-w-0 flex-1">
+        <nav
+          className="settings-tabs-nav"
+          role="tablist"
+          aria-label={t('settings.categories')}
+          aria-orientation="vertical"
+          onKeyDown={handleTabKeyDown}
+        >
+          {tabs.map((tab) => {
+            const Icon = tabIcons[tab];
+            return (
+              <Button
+                key={tab}
+                ref={(el) => {
+                  tabRefs.current[tab] = el;
+                }}
+                role="tab"
+                type="button"
+                variant="tab"
+                size="navigation"
+                id={`settings-tab-${tab}`}
+                aria-selected={activeTab === tab}
+                aria-controls={`settings-tabpanel-${tab}`}
+                tabIndex={activeTab === tab ? 0 : -1}
+                className="settings-nav-tab min-w-0 w-full"
+                onClick={() => changeTab(tab)}
+                title={t('settings.tabs.' + tab)}
               >
-                <span>
-                  {t(
-                    busy
-                      ? 'settings.saving'
-                      : failure || Object.keys(failedPatch).length
-                        ? 'settings.unsaved'
-                        : hasDraft
-                          ? 'settings.pendingChanges'
-                          : hasSaved
-                            ? 'settings.saved'
-                            : 'settings.autoSave',
-                  )}
+                <Icon className="size-4" aria-hidden="true" />
+                <span className="min-w-0 whitespace-normal text-left leading-4">
+                  {t('settings.tabs.' + tab)}
                 </span>
-                {Object.keys(failedPatch).length > 0 && (
-                  <Button type="button" variant="ghost" size="xs" disabled={saving} onClick={retry}>
-                    {t('settings.retry')}
+              </Button>
+            );
+          })}
+        </nav>
+
+        <div className="settings-content" ref={content}>
+          {failure && Object.keys(failedPatch).length > 0 && (
+            <p className="mb-3 wrap-anywhere text-xs leading-5 text-destructive" role="alert">
+              {failure}
+            </p>
+          )}
+
+          {panel(
+            'general',
+            <>
+              <SettingsSection title={t('settings.sections.general')}>
+                <SettingsSelect
+                  label={t('settings.fields.language')}
+                  value={settings.language}
+                  options={[
+                    ['zh-CN', '简体中文'],
+                    ['en', 'English'],
+                  ]}
+                  onChange={(value) => update({ language: value as SpaceSettings['language'] })}
+                />
+                {toggle('openInNewTab')}
+              </SettingsSection>
+              {spaceId === 'private' && (
+                <SettingsSection title={t('settings.privateInheritance')}>
+                  <p className="m-0 py-1 text-xs leading-5 text-muted-foreground">
+                    {t('settings.privateInheritanceHelp', { count: privateOverrideCount })}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="form-action"
+                    disabled={busy || hasDraft || privateOverrideCount === 0}
+                    onClick={() => void resetPrivatePreferences()}
+                  >
+                    {t('settings.followNormal')}
+                  </Button>
+                </SettingsSection>
+              )}
+              <SettingsSection title={t('settings.sections.groups')}>
+                {groupManagement}
+              </SettingsSection>
+              <SettingsSection title={t('settings.groupPassword')}>
+                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                  {t(
+                    protectedPrivate
+                      ? privateLocked
+                        ? 'settings.lockedHelp'
+                        : 'settings.unlockedHelp'
+                      : 'settings.protectionHelp',
+                  )}
+                </p>
+                {protectedPrivate && privateLocked && (
+                  <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
+                    {t('navigation.unlockGroups')}
                   </Button>
                 )}
+                {protectedPrivate && !privateLocked && (
+                  <details className="settings-advanced">
+                    <summary>{t('settings.managePassword')}</summary>
+                    <div>
+                      <PasswordForm mode="change" report={report} />
+                      <PasswordForm mode="remove" report={report} />
+                    </div>
+                  </details>
+                )}
+              </SettingsSection>
+            </>,
+          )}
+
+          {panel(
+            'icons',
+            <>
+              <SettingsSection title={t('settings.sections.iconAppearance')}>
+                <RangeSetting
+                  label={t('settings.iconSize')}
+                  value={Math.round(settings.cardSize * settings.iconSizeRatio)}
+                  min={22}
+                  max={104}
+                  step={1}
+                  format={(value) => value + 'px'}
+                  onPreview={(value) => preview(iconSizePatch(value))}
+                  onCommit={(value) => update(iconSizePatch(value))}
+                />
+                {numberRange('iconRadius', 0, 50, 1, (value) => value + '%')}
+                {toggle('showSiteTitle')}
+              </SettingsSection>
+              <SettingsSection title={t('settings.sections.layout')}>
+                {numberRange('iconSpacing', 8, 48, 2, (value) => value + 'px')}
+                {numberRange('maxCardsPerRow', 4, 12, 1)}
+              </SettingsSection>
+            </>,
+          )}
+
+          {panel(
+            'wallpaper',
+            <>
+              <SettingsSection title={t('settings.theme')}>
+                <ThemeSetting value={settings.theme} onChange={(theme) => update({ theme })} />
+              </SettingsSection>
+              <SettingsSection title={t('settings.sections.wallpaper')}>
+                <WallpaperSettings
+                  settings={settings}
+                  savedUrl={savedSettings.onlineWallpaperUrl}
+                  save={save}
+                  report={report}
+                  onUpdate={update}
+                  onPreview={preview}
+                />
+                {numberRange('overlay', 0, 0.8, 0.05, (value) => Math.round(value * 100) + '%')}
+              </SettingsSection>
+            </>,
+          )}
+
+          {panel(
+            'search',
+            <SettingsSection title={t('settings.sections.search')}>
+              {toggle('showSearch')}
+              <div className="settings-panel-content" hidden={!settings.showSearch}>
+                <SearchEngineSettings settings={savedSettings} save={save} report={report} />
               </div>
-            </div>
-            <p className="text-xs leading-5 text-muted-foreground">
-              {t('settings.categoryDescriptions.' + activeTab)}
-            </p>
-            {failure && Object.keys(failedPatch).length > 0 && (
-              <p className="wrap-anywhere text-xs leading-5 text-destructive" role="alert">
-                {failure}
+            </SettingsSection>,
+          )}
+
+          {panel(
+            'clock',
+            <SettingsSection title={t('settings.sections.clock')}>
+              {toggle('showClock')}
+              <div className="settings-panel-content" hidden={!settings.showClock}>
+                {toggle('hour12')}
+              </div>
+              {toggle('showDate')}
+              {toggle('showLunar')}
+              {toggle('showGreeting')}
+            </SettingsSection>,
+          )}
+
+          {panel(
+            'sidebar',
+            <SettingsSection title={t('settings.sidebar')}>
+              <SettingsSelect
+                label={t('settings.fields.sidebarMode')}
+                value={settings.sidebarMode}
+                options={(['always', 'auto', 'hidden'] as const).map(
+                  (mode) => [mode, t('settings.sidebarModes.' + mode)] as const,
+                )}
+                onChange={(value) => update({ sidebarMode: value as SpaceSettings['sidebarMode'] })}
+              />
+              <p className="m-0 pb-2 text-xs leading-5 text-muted-foreground">
+                {t('settings.sidebarHelp')}
               </p>
-            )}
-          </header>
-          <div
-            className={
-              showPreview ? 'settings-content settings-content--with-preview' : 'settings-content'
-            }
-            ref={content}
-          >
-            {showPreview && <SettingsPreview settings={settings} spaceId={spaceId} />}
-            <div className="settings-fields">
-              {visited.has('general') && (
-                <div className="settings-panel-content" hidden={activeTab !== 'general'}>
-                  <SettingsSection title={t('settings.sections.preferences')}>
-                    <SettingsSelect
-                      label={t('settings.fields.language')}
-                      value={settings.language}
-                      options={[
-                        ['zh-CN', '简体中文'],
-                        ['en', 'English'],
-                      ]}
-                      onChange={(value) => update({ language: value as SpaceSettings['language'] })}
-                      triggerRef={language}
-                    />
-                    {toggle('openInNewTab')}
-                  </SettingsSection>
-                  <SettingsSection title={t('navigation.manageGroups')}>
-                    {groupManagement}
-                  </SettingsSection>
-                  <SettingsSection title={t('settings.privateProtection')}>
-                    <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                      {t(
-                        protectedPrivate
-                          ? privateLocked
-                            ? 'settings.lockedHelp'
-                            : 'settings.unlockedHelp'
-                          : 'settings.protectionHelp',
-                      )}
-                    </p>
-                    {protectedPrivate && privateLocked && (
-                      <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
-                        {t('navigation.unlockGroups')}
-                      </Button>
-                    )}
-                    {protectedPrivate && !privateLocked && (
-                      <details className="settings-advanced">
-                        <summary>{t('settings.managePassword')}</summary>
-                        <div>
-                          <PasswordForm mode="change" report={report} />
-                          <PasswordForm mode="remove" report={report} />
-                        </div>
-                      </details>
-                    )}
-                  </SettingsSection>
-                </div>
-              )}
-              {visited.has('icons') && (
-                <div className="settings-panel-content" hidden={activeTab !== 'icons'}>
-                  <SettingsSection title={t('settings.sections.iconAppearance')}>
-                    <RangeSetting
-                      label={t('settings.iconSize')}
-                      value={Math.round(settings.cardSize * settings.iconSizeRatio)}
-                      min={22}
-                      max={104}
-                      step={1}
-                      format={(value) => value + 'px'}
-                      onPreview={(value) => preview(iconSizePatch(value))}
-                      onCommit={(value) => update(iconSizePatch(value))}
-                    />
-                    {numberRange('iconRadius', 0, 50, 1, (value) => value + '%')}
-                    {toggle('showSiteTitle')}
-                  </SettingsSection>
-                  <SettingsSection title={t('settings.sections.layout')}>
-                    {numberRange('maxCardsPerRow', 4, 12, 1)}
-                    {numberRange('iconSpacing', 8, 48, 2, (value) => value + 'px')}
-                  </SettingsSection>
-                </div>
-              )}
-              {visited.has('appearance') && (
-                <div className="settings-panel-content" hidden={activeTab !== 'appearance'}>
-                  <SettingsSection title={t('settings.fields.theme')}>
-                    <SettingsSelect
-                      label={t('settings.fields.theme')}
-                      value={settings.theme}
-                      options={['system', 'light', 'dark'].map(
-                        (value) => [value, t('settings.themes.' + value)] as const,
-                      )}
-                      onChange={(value) => update({ theme: value as SpaceSettings['theme'] })}
-                    />
-                  </SettingsSection>
-                  <SettingsSection title={t('settings.sections.wallpaper')}>
-                    <SettingsSelect
-                      label={t('settings.wallpaperSource')}
-                      value={settings.background}
-                      options={['gradient', 'bing', 'unsplash', 'custom', 'color'].map(
-                        (value) => [value, t('settings.backgrounds.' + value)] as const,
-                      )}
-                      onChange={(value) =>
-                        update({ background: value as SpaceSettings['background'] })
-                      }
-                    />
-                    {settings.background === 'gradient' && (
-                      <>
-                        <div className="gradient-options" aria-label={t('settings.gradient')}>
-                          {gradientPresets.map((gradient, index) => (
-                            <button
-                              type="button"
-                              key={gradient}
-                              style={{ backgroundImage: gradient }}
-                              aria-label={t('settings.gradientNamed', { number: index + 1 })}
-                              aria-pressed={settings.gradient === gradient}
-                              onClick={() => update({ gradient })}
-                            />
-                          ))}
-                        </div>
-                      </>
-                    )}
-                    {settings.background === 'unsplash' && (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            update({
-                              featuredPhotoUrl: nextFeaturedPhoto(settings.featuredPhotoUrl),
-                            })
-                          }
-                        >
-                          {t('settings.nextPhoto')}
-                        </Button>
-                      </>
-                    )}
-                    {settings.background === 'color' && (
-                      <div className="setting-row">
-                        <div>
-                          <label htmlFor="settings-solid-color">
-                            {t('settings.fields.solidColor')}
-                          </label>
-                        </div>
-                        <input
-                          id="settings-solid-color"
-                          className="settings-color-input"
-                          type="color"
-                          value={settings.solidColor}
-                          onChange={(event) => preview({ solidColor: event.target.value })}
-                          onBlur={(event) => update({ solidColor: event.target.value })}
-                        />
-                      </div>
-                    )}
-                    {numberRange('overlay', 0, 0.8, 0.05, (value) => Math.round(value * 100) + '%')}
-                    <div
-                      className="settings-panel-content settings-form grid min-w-0 gap-3.5 text-sm"
-                      hidden={settings.background !== 'custom'}
-                    >
-                      <LocalWallpaperForm save={save} report={report} />
-                      <WallpaperForm
-                        url={savedSettings.onlineWallpaperUrl}
-                        save={save}
-                        report={report}
-                      />
-                    </div>
-                  </SettingsSection>
-                </div>
-              )}
-              {visited.has('widgets') && (
-                <div className="settings-panel-content" hidden={activeTab !== 'widgets'}>
-                  <SettingsSection title={t('settings.search')}>
-                    {toggle('showSearch')}
-                    <div className="settings-panel-content" hidden={!settings.showSearch}>
-                      <SearchEngineSettings settings={savedSettings} save={save} report={report} />
-                    </div>
-                  </SettingsSection>
-                  <SettingsSection title={t('settings.sections.clock')}>
-                    {toggle('showClock')}
-                    <div className="settings-panel-content" hidden={!settings.showClock}>
-                      {toggle('hour12')}
-                    </div>
-                    {toggle('showDate')}
-                    {toggle('showLunar')}
-                  </SettingsSection>
-                  <SettingsSection title={t('settings.sections.greetings')}>
-                    {toggle('showGreeting')}
-                  </SettingsSection>
-                </div>
-              )}
-              {visited.has('sync') && (
-                <div className="settings-panel-content" hidden={activeTab !== 'sync'}>
-                  <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
-                    <SyncSettings report={report} />
-                  </Suspense>
-                </div>
-              )}
-              {visited.has('data') && (
-                <div className="settings-panel-content" hidden={activeTab !== 'data'}>
-                  <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
-                    <DataSettings spaceId={importSpaceId} groupId={importGroupId} report={report} />
-                  </Suspense>
-                </div>
-              )}
-              {hasDraft && (
-                <p
-                  className="mt-6 wrap-anywhere text-xs leading-5 text-muted-foreground"
-                  role="status"
-                >
-                  {t('settings.draftHelp')}
-                </p>
-              )}
-            </div>
-          </div>
+            </SettingsSection>,
+          )}
+
+          {panel(
+            'sync',
+            <SettingsSection title={t('settings.sections.syncActions')}>
+              <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
+                <SyncSettings report={report} />
+              </Suspense>
+            </SettingsSection>,
+          )}
+
+          {panel(
+            'data',
+            <SettingsSection title={t('settings.sections.backup')}>
+              <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
+                <DataSettings spaceId={importSpaceId} groupId={importGroupId} report={report} />
+              </Suspense>
+            </SettingsSection>,
+          )}
+
+          {hasDraft && (
+            <p className="mt-6 wrap-anywhere text-xs leading-5 text-muted-foreground" role="status">
+              {t('settings.draftHelp')}
+            </p>
+          )}
         </div>
       </div>
       {confirmation}
-    </section>
+    </div>
   );
 }

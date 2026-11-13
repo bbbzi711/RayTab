@@ -49,8 +49,9 @@ export const Clock = memo(function Clock({
   const dateStr = now.toLocaleDateString(locale, {
     month: 'numeric',
     day: 'numeric',
-    weekday: 'long',
   });
+  const weekdayStr = now.toLocaleDateString(locale, { weekday: 'long' });
+  const dateSegments = language === 'en' ? [weekdayStr, dateStr] : [dateStr, weekdayStr];
 
   return (
     <section
@@ -80,7 +81,13 @@ export const Clock = memo(function Clock({
             compact ? 'text-[11px] sm:text-[12px] opacity-75' : 'text-[13px] sm:text-[14px]',
           )}
         >
-          {showDate && <span>{dateStr}</span>}
+          {showDate && (
+            <span className="inline-flex items-center gap-2">
+              {dateSegments.map((segment) => (
+                <span key={segment}>{segment}</span>
+              ))}
+            </span>
+          )}
           {showLunar && <span>{formatLunar(now, language)}</span>}
         </p>
       )}

@@ -1,5 +1,8 @@
-import { useEffect, useId, type ReactNode, type Ref } from 'react';
-import { FileUp } from 'lucide-react';
+import { useEffect, useId, type ReactNode } from 'react';
+import { Check, FileUp } from 'lucide-react';
+import { ToggleGroup } from 'radix-ui';
+import { Button } from '@/components/ui/button';
+import type { SpaceSettings } from '@/storage/model';
 import {
   Select,
   SelectContent,
@@ -45,9 +48,15 @@ export function FormSaveHint({ dirty }: { dirty: boolean }) {
 
 export function SettingsSection({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className="settings-section">
-      {title && <h3 className="m-0 text-sm font-semibold text-foreground">{title}</h3>}
-      <div className="settings-section-body">{children}</div>
+    <section className="settings-section grid min-w-0 gap-[9px]">
+      {title && (
+        <h3 className="m-0 px-0.5 text-xs font-semibold leading-[18px] text-muted-foreground">
+          {title}
+        </h3>
+      )}
+      <div className="settings-section-body grid min-w-0 gap-1 rounded-xl border border-(--preferences-line) bg-(--preferences-surface) px-3 py-2">
+        {children}
+      </div>
     </section>
   );
 }
@@ -126,6 +135,55 @@ export function Toggle({
   );
 }
 
+export function ThemeSetting({
+  value,
+  onChange,
+}: {
+  value: SpaceSettings['theme'];
+  onChange: (value: SpaceSettings['theme']) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ToggleGroup.Root
+      type="multiple"
+      orientation="horizontal"
+      className="theme-options grid grid-cols-3 gap-2"
+      aria-label={t('settings.theme')}
+      value={[value]}
+      onValueChange={(next) => {
+        // Keep toolbar activation semantics, with exactly one active theme.
+        const selected = next.at(-1);
+        if (selected) onChange(selected as SpaceSettings['theme']);
+      }}
+    >
+      {(['light', 'dark', 'system'] as const).map((theme) => (
+        <Button key={theme} asChild variant="choice" size="choice">
+          <ToggleGroup.Item value={theme} className="relative min-w-0">
+            <span className="theme-preview" data-theme-option={theme} aria-hidden="true">
+              <span className="theme-preview-rail" />
+              <span className="theme-preview-content">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            </span>
+            <span>{t('settings.themes.' + theme)}</span>
+            {value === theme && (
+              <span
+                className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                aria-hidden="true"
+              >
+                <Check className="size-2.5" />
+              </span>
+            )}
+          </ToggleGroup.Item>
+        </Button>
+      ))}
+    </ToggleGroup.Root>
+  );
+}
+
 export function SettingsSelect({
   label,
   value,
@@ -133,7 +191,6 @@ export function SettingsSelect({
   onChange,
   disabled,
   name,
-  triggerRef,
   triggerClassName,
 }: {
   label: string;
@@ -142,7 +199,6 @@ export function SettingsSelect({
   onChange: (value: string) => void;
   disabled?: boolean;
   name?: string;
-  triggerRef?: Ref<HTMLButtonElement>;
   triggerClassName?: string;
 }) {
   const id = useId();
@@ -152,11 +208,7 @@ export function SettingsSelect({
         <label htmlFor={id}>{label}</label>
       </div>
       <Select value={value} onValueChange={onChange} disabled={disabled} name={name}>
-        <SelectTrigger
-          id={id}
-          className={cn('min-w-33 max-w-[60%] max-[420px]:min-w-27.5', triggerClassName)}
-          ref={triggerRef}
-        >
+        <SelectTrigger id={id} className={cn('min-w-0 w-32 max-w-[60%]', triggerClassName)}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -192,11 +244,12 @@ export function RangeSetting({
 }) {
   const id = useId();
   return (
-    <div className="setting-range">
-      <div className="setting-range-label">
+    <div className="setting-range grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 pb-1 pt-0.5 text-[13px]">
+      <div className="min-w-0 leading-5">
         <label id={id}>{label}</label>
       </div>
       <Slider
+        className="col-span-2 row-start-2"
         value={[value]}
         min={min}
         max={max}
@@ -205,7 +258,9 @@ export function RangeSetting({
         onValueCommit={([next]) => onCommit(next)}
         thumbProps={{ 'aria-labelledby': id, 'aria-valuetext': format(value) }}
       />
-      <output>{format(value)}</output>
+      <output className="col-start-2 row-start-1 whitespace-nowrap text-right text-[11px] text-muted-foreground tabular-nums">
+        {format(value)}
+      </output>
     </div>
   );
 }

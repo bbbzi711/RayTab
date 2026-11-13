@@ -65,7 +65,7 @@ function DialogContent({
   showCloseButton?: boolean;
   closeLabel?: string;
   overlayClassName?: string;
-  variant?: 'center' | 'workspace';
+  variant?: 'center' | 'workspace' | 'drawer';
   layout?: 'default' | 'custom';
 }) {
   const { t } = useTranslation();
@@ -88,7 +88,11 @@ function DialogContent({
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay
         className={cn(
-          variant === 'workspace' ? 'bg-slate-950/24 backdrop-blur-xs' : undefined,
+          variant === 'drawer'
+            ? 'bg-transparent backdrop-blur-none'
+            : variant === 'workspace'
+              ? 'bg-slate-950/24 backdrop-blur-xs'
+              : undefined,
           overlayClassName,
         )}
       />
@@ -97,7 +101,7 @@ function DialogContent({
         className={cn(
           variant === 'center'
             ? cn(centeredDialogClass, layout === 'default' && dialogLayoutClass)
-            : cn(dialogSurfaceClass, 'ray-workspace'),
+            : cn(dialogSurfaceClass, variant === 'workspace' && 'ray-workspace'),
           className,
         )}
         {...props}

@@ -16,8 +16,7 @@ body {
   z-index: 0;
   pointer-events: none;
 }
-.page-background,
-.settings-wallpaper {
+.page-background {
   background-color: var(--wallpaper-color, transparent);
   background-image: var(--wallpaper-gradient, none);
   background-position: center;

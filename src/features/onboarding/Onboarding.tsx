@@ -50,7 +50,7 @@ export function Onboarding({ onFinish }: { onFinish: () => Promise<void> }) {
         <header className="onboarding-copy">
           <p>{t('onboarding.welcome')}</p>
           <DialogTitle asChild>
-            <h1 ref={title} tabIndex={-1} className="outline-none">
+            <h1 ref={title} tabIndex={-1} className="text-balance outline-none">
               {t('onboarding.title')}
             </h1>
           </DialogTitle>

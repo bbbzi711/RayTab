@@ -11,7 +11,7 @@ test('后台终止后释放锁，闹钟冷启动可完成同步并保留本地�
   const protocol = await context.newCDPSession(newTab);
   try {
     await addSite(newTab, '后台恢复网站', 'https://background.example.test/keep?q=1#fragment');
-    const settings = await openSettings(newTab, '同步');
+    const settings = await openSettings(newTab, '云端同步');
     await settings.getByRole('button', { name: '配置同步', exact: true }).click();
     await settings.getByLabel('服务器地址', { exact: true }).fill(remote.url);
     await settings.getByLabel('用户名', { exact: true }).fill(username);

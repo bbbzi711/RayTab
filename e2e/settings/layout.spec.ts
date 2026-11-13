@@ -9,7 +9,7 @@ for (const viewport of [
   test(`设置可操作、布局即时预览并保存重载（${viewport.width}px）`, async ({ newTab }) => {
     await addSite(newTab, '布局网站', 'https://layout.example.test');
     await newTab.setViewportSize(viewport);
-    const settings = await openSettings(newTab, '图标与布局');
+    const settings = await openSettings(newTab, '图标布局');
     await settle(newTab);
     await noHorizontalOverflow(settings);
     await expect(settings.getByRole('button', { name: '关闭', exact: true })).toBeInViewport({
@@ -31,13 +31,13 @@ for (const viewport of [
     );
     await settings.getByRole('button', { name: '关闭', exact: true }).click();
     await newTab.reload();
-    const reopened = await openSettings(newTab, '图标与布局');
+    const reopened = await openSettings(newTab, '图标布局');
     await expect(reopened.getByRole('slider', { name: '图标大小', exact: true })).toHaveAttribute(
       'aria-valuenow',
       String(saved),
     );
-    await reopened.getByRole('button', { name: '搜索与时钟', exact: true }).click();
-    await expect(reopened.getByRole('button', { name: '搜索与时钟', exact: true })).toBeFocused();
+    await reopened.getByRole('tab', { name: '搜索', exact: true }).click();
+    await expect(reopened.getByRole('tab', { name: '搜索', exact: true })).toBeFocused();
     await reopened.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(reopened).not.toBeVisible();
   });

@@ -337,12 +337,15 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   return (
     <div className="sync-settings">
       <section className="sync-overview" aria-label={t('settings.syncOverview.status')}>
-        <div className="grid grid-cols-[3rem_minmax(0,1fr)] items-start gap-4">
-          <span className="sync-overview-icon" aria-hidden="true">
-            <Cloud size={26} />
+        <div className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-3">
+          <span
+            className="grid size-8 place-items-center rounded-md bg-secondary text-muted-foreground"
+            aria-hidden="true"
+          >
+            <Cloud size={18} />
           </span>
           <div>
-            <h2 className="mb-1.5 text-lg font-semibold tracking-tight">
+            <h2 className="mb-1 text-base font-semibold tracking-tight">
               {t(
                 loading
                   ? 'settings.syncOverview.loading'

@@ -1,6 +1,6 @@
 .sync-settings {
   display: grid;
-  gap: 28px;
+  gap: 20px;
   min-width: 0;
 }
 .sync-settings [hidden] {
@@ -8,18 +8,8 @@
 }
 .sync-overview {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
-}
-.sync-overview-icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 1px solid var(--preferences-line);
-  border-radius: 12px;
-  background: var(--preferences-field);
-  color: var(--preferences-muted);
 }
 .sync-last-success {
   margin: 0;
@@ -88,11 +78,4 @@
 }
 .sync-conflict p {
   margin: 0;
-}
-@media (max-width: 560px) {
-  .sync-overview-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-  }
 }

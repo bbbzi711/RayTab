@@ -41,7 +41,7 @@ for (const [method, status, scheme] of [
     const url = `https://127.0.0.1:${(source.address() as AddressInfo).port}/backup.json`;
     try {
       await addSite(newTab, '保留的网站', 'https://keep.example.test/');
-      const settings = await openSettings(newTab, '同步');
+      const settings = await openSettings(newTab, '云端同步');
       await settings.getByRole('button', { name: '配置同步', exact: true }).click();
       await settings.getByLabel('服务器地址', { exact: true }).fill(url);
       await settings.getByLabel('用户名', { exact: true }).fill(username);
@@ -68,7 +68,7 @@ for (const [method, status, scheme] of [
       expect(JSON.stringify(result)).not.toContain(appPassword);
       await newTab.reload();
       await expect(newTab.getByRole('link', { name: '保留的网站', exact: true })).toBeVisible();
-      const reloaded = await openSettings(newTab, '同步');
+      const reloaded = await openSettings(newTab, '云端同步');
       await reloaded.getByRole('button', { name: '编辑连接', exact: true }).click();
       await expect(reloaded.getByLabel('服务器地址', { exact: true })).toHaveValue(url);
       await expect(reloaded.getByLabel('用户名', { exact: true })).toHaveValue(username);
@@ -105,7 +105,7 @@ test('旧 HTTP 连接不会联网，仍能编辑为 HTTPS 并恢复同步', asyn
       },
     );
     await newTab.reload();
-    const settings = await openSettings(newTab, '同步');
+    const settings = await openSettings(newTab, '云端同步');
     await settings.getByRole('button', { name: '双向同步', exact: true }).click();
     await expect(
       settings.getByRole('alert').filter({ hasText: 'HTTPS 地址' }).first(),
