@@ -19,7 +19,6 @@ export default defineConfig({
       'storage',
       'alarms',
       'activeTab',
-      'search',
       ...(manifestVersion === 2 ? ['https://*/*', 'http://*/*'] : []),
     ],
     ...(manifestVersion === 3

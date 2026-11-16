@@ -43,6 +43,8 @@ export async function request(url: string, init: RequestInit) {
     throw new SyncProviderError('messages.theRemoteFileDoesNotExist', 'not-found');
   if (response.status === 409 || response.status === 412)
     throw new SyncProviderError('messages.theRemoteContentWasUpdatedByAnotherDevice', 'conflict');
+  // MKCOL reports 405 for an occupied URL. The caller still has to write the backup.
+  if (response.status === 405 && init.method === 'MKCOL') return response;
   if (!response.ok)
     throw new SyncProviderError('errors.remoteStatus', 'network', { status: response.status });
   return response;

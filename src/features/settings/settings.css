@@ -33,7 +33,7 @@
   display: grid;
   align-content: start;
   min-width: 0;
-  min-height: 112px;
+  min-height: 88px;
   padding: 18px 16px 12px;
 }
 .settings-close {
@@ -281,46 +281,6 @@
 .settings-file-picker[data-disabled] .settings-file-surface {
   cursor: default;
 }
-.settings-advanced {
-  min-width: 0;
-}
-.settings-advanced summary {
-  min-height: 36px;
-  padding: 8px 0;
-  color: var(--preferences-accent);
-  font-size: 13px;
-  line-height: 20px;
-  cursor: pointer;
-}
-.settings-advanced summary:focus-visible,
-.settings-disclosure > summary:focus-visible {
-  outline: 2px solid var(--preferences-accent);
-  outline-offset: 2px;
-}
-.settings-advanced > div {
-  display: grid;
-  gap: 18px;
-  padding: 16px;
-  margin-top: 8px;
-  border: 1px solid var(--preferences-line);
-  border-radius: var(--radius-control);
-}
-.settings-wallpaper-editor > summary {
-  list-style: none;
-}
-.settings-wallpaper-editor > summary::-webkit-details-marker {
-  display: none;
-}
-.settings-wallpaper-editor > summary:focus-visible {
-  outline: 2px solid var(--preferences-accent);
-  outline-offset: 2px;
-}
-.settings-wallpaper-editor > summary:hover {
-  background: var(--preferences-selection);
-}
-.settings-wallpaper-editor[open] > summary svg {
-  transform: rotate(180deg);
-}
 .settings-wallpaper-preview {
   position: relative;
   flex: 0 0 104px;
@@ -361,12 +321,6 @@
 .gradient-options button[aria-pressed='true'] {
   outline: 2px solid var(--preferences-accent);
   outline-offset: 3px;
-}
-.search-engine-settings {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding-top: 8px;
 }
 .search-engine-list {
   display: grid;
@@ -413,55 +367,27 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.settings-disclosure {
-  min-width: 0;
-}
-.settings-disclosure > summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 8px 10px;
-  border-radius: var(--radius-item);
-  color: var(--preferences-accent);
-  font-size: 13px;
-  line-height: 20px;
-  list-style: none;
-  cursor: pointer;
-}
-.settings-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-.settings-disclosure > summary:hover {
-  background: var(--preferences-selection);
-}
-.settings-disclosure > summary[aria-disabled='true'] {
-  opacity: 0.5;
-  cursor: wait;
-}
-.settings-disclosure > summary svg:last-child {
-  margin-left: auto;
-}
-.settings-disclosure[open] > summary svg:last-child {
-  transform: rotate(180deg);
-}
-.settings-disclosure > .settings-form {
-  padding: 14px 10px;
-}
 @container (max-width: 260px) {
-  .settings-wallpaper-editor > summary {
+  .settings-group-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  }
+  .settings-group-row > span:first-child {
+    grid-column: 1 / -1;
+  }
+  .setting-row:has(> .settings-group-sidebar-select) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-group-sidebar-select {
+    width: 100%;
+  }
+  .settings-wallpaper-current {
     flex-wrap: wrap;
     gap: 8px;
   }
   .settings-wallpaper-preview {
     flex-basis: 100%;
     height: 96px;
-  }
-  .settings-advanced > div {
-    padding: 10px;
-  }
-  .settings-disclosure > .settings-form {
-    padding-inline: 0;
   }
   .settings-file-surface {
     grid-template-columns: minmax(0, 1fr);
@@ -516,7 +442,7 @@
     padding-block: 14px;
   }
   .settings-heading {
-    min-height: 88px;
+    min-height: 72px;
     padding-block: 10px;
   }
   .settings-tabs-nav,

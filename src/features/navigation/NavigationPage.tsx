@@ -1011,7 +1011,6 @@ export function NavigationPage({
         {showGrid && editorOpen && (
           <SiteEditor
             site={editingSite}
-            space={{ ...space, groups: orderedGroups }}
             spaceId={spaceId}
             groupId={activeGroupId}
             folderId={selectedFolderId}

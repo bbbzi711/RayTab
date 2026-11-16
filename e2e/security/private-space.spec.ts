@@ -6,7 +6,6 @@ test('私密空间重载立即锁定并清除编辑草稿与普通缓存中的�
   await encryptGroup(newTab, group, 'vault-e2e-only');
   const settings = await openSettings(newTab, '通用');
   await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
-  await settings.getByRole('button', { name: '配置同步', exact: true }).click();
   await expect(settings.getByRole('switch', { name: '同步私密空间', exact: true })).toBeDisabled();
   await expect(
     settings.getByRole('switch', { name: '同步私密空间', exact: true }),

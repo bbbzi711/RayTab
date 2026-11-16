@@ -35,7 +35,6 @@ for (const viewport of [
     await newTab.getByRole('button', { name: '设置', exact: true }).click();
     const settings = newTab.getByRole('dialog', { name: '设置', exact: true });
     await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
-    await settings.getByRole('button', { name: '配置同步', exact: true }).click();
     await settings.getByLabel('服务器地址', { exact: true }).fill('https://dav.example.test/');
     await settings.getByRole('switch', { name: '自动双向同步', exact: true }).click();
     await settings.getByRole('button', { name: '保存连接', exact: true }).click();
@@ -46,7 +45,7 @@ for (const viewport of [
     await expect(notification).toHaveCount(1);
     await assertNotificationUsable(notification, newTab);
     await settings.getByRole('button', { name: '双向同步', exact: true }).click({ trial: true });
-    await settings.getByRole('button', { name: '高级操作：覆盖与恢复', exact: true }).click();
+    await expect(settings.getByRole('heading', { name: '覆盖与恢复', exact: true })).toBeVisible();
     await settings.getByRole('button', { name: '清除连接', exact: true }).click();
     const confirmation = newTab.getByRole('alertdialog');
     await expect(confirmation).toBeInViewport({ ratio: 1 });

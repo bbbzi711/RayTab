@@ -36,8 +36,10 @@ for (const viewport of [
       'aria-valuenow',
       String(saved),
     );
-    await reopened.getByRole('tab', { name: '搜索', exact: true }).click();
-    await expect(reopened.getByRole('tab', { name: '搜索', exact: true })).toBeFocused();
+    await reopened.getByRole('tab', { name: '首页组件', exact: true }).click();
+    await expect(reopened.getByRole('tab', { name: '首页组件', exact: true })).toBeFocused();
+    await expect(reopened.getByRole('switch', { name: '显示搜索', exact: true })).toBeVisible();
+    await expect(reopened.getByRole('switch', { name: '显示时钟', exact: true })).toBeVisible();
     await reopened.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(reopened).not.toBeVisible();
   });

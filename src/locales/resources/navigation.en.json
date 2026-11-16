@@ -8,7 +8,7 @@
     "deleteGroupContents": "Delete group and contents",
     "groupContentsChanged": "The contents of the group changed. Review the group and confirm deletion again.",
     "noWritableGroups": "Create an available group on the home page first.",
-    "groupPrivacyHelp": "Hiding controls tab visibility. Encryption protects group contents, and group names remain available for the tab labels. Triple-click the first visible, unencrypted tab to show or hide hidden groups.",
+    "groupPrivacyHelp": "Hiding controls tab visibility. Encryption protects group contents, and names still appear on tabs.",
     "hideHiddenGroups": "Hide hidden groups",
     "showHiddenGroups": "Show hidden groups",
     "hideNamedGroup": "Hide {{name}}",
@@ -33,7 +33,7 @@
     "textIcon": "Text icon",
     "websiteIcon": "Website icon",
     "iconText": "Icon text",
-    "iconColor": "Icon background",
+    "iconColor": "Background",
     "invalidIconText": "Enter 1–4 characters for the icon",
     "uploadRequired": "Upload an icon image",
     "replaceImage": "Replace image",
@@ -64,15 +64,10 @@
     "siteCount_other": "{{count}} sites",
     "name": "Name",
     "location": "Destination",
-    "iconSection": "Icon and appearance",
+    "iconSection": "Icon",
     "upload": "Upload image",
     "iconPreview": "Icon preview",
     "chooseImage": "Choose image",
-    "websiteIconHelp": "Fetched automatically after entering a URL, then saved locally.",
-    "savedIconHelp": "Icon saved, available offline.",
-    "draftIconHelp": "Icon fetched. Save it to make it available offline.",
-    "privateIconHelp": "Fetch an icon to save it in the private space.",
-    "uploadIconHelp": "PNG, JPG, WebP, SVG and ICO supported",
     "colors": {
       "white": "White",
       "black": "Black",
@@ -85,7 +80,6 @@
       "pink": "Pink",
       "purple": "Purple"
     },
-    "textIconHelp": "Use text and a background color as the icon.",
     "changedSiteIconFailed": "The URL has changed, but the new site icon could not be fetched. Retry, choose a text icon, or upload an image before saving."
   }
 }

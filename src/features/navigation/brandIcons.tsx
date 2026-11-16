@@ -1,8 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import { siBaidu, siDuckduckgo, type SimpleIcon } from 'simple-icons';
 import { IconFrame } from '@/components/ui/icon-frame';
-import { Search } from 'lucide-react';
-import { BROWSER_SEARCH_ENGINE } from '@/storage/model';
 function SimpleBrandIcon({
   icon,
   className,
@@ -111,12 +109,6 @@ function BingIcon({ className }: { className: string }) {
 
 export function getSearchEngineIcon(id: string, name: string): ReactNode {
   const key = id.toLowerCase();
-  if (key === BROWSER_SEARCH_ENGINE)
-    return (
-      <IconFrame size="search">
-        <Search className="brand-icon-glyph" aria-hidden="true" />
-      </IconFrame>
-    );
   if (key === 'google')
     return (
       <IconFrame size="search">

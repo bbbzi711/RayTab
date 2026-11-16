@@ -37,15 +37,6 @@ export function FormError({ error }: { error?: FieldError | { message?: string }
   );
 }
 
-export function FormSaveHint({ dirty }: { dirty: boolean }) {
-  const { t } = useTranslation();
-  return dirty ? (
-    <p className="m-0 wrap-anywhere text-xs text-muted-foreground">
-      {t('settings.pendingSaveHelp')}
-    </p>
-  ) : null;
-}
-
 export function SettingsSection({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="settings-section grid min-w-0 gap-[9px]">

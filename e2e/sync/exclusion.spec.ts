@@ -47,16 +47,14 @@ test('原生互斥拒绝配置变更，释放后真实后台可以继续同步',
   const url = `https://127.0.0.1:${(server.address() as AddressInfo).port}/raytab.json`;
   try {
     const settings = await openSettings(newTab, '云端同步');
-    await settings.getByRole('button', { name: '配置同步', exact: true }).click();
     await settings.getByLabel('服务器地址', { exact: true }).fill(url);
     await settings.getByRole('button', { name: '保存连接', exact: true }).click();
     await expect(settings.getByText('已配置 WebDAV', { exact: true })).toBeVisible();
-    await expect(settings.getByLabel('服务器地址', { exact: true })).not.toBeVisible();
+    await expect(settings.getByLabel('服务器地址', { exact: true })).toHaveValue(url);
     await expect(settings.getByRole('button', { name: '双向同步', exact: true })).toBeEnabled();
     const contender = await context.newPage();
     await contender.goto(`chrome-extension://${extensionId}/newtab.html`);
     const otherSettings = await openSettings(contender, '云端同步');
-    await otherSettings.getByRole('button', { name: '编辑连接', exact: true }).click();
     holdRead = true;
     await settings.getByRole('button', { name: '双向同步', exact: true }).click();
     await expect.poll(() => Boolean(pendingRead)).toBe(true);

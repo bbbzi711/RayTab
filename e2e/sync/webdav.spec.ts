@@ -45,9 +45,13 @@ for (const addressType of ['nutstore', 'nutstore-no-slash', 'directory', 'file']
     background,
     context,
   }) => {
-    const remote = await webDavFixture();
+    const nutstore = addressType.startsWith('nutstore');
+    const existingDirectory = addressType === 'nutstore-no-slash';
+    const remote = await webDavFixture({
+      nutstore: nutstore ? (existingDirectory ? 'existing-directory' : 'empty') : undefined,
+    });
     try {
-      if (addressType.startsWith('nutstore'))
+      if (nutstore)
         await context.route('https://dav.jianguoyun.com/**', async (route) => {
           const requestUrl = new URL(route.request().url());
           const response = await context.request.fetch(remote.origin + requestUrl.pathname, {
@@ -68,7 +72,6 @@ for (const addressType of ['nutstore', 'nutstore-no-slash', 'directory', 'file']
               ? remote.origin + '/dav/'
               : remote.url;
       const settings = await openSync(newTab);
-      await settings.getByRole('button', { name: '配置同步', exact: true }).click();
       const address = settings.getByLabel('服务器地址', { exact: true });
       const account = settings.getByLabel('用户名', { exact: true });
       const password = settings
@@ -107,12 +110,20 @@ for (const addressType of ['nutstore', 'nutstore-no-slash', 'directory', 'file']
       await settings.getByRole('button', { name: '双向同步', exact: true }).click();
       await expect.poll(async () => (await syncState(background)).status?.lastSuccess).toBeTruthy();
       await expect(settings.getByRole('button', { name: '双向同步', exact: true })).toBeEnabled();
-      expect(remote.events.map(({ method, path, status }) => ({ method, path, status }))).toEqual([
-        { method: 'GET', path: '/dav/raytab.json', status: 404 },
-        { method: 'PUT', path: '/dav/raytab.json', status: 201 },
-      ]);
-      expect(remote.events[1].ifNoneMatch).toBe('*');
-      expect(remote.events[1].ifMatch).toBeUndefined();
+      const firstSync = [{ method: 'GET', path: remote.filePath, status: 404 }];
+      if (nutstore)
+        firstSync.push({
+          method: 'MKCOL',
+          path: '/dav/RayTab/',
+          status: existingDirectory ? 405 : 201,
+        });
+      if (existingDirectory) firstSync.push({ method: 'GET', path: remote.filePath, status: 404 });
+      firstSync.push({ method: 'PUT', path: remote.filePath, status: 201 });
+      expect(remote.events.map(({ method, path, status }) => ({ method, path, status }))).toEqual(
+        firstSync,
+      );
+      expect(remote.events.at(-1)?.ifNoneMatch).toBe('*');
+      expect(remote.events.at(-1)?.ifMatch).toBeUndefined();
       expect(
         z
           .object({ format: z.literal('raytab-backup'), version: z.literal(3) })
@@ -123,26 +134,26 @@ for (const addressType of ['nutstore', 'nutstore-no-slash', 'directory', 'file']
       const reloaded = await openSync(newTab);
       await expect(reloaded.getByText('已配置 WebDAV', { exact: true })).toBeVisible();
       await expect(reloaded.getByText(/上次成功：/)).toBeVisible();
-      await reloaded.getByRole('button', { name: '编辑连接', exact: true }).click();
       await expect(reloaded.getByLabel('服务器地址', { exact: true })).toHaveValue(serverAddress);
       await expect(
         reloaded.getByRole('switch', { name: '自动双向同步', exact: true }),
       ).not.toBeChecked();
-      await reloaded.getByRole('button', { name: '收起配置', exact: true }).click();
       await reloaded.getByRole('button', { name: '双向同步', exact: true }).click();
-      await expect.poll(() => remote.events.length).toBe(4);
+      await expect.poll(() => remote.events.length).toBe(firstSync.length + 2);
       await expect(reloaded.getByRole('button', { name: '双向同步', exact: true })).toBeEnabled();
       const saved = await syncState(background);
       expect(saved.status?.lastSuccess).toBeTruthy();
       expect(saved.status?.lastError).toBeUndefined();
       expect(
-        remote.events.slice(2).map(({ method, path, status }) => ({ method, path, status })),
+        remote.events
+          .slice(firstSync.length)
+          .map(({ method, path, status }) => ({ method, path, status })),
       ).toEqual([
-        { method: 'GET', path: '/dav/raytab.json', status: 200 },
-        { method: 'PUT', path: '/dav/raytab.json', status: 200 },
+        { method: 'GET', path: remote.filePath, status: 200 },
+        { method: 'PUT', path: remote.filePath, status: 200 },
       ]);
-      expect(remote.events[3].ifMatch).toBe('"1"');
-      expect(remote.events[3].ifNoneMatch).toBeUndefined();
+      expect(remote.events.at(-1)?.ifMatch).toBe('"1"');
+      expect(remote.events.at(-1)?.ifNoneMatch).toBeUndefined();
       await expect(reloaded.getByRole('alert')).toHaveCount(0);
     } finally {
       await remote.close();
@@ -154,10 +165,9 @@ for (const status of [401, 403] as const)
     newTab,
     background,
   }) => {
-    const remote = await webDavFixture(status);
+    const remote = await webDavFixture({ failure: status });
     try {
       const settings = await openSync(newTab);
-      await settings.getByRole('button', { name: '配置同步', exact: true }).click();
       await settings.getByLabel('服务器地址', { exact: true }).fill(remote.url);
       await settings.getByLabel('用户名', { exact: true }).fill(username);
       await settings

@@ -8,7 +8,7 @@
     "deleteGroupContents": "删除分组及内容",
     "groupContentsChanged": "分组里的内容已变化，请重新确认删除。",
     "noWritableGroups": "请先在首页创建一个可用分组。",
-    "groupPrivacyHelp": "隐藏只影响标签显示。加密保护分组内容，分组名称仍用于显示标签。三连击第一个未隐藏、未加密的标签也可以展开或收起。",
+    "groupPrivacyHelp": "隐藏控制标签显示。加密保护分组内容，名称仍用于显示标签。",
     "hideHiddenGroups": "收起隐藏分组",
     "showHiddenGroups": "显示隐藏分组",
     "hideNamedGroup": "隐藏 {{name}}",
@@ -64,15 +64,10 @@
     "siteCount_other": "{{count}} 个网站",
     "name": "名称",
     "location": "存入位置",
-    "iconSection": "图标与外观",
+    "iconSection": "图标",
     "upload": "上传图片",
     "iconPreview": "图标预览",
     "chooseImage": "选择图片",
-    "websiteIconHelp": "输入网址后自动获取，保存在本地。",
-    "savedIconHelp": "已保存图标，可离线使用。",
-    "draftIconHelp": "图标已获取，保存后可离线使用。",
-    "privateIconHelp": "点击获取，图标保存在私密空间。",
-    "uploadIconHelp": "支持 PNG、JPG、WebP、SVG 和 ICO",
     "colors": {
       "white": "白色",
       "black": "黑色",
@@ -85,7 +80,6 @@
       "pink": "粉色",
       "purple": "紫色"
     },
-    "textIconHelp": "用文字和底色作为图标。",
     "changedSiteIconFailed": "网址已更改，但未获取到新网站的图标。请重试，或选择文字图标、上传图片后保存。"
   }
 }

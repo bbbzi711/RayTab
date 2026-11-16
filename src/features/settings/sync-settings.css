@@ -1,49 +1,19 @@
 .sync-settings {
+  --sync-column-gap: 12px;
+}
+.sync-columns {
   display: grid;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sync-column-gap);
   min-width: 0;
 }
-.sync-settings [hidden] {
-  display: none;
-}
-.sync-overview {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-.sync-last-success {
-  margin: 0;
-  color: var(--preferences-muted);
-  font-size: 12px;
-  line-height: 20px;
-}
-.sync-settings .sync-overview-actions {
-  gap: 10px;
-}
-.sync-connection-editor {
-  display: grid;
-  gap: 18px;
-  padding-top: 24px;
-  border-top: 1px solid var(--preferences-line);
-}
-.sync-connection-editor .settings-form fieldset {
-  gap: 20px;
-}
-.sync-connection-options {
-  display: grid;
-  gap: 8px;
-  padding-block: 12px;
-  border-top: 1px solid var(--preferences-line);
-  border-bottom: 1px solid var(--preferences-line);
-}
-.sync-settings > .settings-advanced {
-  padding-top: 12px;
-  border-top: 1px solid var(--preferences-line);
-}
-.sync-settings .settings-advanced > .settings-form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+@container (min-width: 280px) {
+  .sync-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sync-provider-select {
+    width: calc((100% - var(--sync-column-gap)) / 2);
+  }
 }
 .sync-conflicts {
   display: grid;

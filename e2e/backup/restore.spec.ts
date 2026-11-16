@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { expect, test } from '../fixtures';
-import { openSettings, exportNormalBackup, parseNormalBackup, openIconOptions } from '../helpers';
+import { openSettings, exportNormalBackup, parseNormalBackup, expectIconOptions } from '../helpers';
 test('图标资源随备份导出和确认替换恢复，切换网站图标移除上传引用', async ({
   newTab,
   context,
@@ -9,7 +9,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await context.route('https://backup-icon.example.test/**', (route) => route.abort());
   await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
   const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
-  await openIconOptions(editor);
+  await expectIconOptions(editor);
   await editor.getByLabel('名称', { exact: true }).fill('备份图标网站');
   await editor.getByLabel('网址', { exact: true }).fill('https://backup-icon.example.test');
   await editor.getByRole('radio', { name: '上传图片', exact: true }).click();
@@ -29,8 +29,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await expect(editor).not.toBeVisible();
   const site = newTab.getByRole('link', { name: '备份图标网站', exact: true });
   await expect(site.locator('img')).toBeVisible();
-  const settings = await openSettings(newTab, '数据备份');
-  await settings.getByRole('button', { name: '导出备份', exact: true }).click();
+  const settings = await openSettings(newTab, '数据管理');
   await settings.getByRole('combobox', { name: '导出范围', exact: true }).click();
   await newTab.getByRole('option', { name: '普通空间', exact: true }).click();
   const downloading = newTab.waitForEvent('download');
@@ -51,8 +50,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await newTab.getByRole('menuitem', { name: '删除', exact: true }).click();
   await newTab.getByRole('alertdialog').getByRole('button', { name: '删除', exact: true }).click();
   await expect(site).not.toBeVisible();
-  const restore = await openSettings(newTab, '数据备份');
-  await restore.getByRole('button', { name: '恢复备份', exact: true }).click();
+  const restore = await openSettings(newTab, '数据管理');
   await restore.getByLabel('备份文件', { exact: true }).setInputFiles(backupPath);
   await restore.getByRole('button', { name: '预览备份', exact: true }).click();
   await expect(restore.getByText('备份内容预览', { exact: true })).toBeVisible();
@@ -70,7 +68,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
-  await openIconOptions(edit);
+  await expectIconOptions(edit);
   await expect(edit.getByRole('button', { name: '自动配色', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -81,7 +79,7 @@ test('图标资源随备份导出和确认替换恢复，切换网站图标移�
   await newTab.reload();
   await site.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
-  await openIconOptions(edit);
+  await expectIconOptions(edit);
   await expect(edit.getByRole('radio', { name: '网站图标', exact: true })).toBeChecked();
   await edit.getByRole('button', { name: '取消', exact: true }).click();
   expect((await exportNormalBackup(newTab)).resources.map((resource) => resource.id)).not.toContain(

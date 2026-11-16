@@ -1,5 +1,5 @@
 import { expect, test } from '../fixtures';
-import { readSiteImage, openIconOptions } from '../helpers';
+import { readSiteImage, expectIconOptions } from '../helpers';
 
 const mark =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect x="12" y="12" width="104" height="104" rx="24" fill="#1677ff"/><path d="M40 64h48M64 40v48" stroke="white" stroke-width="12"/></svg>';
@@ -32,7 +32,7 @@ test('官网 SVG 保存后离线重载，新标签页不重新请求图标', asy
   await expect(
     editor.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
   ).toBeVisible();
-  await expect(editor.getByText('图标已获取，保存后可离线使用。', { exact: true })).toBeVisible();
+  await expect(editor.getByRole('button', { name: '裁切图片', exact: true })).toBeEnabled();
   await editor.getByRole('button', { name: '保存', exact: true }).click();
   await expect(editor).not.toBeVisible();
   const icon = newTab.getByRole('link', { name: '官网图标', exact: true }).locator('img');
@@ -95,11 +95,11 @@ test('网站图标重新获取失败保留已保存图片，重试保存与离�
   await link.click({ button: 'right' });
   await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
   const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
-  await openIconOptions(edit);
+  await expectIconOptions(edit);
   await expect(
     edit.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),
   ).toBeVisible();
-  await expect(edit.getByText('已保存图标，可离线使用。', { exact: true })).toBeVisible();
+  await expect(edit.getByRole('button', { name: '裁切图片', exact: true })).toBeEnabled();
   await edit.getByLabel('网址', { exact: true }).fill(`https://${domain}/updated?q=keep#fragment`);
   await expect(
     edit.getByRole('complementary', { name: '图标预览', exact: true }).locator('img'),

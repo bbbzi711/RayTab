@@ -15,9 +15,8 @@ import {
   SlidersHorizontal,
   Grid2X2,
   Palette,
-  Search,
-  Clock3,
-  PanelLeft,
+  House,
+  Layers3,
   Cloud,
   Database,
   X,
@@ -50,23 +49,13 @@ const SyncSettings = lazy(() =>
   import('./SyncSettings').then((module) => ({ default: module.SyncSettings })),
 );
 
-const tabs = [
-  'general',
-  'icons',
-  'wallpaper',
-  'search',
-  'clock',
-  'sidebar',
-  'sync',
-  'data',
-] as const;
+const tabs = ['general', 'icons', 'wallpaper', 'home', 'groups', 'sync', 'data'] as const;
 const tabIcons = {
   general: SlidersHorizontal,
   icons: Grid2X2,
   wallpaper: Palette,
-  search: Search,
-  clock: Clock3,
-  sidebar: PanelLeft,
+  home: House,
+  groups: Layers3,
   sync: Cloud,
   data: Database,
 };
@@ -114,16 +103,7 @@ export default function SettingsPanel({
   const queue = useRef<Promise<void>>(Promise.resolve());
   const [confirm, confirmation] = useConfirm();
   const content = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<Record<SettingsTab, HTMLButtonElement | null>>({
-    general: null,
-    icons: null,
-    wallpaper: null,
-    search: null,
-    clock: null,
-    sidebar: null,
-    sync: null,
-    data: null,
-  });
+  const tabRefs = useRef<Partial<Record<SettingsTab, HTMLButtonElement | null>>>({});
   const currentTab = useRef<SettingsTab>('general');
   const scrollPositions = useRef<Partial<Record<SettingsTab, number>>>({});
   const hasDraft = Object.values(drafts).some((draft) => draft.dirty);
@@ -357,9 +337,6 @@ export default function SettingsPanel({
             <span className="sr-only">{t('settings.title')} · </span>
             {t('settings.tabs.' + activeTab)}
           </h1>
-          <p className="m-0 text-[11px] leading-[18px] text-muted-foreground">
-            {t('settings.categoryDescriptions.' + activeTab)}
-          </p>
           <div
             className="settings-autosave"
             role="status"
@@ -448,64 +425,18 @@ export default function SettingsPanel({
 
           {panel(
             'general',
-            <>
-              <SettingsSection title={t('settings.sections.general')}>
-                <SettingsSelect
-                  label={t('settings.fields.language')}
-                  value={settings.language}
-                  options={[
-                    ['zh-CN', '简体中文'],
-                    ['en', 'English'],
-                  ]}
-                  onChange={(value) => update({ language: value as SpaceSettings['language'] })}
-                />
-                {toggle('openInNewTab')}
-              </SettingsSection>
-              {spaceId === 'private' && (
-                <SettingsSection title={t('settings.privateInheritance')}>
-                  <p className="m-0 py-1 text-xs leading-5 text-muted-foreground">
-                    {t('settings.privateInheritanceHelp', { count: privateOverrideCount })}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="form-action"
-                    disabled={busy || hasDraft || privateOverrideCount === 0}
-                    onClick={() => void resetPrivatePreferences()}
-                  >
-                    {t('settings.followNormal')}
-                  </Button>
-                </SettingsSection>
-              )}
-              <SettingsSection title={t('settings.sections.groups')}>
-                {groupManagement}
-              </SettingsSection>
-              <SettingsSection title={t('settings.groupPassword')}>
-                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                  {t(
-                    protectedPrivate
-                      ? privateLocked
-                        ? 'settings.lockedHelp'
-                        : 'settings.unlockedHelp'
-                      : 'settings.protectionHelp',
-                  )}
-                </p>
-                {protectedPrivate && privateLocked && (
-                  <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
-                    {t('navigation.unlockGroups')}
-                  </Button>
-                )}
-                {protectedPrivate && !privateLocked && (
-                  <details className="settings-advanced">
-                    <summary>{t('settings.managePassword')}</summary>
-                    <div>
-                      <PasswordForm mode="change" report={report} />
-                      <PasswordForm mode="remove" report={report} />
-                    </div>
-                  </details>
-                )}
-              </SettingsSection>
-            </>,
+            <SettingsSection>
+              <SettingsSelect
+                label={t('settings.fields.language')}
+                value={settings.language}
+                options={[
+                  ['zh-CN', '简体中文'],
+                  ['en', 'English'],
+                ]}
+                onChange={(value) => update({ language: value as SpaceSettings['language'] })}
+              />
+              {toggle('openInNewTab')}
+            </SettingsSection>,
           )}
 
           {panel(
@@ -553,48 +484,88 @@ export default function SettingsPanel({
           )}
 
           {panel(
-            'search',
-            <SettingsSection title={t('settings.sections.search')}>
-              {toggle('showSearch')}
-              <div className="settings-panel-content" hidden={!settings.showSearch}>
-                <SearchEngineSettings settings={savedSettings} save={save} report={report} />
-              </div>
-            </SettingsSection>,
-          )}
-
-          {panel(
-            'clock',
-            <SettingsSection title={t('settings.sections.clock')}>
-              {toggle('showClock')}
-              <div className="settings-panel-content" hidden={!settings.showClock}>
+            'home',
+            <>
+              <SettingsSection title={t('settings.sections.search')}>
+                {toggle('showSearch')}
+              </SettingsSection>
+              <SettingsSection title={t('settings.sections.clock')}>
+                {toggle('showClock')}
                 {toggle('hour12')}
-              </div>
-              {toggle('showDate')}
-              {toggle('showLunar')}
-              {toggle('showGreeting')}
-            </SettingsSection>,
+                {toggle('showDate')}
+                {toggle('showLunar')}
+                {toggle('showGreeting')}
+              </SettingsSection>
+              <SettingsSection title={t('settings.manageSearchEngines')}>
+                <SearchEngineSettings settings={savedSettings} save={save} report={report} />
+              </SettingsSection>
+            </>,
           )}
 
           {panel(
-            'sidebar',
-            <SettingsSection title={t('settings.sidebar')}>
-              <SettingsSelect
-                label={t('settings.fields.sidebarMode')}
-                value={settings.sidebarMode}
-                options={(['always', 'auto', 'hidden'] as const).map(
-                  (mode) => [mode, t('settings.sidebarModes.' + mode)] as const,
+            'groups',
+            <>
+              <SettingsSection title={t('settings.sections.groups')}>
+                {groupManagement}
+              </SettingsSection>
+              <SettingsSection title={t('settings.sidebar')}>
+                <SettingsSelect
+                  triggerClassName="settings-group-sidebar-select"
+                  label={t('settings.fields.sidebarMode')}
+                  value={settings.sidebarMode}
+                  options={(['always', 'auto', 'hidden'] as const).map(
+                    (mode) => [mode, t('settings.sidebarModes.' + mode)] as const,
+                  )}
+                  onChange={(value) =>
+                    update({ sidebarMode: value as SpaceSettings['sidebarMode'] })
+                  }
+                />
+                {settings.sidebarMode === 'auto' && (
+                  <p className="m-0 pb-2 text-xs leading-5 text-muted-foreground">
+                    {t('settings.sidebarHelp')}
+                  </p>
                 )}
-                onChange={(value) => update({ sidebarMode: value as SpaceSettings['sidebarMode'] })}
-              />
-              <p className="m-0 pb-2 text-xs leading-5 text-muted-foreground">
-                {t('settings.sidebarHelp')}
-              </p>
-            </SettingsSection>,
+              </SettingsSection>
+              <SettingsSection title={t('settings.groupPassword')}>
+                {(!protectedPrivate || privateLocked) && (
+                  <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                    {t(protectedPrivate ? 'settings.lockedHelp' : 'settings.protectionHelp')}
+                  </p>
+                )}
+                {protectedPrivate && privateLocked && (
+                  <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
+                    {t('navigation.unlockGroups')}
+                  </Button>
+                )}
+                {protectedPrivate && !privateLocked && (
+                  <>
+                    <PasswordForm mode="change" report={report} />
+                    <PasswordForm mode="remove" report={report} />
+                  </>
+                )}
+              </SettingsSection>
+              {spaceId === 'private' && (
+                <SettingsSection title={t('settings.privateInheritance')}>
+                  <p className="m-0 py-1 text-xs leading-5 text-muted-foreground">
+                    {t('settings.privateInheritanceHelp', { count: privateOverrideCount })}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="form-action"
+                    disabled={busy || hasDraft || privateOverrideCount === 0}
+                    onClick={() => void resetPrivatePreferences()}
+                  >
+                    {t('settings.followNormal')}
+                  </Button>
+                </SettingsSection>
+              )}
+            </>,
           )}
 
           {panel(
             'sync',
-            <SettingsSection title={t('settings.sections.syncActions')}>
+            <SettingsSection>
               <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
                 <SyncSettings report={report} />
               </Suspense>
@@ -603,17 +574,9 @@ export default function SettingsPanel({
 
           {panel(
             'data',
-            <SettingsSection title={t('settings.sections.backup')}>
-              <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
-                <DataSettings spaceId={importSpaceId} groupId={importGroupId} report={report} />
-              </Suspense>
-            </SettingsSection>,
-          )}
-
-          {hasDraft && (
-            <p className="mt-6 wrap-anywhere text-xs leading-5 text-muted-foreground" role="status">
-              {t('settings.draftHelp')}
-            </p>
+            <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
+              <DataSettings spaceId={importSpaceId} groupId={importGroupId} report={report} />
+            </Suspense>,
           )}
         </div>
       </div>

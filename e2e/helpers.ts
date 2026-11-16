@@ -27,7 +27,7 @@ export async function addGroup(page: Page, name: string) {
 /** Encrypt an existing named group through the real shared-password UI. */
 export async function encryptGroup(page: Page, name: string, password: string) {
   await page.getByRole('button', { name: '主页', exact: true }).click();
-  const settings = await openSettings(page, '通用');
+  const settings = await openSettings(page, '分组管理');
   const row = settings.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) });
   await row.getByRole('button', { name: '加密', exact: true }).click();
   const creating = page.getByRole('dialog', { name: '设置分组加密密码', exact: true });
@@ -53,8 +53,8 @@ export async function unlockGroup(page: Page, name: string, password: string) {
   );
 }
 
-export async function openIconOptions(editor: Locator) {
-  await editor.getByRole('button', { name: '图标与外观', exact: true }).click();
+export async function expectIconOptions(editor: Locator) {
+  await expect(editor.getByRole('radiogroup', { name: '图标来源', exact: true })).toBeVisible();
 }
 
 export async function openDesktopMenu(page: Page) {
@@ -109,8 +109,7 @@ export async function noHorizontalOverflow(element: Locator) {
 
 /** Read the supported backup output, without depending on IndexedDB stores or records. */
 export async function exportNormalBackup(page: Page) {
-  const settings = await openSettings(page, '数据备份');
-  await settings.getByRole('button', { name: '导出备份', exact: true }).click();
+  const settings = await openSettings(page, '数据管理');
   await settings.getByRole('combobox', { name: '导出范围', exact: true }).click();
   await page.getByRole('option', { name: '普通空间', exact: true }).click();
   const downloading = page.waitForEvent('download');

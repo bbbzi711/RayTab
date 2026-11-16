@@ -5,7 +5,10 @@ import { fixtureTls } from './tls-fixture';
 export const username = 'webdav-fixture-user';
 export const appPassword = 'webdav-fixture-app-password';
 
-export async function webDavFixture(failure?: 401 | 403) {
+export async function webDavFixture({
+  failure,
+  nutstore,
+}: { failure?: 401 | 403; nutstore?: 'empty' | 'existing-directory' } = {}) {
   const events: {
     method: string;
     path: string;
@@ -15,6 +18,9 @@ export async function webDavFixture(failure?: 401 | 403) {
   }[] = [];
   let content: string | undefined;
   let version = 0;
+  const directoryPath = nutstore ? '/dav/RayTab/' : '/dav/';
+  const filePath = `${directoryPath}raytab.json`;
+  let directoryExists = nutstore !== 'empty';
   const authorization = `Basic ${Buffer.from(`${username}:${appPassword}`).toString('base64')}`;
   const server = createServer(fixtureTls, async (request, response) => {
     const method = request.method ?? '';
@@ -24,7 +30,7 @@ export async function webDavFixture(failure?: 401 | 403) {
       'Access-Control-Allow-Headers',
       'Authorization, Content-Type, If-Match, If-None-Match',
     );
-    response.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS, PROPFIND');
+    response.setHeader('Access-Control-Allow-Methods', 'GET, PUT, OPTIONS, PROPFIND, MKCOL');
     response.setHeader('Access-Control-Expose-Headers', 'ETag');
     const send = (status: number, body = '') => {
       events.push({
@@ -50,7 +56,12 @@ export async function webDavFixture(failure?: 401 | 403) {
       send(method === 'PROPFIND' ? 207 : 403);
       return;
     }
-    if (path !== '/dav/raytab.json') {
+    if (nutstore && path === directoryPath && method === 'MKCOL') {
+      send(directoryExists ? 405 : 201);
+      directoryExists = true;
+      return;
+    }
+    if (path !== filePath || !directoryExists) {
       send(404);
       return;
     }
@@ -89,7 +100,8 @@ export async function webDavFixture(failure?: 401 | 403) {
   const origin = `https://127.0.0.1:${(server.address() as AddressInfo).port}`;
   return {
     origin,
-    url: `${origin}/dav/raytab.json`,
+    url: `${origin}${filePath}`,
+    filePath,
     events,
     content: () => content,
     close: async () => {

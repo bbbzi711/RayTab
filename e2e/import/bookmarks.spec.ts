@@ -1,14 +1,10 @@
 import { expect, test } from '../fixtures';
 import { openSettings, failNextWrite, noHorizontalOverflow, exportNormalBackup } from '../helpers';
 test('导入预览去重且栏目切换保留文件，保存失败重试后重载只导入一次', async ({ newTab }) => {
-  const settings = await openSettings(newTab, '数据备份');
-  await expect(settings.getByRole('button', { name: '预览文件', exact: true })).not.toBeVisible();
-  await expect(
-    settings.getByRole('button', { name: '导出所选备份', exact: true }),
-  ).not.toBeVisible();
-  await expect(settings.getByRole('button', { name: '预览备份', exact: true })).not.toBeVisible();
-  await settings.getByRole('button', { name: '导入书签', exact: true }).click();
-  await expect(settings.getByRole('heading', { name: '导入书签', exact: true })).toBeFocused();
+  const settings = await openSettings(newTab, '数据管理');
+  await expect(settings.getByRole('button', { name: '预览文件', exact: true })).toBeVisible();
+  await expect(settings.getByRole('button', { name: '导出所选备份', exact: true })).toBeVisible();
+  await expect(settings.getByRole('button', { name: '预览备份', exact: true })).toBeVisible();
   const items = Array.from(
     { length: 58 },
     (_, index) =>
@@ -23,16 +19,10 @@ test('导入预览去重且栏目切换保留文件，保存失败重试后重�
   });
   await settings.getByRole('button', { name: '预览文件', exact: true }).click();
   await expect(settings.getByText(/准备导入 58 个网站，已跳过 3 个重复网址/)).toBeVisible();
-  await settings.getByRole('button', { name: '返回数据管理', exact: true }).click();
-  await expect(settings.getByRole('button', { name: '导入书签', exact: true })).toBeFocused();
-  await settings.getByRole('button', { name: '导出备份', exact: true }).click();
-  await expect(settings.getByRole('heading', { name: '导出备份', exact: true })).toBeFocused();
   await expect(settings.getByRole('combobox', { name: '导出范围', exact: true })).toBeVisible();
+  await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
   await expect(settings.getByText(/准备导入 58 个网站，已跳过 3 个重复网址/)).not.toBeVisible();
-  await settings.getByRole('button', { name: '返回数据管理', exact: true }).click();
-  await expect(settings.getByRole('button', { name: '导出备份', exact: true })).toBeFocused();
-  await settings.getByRole('button', { name: '导入书签', exact: true }).click();
-  await expect(settings.getByRole('heading', { name: '导入书签', exact: true })).toBeFocused();
+  await settings.getByRole('tab', { name: '数据管理', exact: true }).click();
   await expect(settings.getByText('layout-bookmarks.html', { exact: true })).toBeVisible();
   expect(
     await settings
@@ -47,8 +37,8 @@ test('导入预览去重且栏目切换保留文件，保存失败重试后重�
   await settings.getByRole('button', { name: '确认导入', exact: true }).click();
   await expect(settings.getByRole('alert')).toBeVisible();
   await expect(settings.getByText(/准备导入 58 个网站，已跳过 3 个重复网址/)).toBeVisible();
-  await settings.getByRole('button', { name: '返回数据管理', exact: true }).click();
-  await settings.getByRole('button', { name: '导入书签', exact: true }).click();
+  await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
+  await settings.getByRole('tab', { name: '数据管理', exact: true }).click();
   await expect(settings.getByRole('alert')).toBeVisible();
   await settings.getByRole('button', { name: '确认导入', exact: true }).click();
   await expect(settings.getByRole('button', { name: '确认导入', exact: true })).not.toBeVisible();

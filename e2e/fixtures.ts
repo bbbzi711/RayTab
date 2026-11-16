@@ -5,10 +5,17 @@ export const test = base.extend<{
   context: BrowserContext;
   background: Worker;
   extensionId: string;
+  extensionArgs: string[];
   newTab: Page;
 }>({
-  context: async ({ headless, viewport, locale }, use, testInfo) => {
-    const context = await launchExtensionContext({ headless, viewport, locale });
+  extensionArgs: [[], { option: true }],
+  context: async ({ headless, viewport, locale, extensionArgs }, use, testInfo) => {
+    const context = await launchExtensionContext({
+      headless,
+      viewport,
+      locale,
+      args: extensionArgs,
+    });
     const unexpectedRequests: string[] = [];
     // A functional test must explicitly supply its external services. Never depend on
     // real website availability, favicon changes or the developer's network/proxy.

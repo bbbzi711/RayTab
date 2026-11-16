@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowDownToLine, ArrowUpFromLine, ChevronRight, RotateCcw } from 'lucide-react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
@@ -28,6 +27,7 @@ import { errorMessage } from '@/lib/errors';
 import {
   FormError,
   SettingsFilePicker,
+  SettingsSection,
   SettingsSelect,
   useDraftStatus,
   type DraftReporter,
@@ -118,15 +118,7 @@ export function DataSettings({
   report: DraftReporter;
 }) {
   const { t } = useTranslation();
-  const [active, setActive] = useState<'import' | 'export' | 'restore' | null>(null);
-  const [visited, setVisited] = useState<Set<'import' | 'export' | 'restore'>>(() => new Set());
   const [busyForms, setBusyForms] = useState<Record<string, boolean>>({});
-  const taskHeading = useRef<HTMLHeadingElement>(null);
-  const taskTrigger = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    const target = active ? taskHeading.current : taskTrigger.current;
-    target?.focus({ preventScroll: true });
-  }, [active]);
   const reportForm = useCallback<DraftReporter>(
     (id, dirty, busy) => {
       report(id, dirty, busy);
@@ -134,83 +126,32 @@ export function DataSettings({
     },
     [report],
   );
-  const tasks = [
-    {
-      id: 'import',
-      title: 'settings.importBookmarks',
-      description: 'settings.dataTasks.importHelp',
-      icon: ArrowDownToLine,
-    },
-    {
-      id: 'export',
-      title: 'settings.exportBackup',
-      description: 'settings.dataTasks.exportHelp',
-      icon: ArrowUpFromLine,
-    },
-    {
-      id: 'restore',
-      title: 'settings.restoreBackup',
-      description: 'settings.dataTasks.restoreHelp',
-      icon: RotateCcw,
-    },
-  ] as const;
+  const otherFormBusy = (id: string) =>
+    Object.entries(busyForms).some(([form, busy]) => form !== id && busy);
+
   return (
-    <div className="data-settings">
-      <div className="data-task-list" hidden={active !== null}>
-        {tasks.map(({ id, title, description, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className="data-task-link"
-            aria-label={t(title)}
-            onClick={(event) => {
-              taskTrigger.current = event.currentTarget;
-              setVisited((previous) => new Set(previous).add(id));
-              setActive(id);
-            }}
-          >
-            <Icon size={20} aria-hidden="true" />
-            <span>
-              <strong>{t(title)}</strong>
-              <small>{t(description)}</small>
-            </span>
-            <ChevronRight size={18} aria-hidden="true" />
-          </button>
-        ))}
-      </div>
-      {active && (
-        <div className="data-task-heading mb-6 grid gap-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="-ml-2 justify-self-start"
-            disabled={Object.values(busyForms).some(Boolean)}
-            onClick={() => setActive(null)}
-          >
-            <ArrowLeft size={16} aria-hidden="true" />
-            {t('settings.dataTasks.back')}
-          </Button>
-          <h2 ref={taskHeading} tabIndex={-1}>
-            {t(tasks.find((task) => task.id === active)!.title)}
-          </h2>
-        </div>
-      )}
-      {visited.has('import') && (
-        <div className="data-task-body" hidden={active !== 'import'}>
+    <div className="data-settings grid min-w-0 gap-5">
+      <SettingsSection title={t('settings.importBookmarks')}>
+        <fieldset
+          className="data-task-body min-w-0 py-2"
+          disabled={otherFormBusy('bookmark-import')}
+        >
           <BookmarkImport spaceId={spaceId} groupId={groupId} report={reportForm} />
-        </div>
-      )}
-      {visited.has('export') && (
-        <div className="data-task-body" hidden={active !== 'export'}>
+        </fieldset>
+      </SettingsSection>
+      <SettingsSection title={t('settings.exportBackup')}>
+        <fieldset className="data-task-body min-w-0 py-2" disabled={otherFormBusy('backup-export')}>
           <BackupExport report={reportForm} />
-        </div>
-      )}
-      {visited.has('restore') && (
-        <div className="data-task-body" hidden={active !== 'restore'}>
+        </fieldset>
+      </SettingsSection>
+      <SettingsSection title={t('settings.restoreBackup')}>
+        <fieldset
+          className="data-task-body min-w-0 py-2"
+          disabled={otherFormBusy('backup-restore')}
+        >
           <BackupRestore report={reportForm} />
-        </div>
-      )}
+        </fieldset>
+      </SettingsSection>
     </div>
   );
 }
@@ -292,9 +233,6 @@ function BookmarkImport({
   });
   return (
     <form className="settings-form grid min-w-0 gap-3.5 text-sm" noValidate onSubmit={submit}>
-      <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-        {t('settings.bookmarkHelp')}
-      </p>
       <SettingsFilePicker
         label={t('settings.bookmarkFile')}
         hint={t('settings.dataTasks.bookmarkFileHint')}
@@ -499,7 +437,7 @@ function BackupExport({ report }: { report: DraftReporter }) {
         )}
       />
       <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-        {t('settings.backupRangeHelp', { range: t('settings.ranges.' + range) })}
+        {t('settings.backupContents')}
       </p>
       {protectedPrivate && range !== 'normal' && (
         <label className="data-input-field">

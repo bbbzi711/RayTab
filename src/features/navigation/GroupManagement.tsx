@@ -43,13 +43,13 @@ export function GroupManagement({
         {groups.map((group) => (
           <li
             key={`${group.spaceId}:${group.id}`}
-            className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_5rem_auto] items-center gap-x-1.5 border-b border-border py-2"
+            className="settings-group-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_5rem_auto] items-center gap-x-1.5 gap-y-1 border-b border-border py-2"
           >
             <span className="flex min-w-0 items-center gap-1.5 break-all text-sm">
               {group.encrypted && <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />}
               {group.name}
             </span>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex min-w-0 items-center gap-1.5 text-xs">
               <Switch
                 checked={group.hidden}
                 aria-label={t('navigation.hideNamedGroup', { name: group.name })}

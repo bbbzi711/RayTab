@@ -38,10 +38,19 @@ test('设置抽屉覆盖首页且不改变几何位置，关闭按钮、Esc 和�
 test('设置抽屉保持键盘焦点，嵌套选择及输入法 Escape 不误关闭', async ({ newTab }) => {
   const drawer = await openSettings(newTab, '通用');
   await settle(newTab);
+  await expect(drawer.getByRole('tab')).toHaveText([
+    '通用',
+    '图标布局',
+    '主题壁纸',
+    '首页组件',
+    '分组管理',
+    '云端同步',
+    '数据管理',
+  ]);
   const general = drawer.getByRole('tab', { name: '通用', exact: true });
   await expect(general).toBeFocused();
   await general.press('ArrowUp');
-  await expect(drawer.getByRole('tab', { name: '数据备份', exact: true })).toBeFocused();
+  await expect(drawer.getByRole('tab', { name: '数据管理', exact: true })).toBeFocused();
   await newTab.keyboard.press('Home');
   await expect(general).toBeFocused();
 

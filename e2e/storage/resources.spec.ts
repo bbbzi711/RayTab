@@ -194,7 +194,7 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   const baseline = await evidence(newTab);
   expect(baseline.reads['shared-icon']).toBe(1);
   expect(baseline.reads['shared-wallpaper']).toBe(1);
-  const widgets = await openSettings(newTab, '时间日期');
+  const widgets = await openSettings(newTab, '首页组件');
   await widgets.getByRole('switch', { name: '显示时钟', exact: true }).click();
   await expect.poll(async () => (await storedState(newTab)).normalSettings.showClock).toBe(false);
   await newTab.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -234,8 +234,7 @@ test('共享资源和上传壁纸在普通保存时保持 URL，跨页同 ID 恢
   };
   const other = await context.newPage();
   await other.goto(`chrome-extension://${extensionId}/newtab.html`);
-  const restore = await openSettings(other, '数据备份');
-  await restore.getByRole('button', { name: '恢复备份', exact: true }).click();
+  const restore = await openSettings(other, '数据管理');
   await restore.getByLabel('备份文件', { exact: true }).setInputFiles({
     name: 'same-id-new-bytes.json',
     mimeType: 'application/json',

@@ -24,7 +24,6 @@ const siteEditorDraftSchema = siteSchema.pick({ iconBackground: true }).extend({
       }
     })
     .pipe(siteSchema.shape.url),
-  location: destinationSchema,
   iconType: z.enum(['text', 'auto', 'resource']),
   textIcon: z.string(),
   websiteResourceId: z.string().max(100),

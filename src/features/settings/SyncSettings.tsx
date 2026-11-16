@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Cloud, Settings2 } from 'lucide-react';
+import { Cloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -25,7 +25,6 @@ import { useRayTabStore } from '@/storage/store';
 import { errorMessage, storedErrorMessage } from '@/lib/errors';
 import {
   FormError,
-  FormSaveHint,
   SettingsSelect,
   SettingsSection,
   Toggle,
@@ -142,7 +141,6 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
     includePrivate: boolean;
   } | null>(null);
   const connected = connectionInfo !== null;
-  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailure, setLoadFailure] = useState<'invalid' | 'unavailable'>();
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -166,6 +164,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   });
   const { isDirty, isSubmitting, errors } = form.formState;
   const busy = isSubmitting || actions.formState.isSubmitting;
+  const formDisabled = busy || loading || !available || loadFailure === 'unavailable';
   const provider = useWatch({ control: form.control, name: 'type' });
   const includePrivate = useWatch({ control: form.control, name: 'includePrivate' });
   useDraftStatus('sync', isDirty, busy, report);
@@ -284,7 +283,6 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
           await clearSyncConfig();
           form.reset(emptyDraft);
           setConnectionInfo(null);
-          setEditing(false);
           setStatus({ schemaVersion: 1, conflicts: [] });
         } else if (values.operation === 'resolve' && values.conflict) {
           await resolveSyncConflict(values.conflict, values.choice);
@@ -334,18 +332,15 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
           ] as const),
     [provider],
   );
+  const actionError = actions.formState.errors.root;
+  const lastError = storedErrorMessage(status.lastError);
+  const showLastError = lastError && lastError !== actionError?.message;
   return (
-    <div className="sync-settings">
-      <section className="sync-overview" aria-label={t('settings.syncOverview.status')}>
-        <div className="grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-3">
-          <span
-            className="grid size-8 place-items-center rounded-md bg-secondary text-muted-foreground"
-            aria-hidden="true"
-          >
-            <Cloud size={18} />
-          </span>
-          <div>
-            <h2 className="mb-1 text-base font-semibold tracking-tight">
+    <div className="sync-settings grid min-w-0 gap-4 py-1">
+      <section className="grid min-w-0 gap-3" aria-label={t('settings.syncOverview.status')}>
+        <div className="grid gap-1">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <h2 className="wrap-anywhere text-base font-semibold tracking-tight">
               {t(
                 loading
                   ? 'settings.syncOverview.loading'
@@ -364,31 +359,36 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 },
               )}
             </h2>
-            <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-              {t(
-                !available
-                  ? 'settings.syncUnavailable'
-                  : connected
-                    ? connectionInfo.automatic
-                      ? status.automaticPaused ||
-                        (connectionInfo.includePrivate && protectedPrivate)
-                        ? 'settings.syncOverview.automaticPaused'
-                        : 'settings.syncOverview.automatic'
-                      : 'settings.syncOverview.manual'
-                    : 'settings.syncHelp',
-              )}
-            </p>
+            <span
+              className="grid size-8 shrink-0 place-items-center rounded-md bg-secondary text-muted-foreground"
+              aria-hidden="true"
+            >
+              <Cloud size={18} />
+            </span>
           </div>
-        </div>
-        {connected && (
-          <p className="sync-last-success">
-            {status.lastSuccess
-              ? t('settings.lastSync', {
-                  date: new Date(status.lastSuccess).toLocaleString(i18n.language),
-                })
-              : t('settings.syncOverview.noSuccess')}
+          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+            {t(
+              !available
+                ? 'settings.syncUnavailable'
+                : connected
+                  ? connectionInfo.automatic
+                    ? status.automaticPaused || (connectionInfo.includePrivate && protectedPrivate)
+                      ? 'settings.syncOverview.automaticPaused'
+                      : 'settings.syncOverview.automatic'
+                    : 'settings.syncOverview.manual'
+                  : 'settings.syncHelp',
+            )}
           </p>
-        )}
+          {connected && (
+            <p className="text-xs leading-5 text-muted-foreground">
+              {status.lastSuccess
+                ? t('settings.lastSync', {
+                    date: new Date(status.lastSuccess).toLocaleString(i18n.language),
+                  })
+                : t('settings.syncOverview.noSuccess')}
+            </p>
+          )}
+        </div>
         {status.recovery && (
           <p role="status" className="wrap-anywhere text-xs leading-5 text-muted-foreground">
             {t('settings.syncRecovered', {
@@ -398,69 +398,62 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
             })}
           </p>
         )}
-        <div className="settings-form-actions sync-overview-actions">
-          {connected && (
-            <Button type="button" disabled={busy || isDirty || loading} onClick={() => run('auto')}>
-              {t(actions.formState.isSubmitting ? 'settings.syncing' : 'settings.twoWaySync')}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant={connected || editing ? 'outline' : 'default'}
-            aria-expanded={editing}
-            disabled={busy || loading || loadFailure === 'unavailable' || !available}
-            onClick={() => setEditing((value) => !value)}
-          >
-            <Settings2 size={16} aria-hidden="true" />
-            {t(
-              editing
-                ? 'settings.syncOverview.collapse'
-                : connected
-                  ? 'settings.syncOverview.edit'
-                  : 'settings.syncOverview.configure',
+        {(connected || loadFailure) && (
+          <div className="sync-columns">
+            {connected && (
+              <Button
+                type="button"
+                size="form-action"
+                disabled={busy || isDirty || loading}
+                onClick={() => run('auto')}
+              >
+                {t(actions.formState.isSubmitting ? 'settings.syncing' : 'settings.twoWaySync')}
+              </Button>
             )}
-          </Button>
-          {loadFailure && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setLoadAttempt((value) => value + 1)}
-            >
-              {t('settings.syncOverview.retryLoad')}
-            </Button>
-          )}
-        </div>
+            {loadFailure && (
+              <Button
+                type="button"
+                size="form-action"
+                variant="outline"
+                onClick={() => setLoadAttempt((value) => value + 1)}
+              >
+                {t('settings.syncOverview.retryLoad')}
+              </Button>
+            )}
+          </div>
+        )}
         {isDirty && (
           <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
             {t('settings.syncDirtyHelp')}
           </p>
         )}
-        <FormError error={errors.root} />
-        <FormError error={actions.formState.errors.root} />
-        {status.lastError && (
-          <p className="m-0 wrap-anywhere text-xs text-destructive" role="alert">
-            {storedErrorMessage(status.lastError)}
-          </p>
-        )}
-        {status.nextRetryAt && (
-          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-            {t('settings.syncRetry', {
-              count: status.retryCount ?? 0,
-              date: new Date(status.nextRetryAt).toLocaleString(i18n.language),
-            })}
-          </p>
+        {(actionError?.message || showLastError || status.nextRetryAt) && (
+          <div className="grid gap-1">
+            <FormError error={actionError} />
+            {showLastError && (
+              <p className="wrap-anywhere text-xs text-destructive" role="alert">
+                {lastError}
+              </p>
+            )}
+            {status.nextRetryAt && (
+              <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                {t('settings.syncRetry', {
+                  count: status.retryCount ?? 0,
+                  date: new Date(status.nextRetryAt).toLocaleString(i18n.language),
+                })}
+              </p>
+            )}
+          </div>
         )}
       </section>
-      <div className="sync-connection-editor" hidden={!editing}>
-        <h2 className="text-lg font-semibold tracking-tight">
-          {t('settings.sections.connection')}
-        </h2>
+      <section className="grid min-w-0 gap-3 border-t border-border pt-4">
+        <h2 className="text-sm font-semibold">{t('settings.sections.connection')}</h2>
         <form
           aria-label={t('settings.sections.connection')}
           className="settings-form grid min-w-0 gap-3.5 text-sm"
           noValidate
           onSubmit={(event) => {
-            if (busy) {
+            if (formDisabled) {
               event.preventDefault();
               return;
             }
@@ -503,7 +496,6 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                   automatic: draft.automatic,
                   includePrivate: draft.includePrivate,
                 });
-                setEditing(false);
                 toast.success(t('settings.connectionSaved'));
               } catch (reason) {
                 form.setError('root', { message: errorMessage(reason) });
@@ -511,12 +503,13 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
             })(event);
           }}
         >
-          <fieldset disabled={busy || loading || !available}>
+          <fieldset disabled={formDisabled}>
             <Controller
               control={form.control}
               name="type"
               render={({ field }) => (
                 <SettingsSelect
+                  triggerClassName="sync-provider-select"
                   label={t('settings.provider')}
                   value={field.value}
                   options={[
@@ -525,11 +518,11 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                     ['gitee', 'Gitee'],
                   ]}
                   onChange={field.onChange}
-                  disabled={busy || loading || !available}
+                  disabled={formDisabled}
                 />
               )}
             />
-            <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-4.5 max-[560px]:grid-cols-1">
+            <div className="sync-columns">
               {fields.map(([name, label, type]) => (
                 <div
                   className={name === 'url' || name === 'token' ? 'col-span-full' : undefined}
@@ -555,25 +548,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 </div>
               ))}
             </div>
-            {provider === 'webdav' && (
-              <div className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                <p>{t('settings.webdavServerHelp')}</p>
-                <p>{t('settings.webdavNutstoreHelp')}</p>
-              </div>
-            )}
-            <div className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-              <p>{t('settings.syncDataDisclosure')}</p>
-              <p>{t('settings.syncCredentialDisclosure')}</p>
-              <a
-                href="https://github.com/bbbzi711/RayTab/blob/main/PRIVACY.md"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-4"
-              >
-                {t('settings.privacyPolicy')}
-              </a>
-            </div>
-            <div className="sync-connection-options">
+            <div className="grid min-w-0 border-y border-border py-1">
               <Controller
                 control={form.control}
                 name="automatic"
@@ -582,7 +557,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                     label={t('settings.automaticSync')}
                     checked={field.value}
                     onChange={field.onChange}
-                    disabled={busy || loading || !available}
+                    disabled={formDisabled}
                   />
                 )}
               />
@@ -594,7 +569,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                     label={t('settings.includePrivate')}
                     checked={field.value}
                     onChange={field.onChange}
-                    disabled={busy || loading || !available || locked}
+                    disabled={formDisabled || locked}
                   />
                 )}
               />
@@ -625,53 +600,59 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
                 </div>
               )}
             </div>
-            <FormSaveHint dirty={isDirty} />
-            <div className="settings-form-actions">
+            <a
+              href="https://github.com/bbbzi711/RayTab/blob/main/PRIVACY.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="justify-self-start text-xs leading-5 text-muted-foreground underline underline-offset-4"
+            >
+              {t('settings.privacyPolicy')}
+            </a>
+            <FormError error={errors.root} />
+            <div className="sync-columns">
               <Button
                 type="submit"
-                size="sm"
-                disabled={busy || loading || !available || (locked && includePrivate)}
+                size="form-action"
+                disabled={formDisabled || (locked && includePrivate)}
               >
                 {t(isSubmitting ? 'settings.saving' : 'settings.saveConnection')}
               </Button>
             </div>
           </fieldset>
         </form>
-      </div>
-      {connected && (
-        <details className="settings-advanced">
-          <summary role="button">{t('settings.advancedSync')}</summary>
-          <div className="settings-form-actions">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy || !connected || isDirty}
-              onClick={() => run('push')}
-            >
-              {t('settings.overwriteCloud')}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy || !connected || isDirty}
-              onClick={() => run('pull')}
-            >
-              {t('settings.restoreCloud')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={busy || !connected}
-              onClick={() => run('disconnect')}
-            >
-              {t('settings.disconnect')}
-            </Button>
-          </div>
-        </details>
-      )}
+      </section>
+      <section className="grid min-w-0 gap-3 border-t border-border pt-4">
+        <h2 className="text-sm font-semibold">{t('settings.syncOverwriteRestore')}</h2>
+        <div className="sync-columns">
+          <Button
+            type="button"
+            variant="outline"
+            size="form-action"
+            disabled={busy || loading || !connected || isDirty}
+            onClick={() => run('push')}
+          >
+            {t('settings.overwriteCloud')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="form-action"
+            disabled={busy || loading || !connected || isDirty}
+            onClick={() => run('pull')}
+          >
+            {t('settings.restoreCloud')}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="form-action"
+            disabled={busy || loading || !connected}
+            onClick={() => run('disconnect')}
+          >
+            {t('settings.disconnect')}
+          </Button>
+        </div>
+      </section>
       {status.conflicts.length > 0 && (
         <SettingsSection title={t('settings.conflicts')}>
           <div className="sync-conflicts">

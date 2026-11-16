@@ -4,7 +4,7 @@ import { fixtureSpki } from './sync/tls-fixture.ts';
 
 export const extensionPath = fileURLToPath(new URL('../.output/chrome-mv3', import.meta.url));
 
-type ExtensionBrowserOptions = Pick<LaunchOptions, 'headless'> &
+type ExtensionBrowserOptions = Pick<LaunchOptions, 'headless' | 'args'> &
   Pick<BrowserContextOptions, 'viewport' | 'locale'>;
 
 export async function launchExtensionContext(options: ExtensionBrowserOptions) {
@@ -28,6 +28,7 @@ export async function launchExtensionContext(options: ExtensionBrowserOptions) {
         ? ['--enable-unsafe-extension-debugging']
         : [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`]),
       `--ignore-certificate-errors-spki-list=${fixtureSpki}`,
+      ...(options.args ?? []),
     ],
   });
   if (executablePath) {

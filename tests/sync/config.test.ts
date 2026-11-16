@@ -104,7 +104,7 @@ describe('sync connection storage', () => {
     const config = {
       connection: {
         type: 'webdav',
-        url: 'https://dav.jianguoyun.com/dav/raytab.json',
+        url: 'https://dav.jianguoyun.com/dav/RayTab/raytab.json',
         username: 'user',
         password: 'password',
       },
@@ -116,7 +116,11 @@ describe('sync connection storage', () => {
     const status = { schemaVersion: 1, conflicts: [], lastSuccess: 'previous-success' };
     local['raytab-sync-baseline'] = baseline;
     local['raytab-sync-status'] = status;
-    for (const url of ['https://dav.jianguoyun.com/dav/', 'https://dav.jianguoyun.com/dav']) {
+    for (const url of [
+      'https://dav.jianguoyun.com/dav/',
+      'https://dav.jianguoyun.com/dav',
+      'https://dav.jianguoyun.com/dav/RayTab/',
+    ]) {
       await saveSyncConfig({
         ...config,
         connection: { ...config.connection, url },

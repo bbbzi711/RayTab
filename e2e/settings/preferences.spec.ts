@@ -9,19 +9,14 @@ import {
   noHorizontalOverflow,
 } from '../helpers';
 test('提交保存失败保留搜索引擎输入，重试仅新增一次', async ({ newTab }) => {
-  const settings = await openSettings(newTab, '搜索');
-  await settings.getByRole('button', { name: '管理搜索引擎', exact: true }).click();
-  const disclosure = settings.getByRole('button', { name: /^(添加|编辑)搜索引擎$/ });
-  await expect(settings.getByLabel('搜索引擎名称', { exact: true })).not.toBeVisible();
-  await disclosure.click();
+  const settings = await openSettings(newTab, '首页组件');
+  const editorHeading = settings.getByRole('heading', { name: '添加搜索引擎', exact: true });
   const form = settings.getByRole('form', { name: '编辑搜索引擎', exact: true });
-  await expect(form.getByLabel('搜索引擎名称', { exact: true })).toBeFocused();
+  await expect(form.getByLabel('搜索引擎名称', { exact: true })).toBeVisible();
   await form.getByLabel('搜索引擎名称', { exact: true }).fill('失败重试引擎');
   await form.getByLabel('搜索引擎地址', { exact: true }).fill('https://search.example.test/?q=%s');
-  await disclosure.click();
   await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
-  await settings.getByRole('tab', { name: '搜索', exact: true }).click();
-  await disclosure.click();
+  await settings.getByRole('tab', { name: '首页组件', exact: true }).click();
   await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('失败重试引擎');
   await expect(form.getByLabel('搜索引擎地址', { exact: true })).toHaveValue(
     'https://search.example.test/?q=%s',
@@ -34,18 +29,15 @@ test('提交保存失败保留搜索引擎输入，重试仅新增一次', async
     settings.getByRole('button', { name: '编辑 失败重试引擎', exact: true }),
   ).toHaveCount(0);
   await form.getByRole('button', { name: '添加', exact: true }).click();
-  await expect(form).not.toBeVisible();
-  await expect(disclosure).toBeFocused();
-  await disclosure.click();
+  await expect(form).toBeVisible();
+  await expect(editorHeading).toBeFocused();
   await expect(form.getByLabel('搜索引擎名称', { exact: true })).toHaveValue('');
-  await disclosure.click();
   await expect(
     settings.getByRole('button', { name: '编辑 失败重试引擎', exact: true }),
   ).toHaveCount(1);
   await settings.getByRole('button', { name: '关闭', exact: true }).click();
   await newTab.reload();
-  const reloaded = await openSettings(newTab, '搜索');
-  await reloaded.getByRole('button', { name: '管理搜索引擎', exact: true }).click();
+  const reloaded = await openSettings(newTab, '首页组件');
   await expect(
     reloaded.getByRole('button', { name: '编辑 失败重试引擎', exact: true }),
   ).toHaveCount(1);
@@ -59,7 +51,7 @@ test('提交保存失败保留搜索引擎输入，重试仅新增一次', async
     .getByRole('form', { name: '编辑搜索引擎', exact: true })
     .getByRole('button', { name: '取消', exact: true })
     .click();
-  await expect(reloaded.getByRole('button', { name: /^(添加|编辑)搜索引擎$/ })).toBeFocused();
+  await expect(reloaded.getByRole('heading', { name: '添加搜索引擎', exact: true })).toBeFocused();
 });
 
 test('即时保存失败不影响其他页面，重试后跨页更新且重载保留结果', async ({
@@ -154,14 +146,10 @@ test('全局偏好在普通和加密分组间双向一致，重载保留设置�
 test('设置表单在栏目间保留草稿，关闭时确认放弃', async ({ newTab }) => {
   const settings = await openSettings(newTab, '云端同步');
   await expect(settings.getByText('尚未设置同步', { exact: true })).toBeVisible();
-  await expect(settings.getByLabel('服务器地址', { exact: true })).not.toBeVisible();
-  await settings.getByRole('button', { name: '配置同步', exact: true }).click();
+  await expect(settings.getByLabel('服务器地址', { exact: true })).toBeVisible();
   await settings
     .getByLabel('服务器地址', { exact: true })
     .fill('https://dav.example.test/draft.json');
-  await settings.getByRole('button', { name: '收起配置', exact: true }).click();
-  await expect(settings.getByLabel('服务器地址', { exact: true })).not.toBeVisible();
-  await settings.getByRole('button', { name: '配置同步', exact: true }).click();
   await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
   await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
   await expect(settings.getByLabel('服务器地址', { exact: true })).toHaveValue(
@@ -206,11 +194,11 @@ test('英文设置在横向小窗口和320px内保留可达分类与关闭入口
   const settings = newTab.getByRole('dialog');
   await settings.getByRole('combobox', { name: '语言', exact: true }).click();
   await newTab.getByRole('option', { name: 'English', exact: true }).click();
-  await settings.getByRole('tab', { name: 'Search', exact: true }).click();
+  await settings.getByRole('tab', { name: 'Home widgets', exact: true }).click();
   for (const width of [640, 320]) {
     await newTab.setViewportSize({ width, height: 360 });
     await settle(newTab);
-    const category = settings.getByRole('tab', { name: 'Search', exact: true });
+    const category = settings.getByRole('tab', { name: 'Home widgets', exact: true });
     await expect(category).toBeInViewport({ ratio: 1 });
     expect((await category.boundingBox())!.height).toBeGreaterThanOrEqual(44);
     await expect(settings.getByRole('button', { name: 'Close', exact: true })).toBeInViewport({

@@ -1,6 +1,6 @@
 import { seedLargeNavigation } from '../storage/inspect';
 import { addSite, expect, test } from '../fixtures';
-import { settle, noHorizontalOverflow, openDesktopMenu } from '../helpers';
+import { addGroup, settle, noHorizontalOverflow, openDesktopMenu } from '../helpers';
 test('键盘和右键均可编辑网站，取消保留原值，保存与重载保留修改', async ({ newTab }) => {
   await addSite(newTab, '菜单网站', 'https://menu.example.test/path?q=1#fragment');
   const site = newTab.getByRole('link', { name: '菜单网站', exact: true });
@@ -68,33 +68,53 @@ test('小窗口删除超长名称时确认文字完整换行，取消后保留�
   await expect(site).toBeVisible();
 });
 
-test('长分组名称的存入位置列表在窄屏内完整换行且可用键盘选择', async ({ newTab }) => {
-  const name = 'W'.repeat(80);
-  await newTab.getByRole('button', { name: '添加分组', exact: true }).click();
-  const group = newTab.getByRole('dialog');
-  await group.getByLabel('名称', { exact: true }).fill(name);
-  await group.getByRole('button', { name: '保存', exact: true }).click();
-  await expect(group).not.toBeVisible();
-  await newTab.setViewportSize({ width: 320, height: 360 });
-  await newTab.getByRole('button', { name: '添加网站', exact: true }).click();
-  const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
-  const location = editor.getByLabel('存入位置', { exact: true });
-  await location.click();
-  const options = newTab.getByRole('listbox');
-  const lastOption = options.getByRole('option', { name, exact: true });
-  await expect(options).toBeVisible();
-  await noHorizontalOverflow(options);
-  await noHorizontalOverflow(lastOption);
+test('窄屏网站表单直接保存到当前文件夹，编辑与重载保持位置', async ({ newTab }) => {
+  const groupName = 'W'.repeat(80);
+  const folderName = '网站位置测试';
+  await addGroup(newTab, groupName);
+  await newTab.getByRole('button', { name: groupName, exact: true }).click();
+  await openDesktopMenu(newTab);
+  await newTab.getByRole('menuitem', { name: '新建文件夹', exact: true }).click();
+  const naming = newTab.getByRole('dialog', { name: '新建文件夹', exact: true });
+  await naming.getByLabel('名称', { exact: true }).fill(folderName);
+  await naming.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(naming).not.toBeVisible();
 
-  await newTab.keyboard.press('Home');
-  await expect(options.getByRole('option').first()).toBeFocused();
-  await newTab.keyboard.press('End');
-  await expect(lastOption).toBeFocused();
-  await newTab.keyboard.press('Enter');
-  await expect(options).not.toBeVisible();
-  await expect(location).toHaveText(name);
-  await expect(location).toBeFocused();
-  await editor.getByRole('button', { name: '取消', exact: true }).click();
+  await newTab.setViewportSize({ width: 320, height: 360 });
+  const folderCard = newTab.getByRole('button', { name: folderName, exact: true });
+  await folderCard.click();
+  const folder = newTab.getByRole('dialog', { name: folderName, exact: true });
+  await folder.getByRole('button', { name: '添加网站', exact: true }).click();
+  const editor = newTab.getByRole('dialog', { name: '添加网站', exact: true });
+  await settle(newTab);
+  await noHorizontalOverflow(editor);
+  await expect(editor.getByLabel('存入位置', { exact: true })).toHaveCount(0);
+  await expect(editor.getByLabel('网址', { exact: true })).toBeFocused();
+  await newTab.keyboard.press('Tab');
+  await expect(editor.getByLabel('名称', { exact: true })).toBeFocused();
+  await editor.getByRole('radio', { name: '文字图标', exact: true }).click();
+  await editor.getByLabel('网址', { exact: true }).fill('https://folder.example.test/');
+  await editor.getByLabel('名称', { exact: true }).fill('文件夹网站');
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(editor).not.toBeVisible();
+
+  await folder.getByRole('link', { name: '文件夹网站', exact: true }).click({ button: 'right' });
+  await newTab.getByRole('menuitem', { name: '编辑网站', exact: true }).click();
+  const edit = newTab.getByRole('dialog', { name: '编辑网站', exact: true });
+  await expect(edit.getByLabel('存入位置', { exact: true })).toHaveCount(0);
+  await edit.getByLabel('名称', { exact: true }).fill('修改后的文件夹网站');
+  await edit.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(edit).not.toBeVisible();
+  await folder.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(folder).not.toBeVisible();
+  await expect(newTab.getByRole('link', { name: '修改后的文件夹网站', exact: true })).toHaveCount(
+    0,
+  );
+  await newTab.reload();
+  await folderCard.click();
+  await expect(
+    folder.getByRole('link', { name: '修改后的文件夹网站', exact: true }),
+  ).toHaveAttribute('href', 'https://folder.example.test/');
 });
 
 test('Esc 只关闭最上层设置和菜单，保留底层整理选择', async ({ newTab }) => {

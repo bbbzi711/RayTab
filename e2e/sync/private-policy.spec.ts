@@ -27,7 +27,6 @@ test('受保护私密空间只允许手动同步，旧自动配置由后台暂�
     await encryptGroup(newTab, group, vaultPassword);
     await unlockGroup(newTab, group, vaultPassword);
     const settings = await openSettings(newTab, '云端同步');
-    await settings.getByRole('button', { name: '配置同步', exact: true }).click();
     await settings.getByLabel('服务器地址', { exact: true }).fill(url);
     const automatic = settings.getByRole('switch', { name: '自动双向同步', exact: true });
     await expect(automatic).toBeChecked();
@@ -63,7 +62,6 @@ test('受保护私密空间只允许手动同步，旧自动配置由后台暂�
     await newTab.getByRole('button', { name: '设置', exact: true }).click();
     await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
     await expect(settings.getByText('已配置 WebDAV', { exact: true })).toBeVisible();
-    await settings.getByRole('button', { name: '编辑连接', exact: true }).click();
     await expect(automatic).not.toBeChecked();
     await expect(settings.getByRole('switch', { name: '同步私密空间', exact: true })).toBeChecked();
     await expect(settings.getByLabel('私密同步加密密码', { exact: true })).toHaveValue('');

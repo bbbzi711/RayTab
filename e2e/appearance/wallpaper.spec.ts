@@ -6,16 +6,14 @@ import { paintedArtwork } from '../artwork';
 import { addGroup, encryptGroup, unlockGroup } from '../helpers';
 import { RAY_DATABASE_NAME } from '../../src/storage/connection';
 
-async function wallpaperSettings(page: Page, source: 'online' | 'local' = 'online') {
+async function wallpaperSettings(page: Page) {
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const settings = page.getByRole('dialog', { name: '设置', exact: true });
   await settings.getByRole('tab', { name: '主题壁纸', exact: true }).click();
-  await settings.getByRole('button', { name: '更换壁纸', exact: true }).click();
   await settings.getByRole('combobox', { name: '壁纸来源', exact: true }).click();
   await page.getByRole('option', { name: '自定义', exact: true }).click();
-  await settings
-    .getByRole('button', { name: source === 'online' ? '图片网址' : '上传图片', exact: true })
-    .click();
+  await expect(settings.getByRole('button', { name: '使用本地壁纸', exact: true })).toBeVisible();
+  await expect(settings.getByLabel('在线壁纸地址', { exact: true })).toBeVisible();
   return settings;
 }
 
@@ -170,7 +168,7 @@ test('壁纸显示成功但缓存写入失败时明确通知，重试后才算�
     if (!fault || typeof fault !== 'object') throw new Error('Missing cache fault fixture');
     Reflect.set(fault, 'blocked', false);
   });
-  await settings.getByRole('tab', { name: '时间日期', exact: true }).click();
+  await settings.getByRole('tab', { name: '首页组件', exact: true }).click();
   await settings.getByRole('switch', { name: '显示时钟', exact: true }).click();
   await expect
     .poll(() => cacheInfo(newTab))
@@ -181,7 +179,7 @@ test('全局壁纸跨普通和加密分组一致，上传只存一份且启动�
   newTab,
   context,
 }) => {
-  const settings = await wallpaperSettings(newTab, 'local');
+  const settings = await wallpaperSettings(newTab);
   await settings.getByLabel('本地壁纸', { exact: true }).setInputFiles({
     name: 'wallpaper.svg',
     mimeType: 'image/svg+xml',

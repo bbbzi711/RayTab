@@ -9,12 +9,12 @@ import { createRepository } from '../../src/storage/database';
 afterEach(() => vi.useRealTimers());
 
 describe('home preferences', () => {
-  it('persists browser and explicit search choices across reload and backup restore', async () => {
+  it('defaults to Bing and persists configured engine choices across reload and backup restore', async () => {
     const name = crypto.randomUUID();
     let repo = createRepository(name);
     try {
-      expect((await repo.read()).normalSettings.searchEngine).toBe('browser');
-      for (const searchEngine of ['google', 'browser']) {
+      expect((await repo.read()).normalSettings.searchEngine).toBe('bing');
+      for (const searchEngine of ['google', 'bing']) {
         await repo.update((state) =>
           applyCommand(state, { type: 'settings', spaceId: 'normal', patch: { searchEngine } }),
         );
@@ -33,6 +33,34 @@ describe('home preferences', () => {
       await repo.close();
     }
   });
+
+  it.each([
+    { engineIds: ['google', 'bing'], expected: 'bing' },
+    { engineIds: ['google'], expected: 'google' },
+  ])(
+    'resolves a legacy browser choice to $expected with engines $engineIds',
+    async ({ engineIds, expected }) => {
+      const repo = createRepository(crypto.randomUUID());
+      try {
+        await repo.update((state) => {
+          state.normalSettings.searchEngine = 'browser';
+          state.normalSettings.searchEngines = engineIds.map((id) =>
+            state.normalSettings.searchEngines.find((engine) => engine.id === id)!,
+          );
+        });
+        const saved = await repo.read();
+        expect(effectiveSettings(saved, 'normal').searchEngine).toBe(expected);
+        expect(effectiveSettings(saved, 'private').searchEngine).toBe(expected);
+        const backup = await parseBackup(
+          JSON.stringify(await createBackup(saved, new Map(), 'normal')),
+        );
+        const restored = await restoreBackup(createInitialState(), backup, 'replace');
+        expect(effectiveSettings(restored.state, 'normal').searchEngine).toBe(expected);
+      } finally {
+        await repo.close();
+      }
+    },
+  );
 
   it('shows time, date and greeting independently according to their switches', () => {
     vi.useFakeTimers();

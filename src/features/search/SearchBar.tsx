@@ -4,8 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from 'sonner';
 import { ArrowRight, ChevronDown, X } from 'lucide-react';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
-import { BROWSER_SEARCH_ENGINE, type SpaceId } from '@/storage/model';
-import { searchWithBrowser } from './browser-search';
+import type { SpaceId } from '@/storage/model';
 import { errorMessage } from '@/lib/errors';
 import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -46,24 +45,21 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
     window.addEventListener('keydown', focusSearch);
     return () => window.removeEventListener('keydown', focusSearch);
   }, []);
-  const useBrowserEngine = settings.searchEngine === BROWSER_SEARCH_ENGINE;
   const engine =
     settings.searchEngines.find((item) => item.id === settings.searchEngine) ??
     settings.searchEngines[0];
   const search = async (event: FormEvent) => {
     event.preventDefault();
-    if (!query.trim()) return;
-    if (useBrowserEngine) {
-      try {
-        await searchWithBrowser(query.trim(), settings.openInNewTab);
-      } catch (reason) {
-        toast.error(errorMessage(reason));
-      }
-      return;
+    const text = query.trim();
+    if (!text) return;
+    try {
+      const url = engine.url.replace('%s', encodeURIComponent(text));
+      if (settings.openInNewTab) await browser.tabs.create({ url });
+      else window.location.assign(url);
+      setQuery((current) => (current === query ? '' : current));
+    } catch (reason) {
+      toast.error(errorMessage(reason));
     }
-    const url = engine.url.replace('%s', encodeURIComponent(query.trim()));
-    if (settings.openInNewTab) window.open(url, '_blank', 'noopener,noreferrer');
-    else window.location.assign(url);
   };
   return (
     <form className="search-shell" onSubmit={search} role="search">
@@ -80,10 +76,7 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               className={cn(searchActionClass, 'min-w-9 gap-1.25 px-1.5 has-[>svg]:px-1.5')}
               aria-label={t('messages.switchSearchEngine')}
             >
-              {getSearchEngineIcon(
-                useBrowserEngine ? BROWSER_SEARCH_ENGINE : engine.id,
-                engine.name,
-              )}
+              {getSearchEngineIcon(engine.id, engine.name)}
               <ChevronDown className="ui-icon-compact" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
@@ -109,15 +102,6 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               );
             }}
           >
-            <DropdownMenuRadioItem
-              value={BROWSER_SEARCH_ENGINE}
-              onSelect={() => {
-                focusSearchOnClose.current = true;
-              }}
-            >
-              {getSearchEngineIcon(BROWSER_SEARCH_ENGINE, '')}
-              <span className="min-w-0 truncate">{t('messages.browserSearchEngine')}</span>
-            </DropdownMenuRadioItem>
             {settings.searchEngines.map((item) => (
               <DropdownMenuRadioItem
                 key={item.id}

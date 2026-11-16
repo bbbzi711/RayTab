@@ -52,8 +52,10 @@ describe('sync provider concurrency guards', () => {
     },
   );
   it.each([
-    ['https://dav.jianguoyun.com/dav/', 'https://dav.jianguoyun.com/dav/raytab.json'],
-    ['https://dav.jianguoyun.com/dav', 'https://dav.jianguoyun.com/dav/raytab.json'],
+    ['https://dav.jianguoyun.com/dav/', 'https://dav.jianguoyun.com/dav/RayTab/raytab.json'],
+    ['https://dav.jianguoyun.com/dav', 'https://dav.jianguoyun.com/dav/RayTab/raytab.json'],
+    ['https://dav.jianguoyun.com/dav/raytab.json', 'https://dav.jianguoyun.com/dav/raytab.json'],
+    ['https://dav.jianguoyun.com/dav/custom/', 'https://dav.jianguoyun.com/dav/custom/raytab.json'],
     ['https://dav.test', 'https://dav.test/raytab.json'],
     ['https://dav.test/RayTab/', 'https://dav.test/RayTab/raytab.json'],
     ['https://dav.test/RayTab/custom.json', 'https://dav.test/RayTab/custom.json'],
@@ -65,6 +67,7 @@ describe('sync provider concurrency guards', () => {
     const provider = createWebDavProvider({ type: 'webdav', url, username: 'user', password: 'p' });
     await expect(provider.read()).resolves.toEqual({ content: '{}', version: 'v1' });
     await provider.write('{}', 'v1');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0][0]).toBe(target);
     expect(fetchMock.mock.calls[1][0]).toBe(target);
     expect(fetchMock.mock.calls[1][1].headers['If-Match']).toBe('v1');
@@ -206,6 +209,28 @@ describe('sync provider concurrency guards', () => {
       code: 'conflict',
       translationKey: 'messages.theRemoteContentWasUpdatedByAnotherDevice',
     });
+  });
+
+  it('does not overwrite a Nutstore backup created while preparing the default folder', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 405 }))
+      .mockResolvedValueOnce(new Response('{}', { headers: { etag: 'other-device' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = createWebDavProvider({
+      type: 'webdav',
+      url: 'https://dav.jianguoyun.com/dav/',
+      username: 'user',
+      password: 'password',
+    });
+    await expect(provider.read()).resolves.toBeNull();
+    await expect(provider.write('{}', null)).rejects.toMatchObject({ code: 'conflict' });
+    expect(fetchMock.mock.calls.map(([, init]) => init.method ?? 'GET')).toEqual([
+      'GET',
+      'MKCOL',
+      'GET',
+    ]);
   });
 
   it('uses WebDAV ETags for conditional writes', async () => {
