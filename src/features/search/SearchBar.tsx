@@ -4,8 +4,8 @@ import { useShallow } from 'zustand/react/shallow';
 import { toast } from 'sonner';
 import { ArrowRight, ChevronDown, X } from 'lucide-react';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
-import type { SpaceId } from '@/storage/model';
-import { errorMessage } from '@/lib/errors';
+import { BROWSER_SEARCH_ENGINE, browserSearchEnabled, type SpaceId } from '@/storage/model';
+import { AppError, errorMessage } from '@/lib/errors';
 import { getSearchEngineIcon } from '@/features/navigation/brandIcons';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -48,14 +48,34 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
   const engine =
     settings.searchEngines.find((item) => item.id === settings.searchEngine) ??
     settings.searchEngines[0];
+  const useBrowserSearch = browserSearchEnabled && settings.searchEngine === BROWSER_SEARCH_ENGINE;
+  const focusAfterSelection = () => {
+    focusSearchOnClose.current = true;
+  };
   const search = async (event: FormEvent) => {
     event.preventDefault();
     const text = query.trim();
     if (!text) return;
     try {
-      const url = engine.url.replace('%s', encodeURIComponent(text));
-      if (settings.openInNewTab) await browser.tabs.create({ url });
-      else window.location.assign(url);
+      if (useBrowserSearch) {
+        const chromeApi = (globalThis as typeof globalThis & { chrome?: typeof browser }).chrome;
+        if (!chromeApi?.search?.query) {
+          const manifest = chromeApi?.runtime?.getManifest?.();
+          throw new AppError(
+            manifest && !manifest.permissions?.includes('search')
+              ? 'messages.browserSearchReloadRequired'
+              : 'messages.browserSearchUnavailable',
+          );
+        }
+        await chromeApi.search.query({
+          text,
+          disposition: settings.openInNewTab ? 'NEW_TAB' : 'CURRENT_TAB',
+        });
+      } else {
+        const url = engine.url.replace('%s', encodeURIComponent(text));
+        if (settings.openInNewTab) await browser.tabs.create({ url });
+        else window.location.assign(url);
+      }
       setQuery((current) => (current === query ? '' : current));
     } catch (reason) {
       toast.error(errorMessage(reason));
@@ -76,7 +96,10 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               className={cn(searchActionClass, 'min-w-9 gap-1.25 px-1.5 has-[>svg]:px-1.5')}
               aria-label={t('messages.switchSearchEngine')}
             >
-              {getSearchEngineIcon(engine.id, engine.name)}
+              {getSearchEngineIcon(
+                useBrowserSearch ? BROWSER_SEARCH_ENGINE : engine.id,
+                engine.name,
+              )}
               <ChevronDown className="ui-icon-compact" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
@@ -102,14 +125,14 @@ export function SearchBar({ spaceId }: { spaceId: SpaceId }) {
               );
             }}
           >
+            {browserSearchEnabled && (
+              <DropdownMenuRadioItem value={BROWSER_SEARCH_ENGINE} onSelect={focusAfterSelection}>
+                {getSearchEngineIcon(BROWSER_SEARCH_ENGINE, '')}
+                <span className="min-w-0 truncate">{t('messages.browserSearchEngine')}</span>
+              </DropdownMenuRadioItem>
+            )}
             {settings.searchEngines.map((item) => (
-              <DropdownMenuRadioItem
-                key={item.id}
-                value={item.id}
-                onSelect={() => {
-                  focusSearchOnClose.current = true;
-                }}
-              >
+              <DropdownMenuRadioItem key={item.id} value={item.id} onSelect={focusAfterSelection}>
                 {getSearchEngineIcon(item.id, item.name)}
                 <span className="min-w-0 truncate">{item.name}</span>
               </DropdownMenuRadioItem>

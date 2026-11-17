@@ -36,14 +36,25 @@ test.beforeEach(async ({ context }) => {
   await context.route('https://www.bing.com/search?**', (route) => route.continue());
 });
 
-test('必应首选完整传递关键词，新标签页搜索后清空输入并遵循当前页偏好', async ({
+test('真实 Chrome 新标签页初次选中默认，使用浏览器引擎并遵循打开位置偏好', async ({
   newTab,
   context,
 }) => {
+  await newTab.goto('chrome://newtab/');
+  const capability = await newTab.evaluate(async () => {
+    const api = (globalThis as typeof globalThis & { chrome: typeof browser }).chrome;
+    return {
+      manifest: api.runtime.getManifest().permissions?.includes('search'),
+      granted: await api.permissions.contains({ permissions: ['search'] }),
+      query: typeof api.search?.query,
+    };
+  });
+  expect(capability).toEqual({ manifest: true, granted: true, query: 'function' });
   const input = '中文 空格 & + / ?';
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await expect(newTab.getByRole('menuitemradio', { name: '必应', exact: true })).toBeChecked();
+  await expect(newTab.getByRole('menuitemradio', { name: '默认', exact: true })).toBeChecked();
   await expect(newTab.getByRole('menuitemradio')).toHaveText([
+    '默认',
     '必应',
     'Google',
     '百度',
@@ -55,7 +66,7 @@ test('必应首选完整传递关键词，新标签页搜索后清空输入并�
   await newTab.getByRole('button', { name: '搜索', exact: true }).click();
   const result = await resultOpened;
   await expect(result).toHaveURL(
-    (url) => url.origin === 'https://www.bing.com' && url.searchParams.get('q') === input,
+    (url) => url.origin === 'https://www.google.com' && url.searchParams.get('q') === input,
   );
   await expect(result).toHaveTitle('Search result');
   await expect(newTab.getByRole('textbox', { name: '搜索内容', exact: true })).toHaveValue('');
@@ -71,31 +82,42 @@ test('必应首选完整传递关键词，新标签页搜索后清空输入并�
   await query.fill(input);
   await query.press('Enter');
   await expect(newTab).toHaveURL(
-    (url) => url.origin === 'https://www.bing.com' && url.searchParams.get('q') === input,
+    (url) => url.origin === 'https://www.google.com' && url.searchParams.get('q') === input,
   );
   await expect(newTab).toHaveTitle('Search result');
 });
 
-test('引擎选择保存失败保留原值，改选后跨页和重载保留，支持切回必应', async ({
+test('自定义引擎保存失败保留默认，改选后跨页和重载保留，支持切回默认', async ({
   newTab,
   context,
   extensionId,
 }) => {
+  const name = '自定义查询';
+  const settings = await openSettings(newTab, '首页组件');
+  const form = settings.getByRole('form', { name: '编辑搜索引擎', exact: true });
+  await form.getByLabel('搜索引擎名称', { exact: true }).fill(name);
+  await form
+    .getByLabel('搜索引擎地址', { exact: true })
+    .fill('https://www.bing.com/search?q=%s&source=raytab-custom');
+  await form.getByRole('button', { name: '添加', exact: true }).click();
+  await expect(settings.getByRole('button', { name: `编辑 ${name}`, exact: true })).toBeVisible();
+  await settings.getByRole('button', { name: '关闭', exact: true }).click();
+
   const other = await context.newPage();
   await other.goto(`chrome-extension://${extensionId}/newtab.html`);
   await failNextWrite(newTab);
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await newTab.getByRole('menuitemradio', { name: 'Google', exact: true }).click();
+  await newTab.getByRole('menuitemradio', { name, exact: true }).click();
   await expect(newTab.getByText(/E2E injected write failure/)).toBeVisible();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await expect(newTab.getByRole('menuitemradio', { name: '必应', exact: true })).toBeChecked();
-  await newTab.getByRole('menuitemradio', { name: 'Google', exact: true }).click();
+  await expect(newTab.getByRole('menuitemradio', { name: '默认', exact: true })).toBeChecked();
+  await newTab.getByRole('menuitemradio', { name, exact: true }).click();
   await other.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await expect(other.getByRole('menuitemradio', { name: 'Google', exact: true })).toBeChecked();
+  await expect(other.getByRole('menuitemradio', { name, exact: true })).toBeChecked();
   await other.keyboard.press('Escape');
   await newTab.reload();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await expect(newTab.getByRole('menuitemradio', { name: 'Google', exact: true })).toBeChecked();
+  await expect(newTab.getByRole('menuitemradio', { name, exact: true })).toBeChecked();
   await newTab.keyboard.press('Escape');
   const input = '切换 & remembered';
   await newTab.getByRole('textbox', { name: '搜索内容', exact: true }).fill(input);
@@ -103,7 +125,10 @@ test('引擎选择保存失败保留原值，改选后跨页和重载保留，�
   await newTab.getByRole('button', { name: '搜索', exact: true }).click();
   const result = await opened;
   await expect(result).toHaveURL(
-    (url) => url.origin === 'https://www.google.com' && url.searchParams.get('q') === input,
+    (url) =>
+      url.origin === 'https://www.bing.com' &&
+      url.searchParams.get('q') === input &&
+      url.searchParams.get('source') === 'raytab-custom',
   );
   await expect(result).toHaveTitle('Search result');
   await expect(newTab.getByRole('textbox', { name: '搜索内容', exact: true })).toHaveValue('');
@@ -113,12 +138,31 @@ test('引擎选择保存失败保留原值，改选后跨页和重载保留，�
   ]);
   await result.close();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await newTab.getByRole('menuitemradio', { name: '必应', exact: true }).click();
+  await newTab.getByRole('menuitemradio', { name: '默认', exact: true }).click();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await expect(newTab.getByRole('menuitemradio', { name: '必应', exact: true })).toBeChecked();
+  await expect(newTab.getByRole('menuitemradio', { name: '默认', exact: true })).toBeChecked();
   await newTab.reload();
   await newTab.getByRole('button', { name: '切换搜索引擎', exact: true }).click();
-  await expect(newTab.getByRole('menuitemradio', { name: '必应', exact: true })).toBeChecked();
+  await expect(newTab.getByRole('menuitemradio', { name: '默认', exact: true })).toBeChecked();
+});
+
+test('扩展仍使用旧清单时，默认搜索提示重载并保留输入', async ({ newTab }) => {
+  await newTab.evaluate(() => {
+    const api = (globalThis as typeof globalThis & { chrome: typeof browser }).chrome;
+    const manifest = api.runtime.getManifest();
+    delete manifest.permissions;
+    api.runtime.getManifest = () => manifest;
+    Object.defineProperty(api.search, 'query', { value: undefined });
+  });
+  const query = newTab.getByRole('textbox', { name: '搜索内容', exact: true });
+  await query.fill('待重试的默认搜索');
+  await query.press('Enter');
+  await expect(
+    newTab.getByText('请在 chrome://extensions 重新加载 RayTab 扩展，再打开新标签页。', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(query).toHaveValue('待重试的默认搜索');
 });
 
 test('搜索失败保留关键词，延迟成功也保留后来输入的内容', async ({ newTab, context }) => {

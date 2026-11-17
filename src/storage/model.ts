@@ -8,12 +8,11 @@ const idSchema = z.string().min(1).max(100);
 const titleSchema = z.string().trim().min(1).max(80);
 const colorSchema = z.string().regex(/^#[0-9a-f]{6}$/i);
 const timestampSchema = z.number().int().nonnegative();
-const LEGACY_BROWSER_SEARCH_ENGINE = 'browser';
+export const BROWSER_SEARCH_ENGINE = 'browser';
+export const browserSearchEnabled = import.meta.env.CHROME;
+const DEFAULT_CONFIGURED_SEARCH_ENGINE = 'bing';
 export const searchEngineSchema = z.object({
-  id: idSchema.refine(
-    (id) => id !== LEGACY_BROWSER_SEARCH_ENGINE,
-    'errors.model.reservedSearchEngine',
-  ),
+  id: idSchema.refine((id) => id !== BROWSER_SEARCH_ENGINE, 'errors.model.reservedSearchEngine'),
   name: titleSchema,
   url: z
     .string()
@@ -201,10 +200,7 @@ export const rayStateSchema = z
       const ids = settings.searchEngines.map((engine) => engine.id);
       if (new Set(ids).size !== ids.length)
         ctx.addIssue({ code: 'custom', message: 'errors.model.duplicateSearchEngineId' });
-      if (
-        settings.searchEngine !== LEGACY_BROWSER_SEARCH_ENGINE &&
-        !ids.includes(settings.searchEngine)
-      )
+      if (settings.searchEngine !== BROWSER_SEARCH_ENGINE && !ids.includes(settings.searchEngine))
         ctx.addIssue({ code: 'custom', message: 'errors.model.missingSearchEngine' });
     };
     validateEngines(state.normalSettings);
@@ -224,7 +220,7 @@ export type RayState = z.infer<typeof rayStateSchema>;
 export const defaultSettings: SpaceSettings = {
   language: 'zh-CN',
   theme: 'system',
-  searchEngine: 'bing',
+  searchEngine: browserSearchEnabled ? BROWSER_SEARCH_ENGINE : DEFAULT_CONFIGURED_SEARCH_ENGINE,
   searchEngines: [
     { id: 'bing', name: '必应', url: 'https://www.bing.com/search?q=%s' },
     { id: 'google', name: 'Google', url: 'https://www.google.com/search?q=%s' },
@@ -309,9 +305,10 @@ export function effectiveSettings(state: RayState, spaceId: SpaceId): SpaceSetti
     spaceId === 'normal'
       ? state.normalSettings
       : { ...state.normalSettings, ...state.privateSettingOverrides };
+  if (browserSearchEnabled && settings.searchEngine === BROWSER_SEARCH_ENGINE) return settings;
   const preferredId =
-    settings.searchEngine === LEGACY_BROWSER_SEARCH_ENGINE
-      ? defaultSettings.searchEngine
+    settings.searchEngine === BROWSER_SEARCH_ENGINE
+      ? DEFAULT_CONFIGURED_SEARCH_ENGINE
       : settings.searchEngine;
   const searchEngine =
     settings.searchEngines.find((engine) => engine.id === preferredId)?.id ??
