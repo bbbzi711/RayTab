@@ -1,4 +1,4 @@
-import { folderSchema, siteSchema, type SpaceData } from '@/storage/model';
+import { folderSchema, normalizeUrl, siteSchema, type Site, type SpaceData } from '@/storage/model';
 import { reconcileMergedContainers, type MergeLocation } from '@/storage/merge-containers';
 import { z } from '@/lib/zod';
 
@@ -9,15 +9,83 @@ export const syncConflictSchema = z.object({
   field: z.string().min(1),
   local: z.unknown(),
   remote: z.unknown(),
+  choice: z.enum(['local', 'remote']).optional(),
 });
 export type SyncConflict = z.infer<typeof syncConflictSchema>;
 export function createSyncConflict(conflict: Omit<SyncConflict, 'key'>): SyncConflict {
   return { key: JSON.stringify([conflict.entity, conflict.id, conflict.field]), ...conflict };
 }
 
-export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, remote: SpaceData) {
+function iconPriority(icon: Site['icon']) {
+  if (icon.source !== 'auto' || icon.fit === 'original') return 2;
+  return icon.resourceId ? 1 : 0;
+}
+
+// A URL is a match only for unambiguous, independently added records.
+// Existing records, unilateral copies and ambiguous additions keep their identities.
+function uniqueAdditions(sites: Site[], knownIds: Set<string>, liveIds: Set<string>) {
+  const additions = new Map<string, Site | null>();
+  for (const site of sites) {
+    if (knownIds.has(site.id) || !liveIds.has(site.id)) continue;
+    const key = JSON.stringify([site.groupId, normalizeUrl(site.url)]);
+    additions.set(key, additions.has(key) ? null : site);
+  }
+  return additions;
+}
+
+function mergeSiteAdditions(
+  data: SpaceData,
+  base: SpaceData | undefined,
+  local: SpaceData,
+  remote: SpaceData,
+) {
+  const baseIds = base?.sites.map((site) => site.id) ?? [];
+  const localIds = new Set([...baseIds, ...local.sites.map((site) => site.id)]);
+  const remoteIds = new Set([...baseIds, ...remote.sites.map((site) => site.id)]);
+  const liveIds = new Set(data.sites.map((site) => site.id));
+  const left = uniqueAdditions(local.sites, remoteIds, liveIds);
+  const right = uniqueAdditions(remote.sites, localIds, liveIds);
+  const replacements = new Map<string, Site>();
+  for (const [key, a] of left) {
+    const b = right.get(key);
+    if (!a || !b) continue;
+    // Both devices must retain the same identity regardless of which initiates sync.
+    const keepA = a.createdAt === b.createdAt ? a.id < b.id : a.createdAt < b.createdAt;
+    const [kept, copy] = keepA ? [a, b] : [b, a];
+    const [latest, older] = kept.updatedAt >= copy.updatedAt ? [kept, copy] : [copy, kept];
+    replacements.set(kept.id, {
+      ...kept,
+      title: latest.title,
+      icon: iconPriority(older.icon) > iconPriority(latest.icon) ? older.icon : latest.icon,
+      iconBackground:
+        latest.iconBackground.mode === 'color' ? latest.iconBackground : older.iconBackground,
+      updatedAt: latest.updatedAt,
+      changeId: latest.changeId,
+    });
+    liveIds.delete(copy.id);
+    data.tombstones.push({
+      entity: 'site',
+      id: copy.id,
+      deletedAt: latest.updatedAt,
+      changeId: copy.changeId,
+    });
+  }
+  if (replacements.size)
+    data.sites = data.sites
+      .filter((site) => liveIds.has(site.id))
+      .map((site) => replacements.get(site.id) ?? site);
+}
+
+type ChooseConflict = (conflict: SyncConflict) => 'local' | 'remote' | undefined;
+
+export function mergeSpaceData(
+  base: SpaceData | undefined,
+  local: SpaceData,
+  remote: SpaceData,
+  choose?: ChooseConflict,
+) {
   const conflicts: SyncConflict[] = [];
-  const deleted = mergeTombstones(base?.tombstones ?? [], local.tombstones, remote.tombstones);
+  const deleted = mergeTombstones(base, local, remote);
   const deletedKeys = new Set(deleted.map((item) => `${item.entity}:${item.id}`));
   const groups = mergeRecords(
     'group',
@@ -25,6 +93,7 @@ export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, re
     local.groups,
     remote.groups,
     conflicts,
+    choose,
   ).filter((item) => !deletedKeys.has(`group:${item.id}`));
   const folders = mergeRecords(
     'folder',
@@ -32,6 +101,7 @@ export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, re
     local.folders,
     remote.folders,
     conflicts,
+    choose,
   ).filter((item) => !deletedKeys.has(`folder:${item.id}`));
   const sites = mergeRecords(
     'site',
@@ -39,8 +109,11 @@ export function mergeSpaceData(base: SpaceData | undefined, local: SpaceData, re
     local.sites,
     remote.sites,
     conflicts,
+    choose,
   ).filter((item) => !deletedKeys.has(`site:${item.id}`));
-  return reconcileMergeConflicts({ groups, folders, sites, tombstones: deleted }, conflicts);
+  const data = { groups, folders, sites, tombstones: deleted };
+  mergeSiteAdditions(data, base, local, remote);
+  return reconcileMergeConflicts(data, conflicts);
 }
 
 export function reconcileMergeConflicts(data: SpaceData, conflicts: SyncConflict[]) {
@@ -100,6 +173,7 @@ function mergeRecords<T extends { id: string }>(
   local: T[],
   remote: T[],
   conflicts: SyncConflict[],
+  choose?: ChooseConflict,
 ): T[] {
   const baseMap = new Map(base.map((item) => [item.id, item]));
   const localMap = new Map(local.map((item) => [item.id, item]));
@@ -121,8 +195,10 @@ function mergeRecords<T extends { id: string }>(
     if (!ancestor) {
       if (same(left, right)) result.push(left);
       else {
-        conflicts.push(createSyncConflict({ entity, id, field: '*', local: left, remote: right }));
-        result.push(left);
+        const conflict = createSyncConflict({ entity, id, field: '*', local: left, remote: right });
+        const choice = choose?.(conflict);
+        if (!choice) conflicts.push(conflict);
+        result.push(choice === 'remote' ? right : left);
       }
       continue;
     }
@@ -168,10 +244,16 @@ function mergeRecords<T extends { id: string }>(
       if (same(localValue, baseValue)) selected = remoteValue;
       else if (same(remoteValue, baseValue) || same(localValue, remoteValue)) selected = localValue;
       else {
-        selected = localValue;
-        conflicts.push(
-          createSyncConflict({ entity, id, field: key, local: localValue, remote: remoteValue }),
-        );
+        const conflict = createSyncConflict({
+          entity,
+          id,
+          field: key,
+          local: localValue,
+          remote: remoteValue,
+        });
+        const choice = choose?.(conflict);
+        selected = choice === 'remote' ? remoteValue : localValue;
+        if (!choice) conflicts.push(conflict);
       }
       if (key === 'location') Object.assign(merged, selected);
       else merged[key] = selected;
@@ -181,15 +263,34 @@ function mergeRecords<T extends { id: string }>(
   return result;
 }
 
-function mergeTombstones(
-  base: SpaceData['tombstones'],
-  local: SpaceData['tombstones'],
-  remote: SpaceData['tombstones'],
-) {
-  const values = new Map<string, SpaceData['tombstones'][number]>();
-  for (const item of [...base, ...local, ...remote]) {
-    const key = `${item.entity}:${item.id}`;
+function mergeTombstones(base: SpaceData | undefined, local: SpaceData, remote: SpaceData) {
+  const keyOf = (item: SpaceData['tombstones'][number]) => item.entity + ':' + item.id;
+  const ancestor = new Map((base?.tombstones ?? []).map((item) => [keyOf(item), item]));
+  const values = new Map(ancestor);
+  for (const item of [...local.tombstones, ...remote.tombstones]) {
+    const key = keyOf(item);
     if (!values.has(key) || values.get(key)!.deletedAt < item.deletedAt) values.set(key, item);
+  }
+  // A group moved back across the encryption boundary explicitly retires its
+  // previous deletion. Only revive it against that exact common tombstone.
+  for (const space of [local, remote]) {
+    const tombstones = new Set(space.tombstones.map(keyOf));
+    const inspect = (entity: string, records: { id: string; updatedAt: number }[]) => {
+      for (const record of records) {
+        const key = entity + ':' + record.id;
+        const deletion = ancestor.get(key);
+        if (
+          deletion &&
+          !tombstones.has(key) &&
+          values.get(key)?.changeId === deletion.changeId &&
+          record.updatedAt > deletion.deletedAt
+        )
+          values.delete(key);
+      }
+    };
+    inspect('group', space.groups);
+    inspect('folder', space.folders);
+    inspect('site', space.sites);
   }
   return [...values.values()];
 }

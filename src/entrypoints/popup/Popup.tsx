@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type BaseSyntheticEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type BaseSyntheticEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
@@ -25,8 +25,9 @@ import {
   type Site,
 } from '@/storage/model';
 import { startRayTabStore, useRayTabStore } from '@/storage/store';
-import { isPlaceholderGroup } from '@/storage/group-privacy';
-import { errorMessage, storedErrorMessage } from '@/lib/errors';
+import { useUnlockedSync } from '@/sync/use-unlocked-sync';
+import { listGroupTabs } from '@/storage/group-privacy';
+import { AppError, errorMessage, storedErrorMessage } from '@/lib/errors';
 import { prepareImage } from '@/lib/images';
 import i18n from '@/locales';
 
@@ -56,15 +57,16 @@ type IconDraft = {
 export default function Popup() {
   const { t } = useTranslation();
   const error = useRayTabStore((store) => store.error);
-  const settings = useRayTabStore((store) => store.state?.normalSettings);
-  const normalSpace = useRayTabStore((store) => store.state?.spaces.normal);
-  const savedGroupId = useRayTabStore((store) => store.state?.local.activeGroup.normal);
-  const normalGroups = normalSpace?.groups.filter((group) => !isPlaceholderGroup(group.id)) ?? [];
-  const activeGroupId =
-    normalGroups.find((group) => group.id === savedGroupId)?.id ?? normalGroups[0]?.id;
+  const state = useRayTabStore((store) => store.state);
+  const settings = state?.normalSettings;
+  const groups = useMemo(() => (state ? listGroupTabs(state) : []), [state]);
+  const savedGroupId = state?.local.activeGroup[state.local.activeSpace];
+  const activeGroupId = groups.find((group) => group.id === savedGroupId)?.id ?? groups[0]?.id;
+  const [password, setPassword] = useState('');
   const dispatch = useRayTabStore((store) => store.dispatch);
   const refresh = useRayTabStore((store) => store.refresh);
   useEffect(startRayTabStore, []);
+  useUnlockedSync(Boolean(state?.privateSecurity.protected && !state.privateSecurity.locked));
   const [saved, setSaved] = useState(false);
   const [page, setPage] = useState({ title: '', url: '' });
   const [fetchingIcon, setFetchingIcon] = useState(false);
@@ -120,7 +122,7 @@ export default function Popup() {
     }
   }, [settings?.theme, settings?.language]);
   useEffect(() => {
-    document.title = `RayTab · ${t('messages.quickAddToPersonalSpace')}`;
+    document.title = `RayTab · ${t('messages.addSite')}`;
   }, [t]);
   useEffect(() => {
     form.reset(
@@ -132,6 +134,12 @@ export default function Popup() {
       { keepDirtyValues: true },
     );
   }, [page, activeGroupId, form]);
+  const selectedLocation = form.watch('location');
+  // The select stores destinations encoded by this form, including its initial empty value.
+  const selectedGroupId = selectedLocation
+    ? destinationSchema.parse(JSON.parse(selectedLocation)).groupId
+    : undefined;
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId);
   const title = form.watch('title');
   const url = form.watch('url');
   const openRayTab = async () => {
@@ -148,8 +156,18 @@ export default function Popup() {
     try {
       form.clearErrors('root');
       const location = destinationSchema.parse(JSON.parse(data.location));
+      const group = groups.find((candidate) => candidate.id === location.groupId);
+      if (!group) throw new AppError('messages.theDestinationGroupDoesNotExist');
+      if (group.encrypted && useRayTabStore.getState().state?.privateSecurity.locked) {
+        await useRayTabStore.getState().unlockPrivate(password, true);
+        setPassword('');
+      }
       let draft = iconDraft.current;
-      if (withoutIcon) {
+      const storedGroup = useRayTabStore
+        .getState()
+        .state?.spaces[group.spaceId].groups.find((item) => item.id === group.id);
+      if (!storedGroup) throw new AppError('messages.theDestinationGroupDoesNotExist');
+      if (withoutIcon || group.spaceId === 'private' || storedGroup.manualIconFetchOnly) {
         draft = { url: data.url, icon: defaultSiteIcon, background: defaultSiteIconBackground };
       } else if (draft?.url !== data.url) {
         setIconFailure(undefined);
@@ -184,7 +202,7 @@ export default function Popup() {
       await dispatch(
         {
           type: 'save-site',
-          spaceId: 'normal',
+          spaceId: group.spaceId,
           id: siteId.current,
           ...location,
           site: {
@@ -226,12 +244,12 @@ export default function Popup() {
   return (
     <main className="flex min-h-[420px] flex-col bg-background px-4.5 pt-4 pb-4.5 text-foreground">
       <Toaster theme={settings?.theme ?? 'system'} />
-      {!settings || !normalSpace ? (
+      {!settings || !state ? (
         <div className="grid min-h-[420px] place-items-center text-sm text-muted-foreground">
           <p>{error ? storedErrorMessage(error) : t('messages.openingYourSpace')}</p>
           {error && <Button onClick={() => void refresh()}>{t('messages.retry')}</Button>}
         </div>
-      ) : normalGroups.length === 0 ? (
+      ) : groups.length === 0 ? (
         <div className="grid min-h-70 place-content-center justify-items-center gap-3 text-sm">
           <p className="text-muted-foreground">{t('navigation.noWritableGroups')}</p>
           <Button type="button" variant="outline" onClick={() => void openRayTab()}>
@@ -245,9 +263,6 @@ export default function Popup() {
               <RayTabMark className="size-6 text-primary" />
               <span>RayTab</span>
             </div>
-            <span className="rounded-full border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {t('messages.personalSpace')}
-            </span>
           </header>
           {saved ? (
             <div
@@ -304,7 +319,7 @@ export default function Popup() {
                 </div>
               </div>
               <form
-                aria-label={t('messages.quickAddToPersonalSpace')}
+                aria-label={t('messages.addSite')}
                 className="mt-3.5 flex flex-1 flex-col gap-3"
                 onSubmit={submit}
                 noValidate
@@ -339,31 +354,43 @@ export default function Popup() {
                     {...form.register('location')}
                     disabled={isSubmitting}
                   >
-                    {[...normalGroups]
-                      .sort((a, b) => a.order - b.order)
-                      .map((group) => (
-                        <NativeSelectOptGroup key={group.id} label={group.name}>
-                          <NativeSelectOption
-                            value={JSON.stringify({ groupId: group.id, folderId: null })}
-                          >
-                            {group.name}
-                          </NativeSelectOption>
-                          {normalSpace.folders
-                            .filter((folder) => folder.groupId === group.id)
-                            .sort((a, b) => a.order - b.order)
-                            .map((folder) => (
-                              <NativeSelectOption
-                                key={folder.id}
-                                value={JSON.stringify({ groupId: group.id, folderId: folder.id })}
-                              >
-                                {folder.name}
-                              </NativeSelectOption>
-                            ))}
-                        </NativeSelectOptGroup>
-                      ))}
+                    {groups.map((group) => (
+                      <NativeSelectOptGroup key={group.id} label={group.name}>
+                        <NativeSelectOption
+                          value={JSON.stringify({ groupId: group.id, folderId: null })}
+                        >
+                          {group.encrypted ? '🔒 ' : ''}
+                          {group.name}
+                        </NativeSelectOption>
+                        {state.spaces[group.spaceId].folders
+                          .filter((folder) => folder.groupId === group.id)
+                          .sort((a, b) => a.order - b.order)
+                          .map((folder) => (
+                            <NativeSelectOption
+                              key={folder.id}
+                              value={JSON.stringify({ groupId: group.id, folderId: folder.id })}
+                            >
+                              {folder.name}
+                            </NativeSelectOption>
+                          ))}
+                      </NativeSelectOptGroup>
+                    ))}
                   </NativeSelect>
                   {fieldError(errors.location?.message)}
                 </div>
+                {selectedGroup?.encrypted && state.privateSecurity.locked && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="group-password">{t('messages.privateGroupPassword')}</Label>
+                    <Input
+                      id="group-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                )}
                 {errors.root?.message && (
                   <p role="alert" className="text-xs text-destructive">
                     {errors.root.message}

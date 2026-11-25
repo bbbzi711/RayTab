@@ -2,7 +2,7 @@
   "errors": {
     "localRead": "本地数据暂时无法读取。请重试；不要清除浏览器数据。",
     "model": {
-      "groupRequired": "空间必须至少保留一个分组",
+      "groupRequired": "缺少分组记录",
       "duplicateGroupId": "分组 ID 重复",
       "duplicateFolderId": "文件夹 ID 重复",
       "duplicateSiteId": "网站 ID 重复",
@@ -19,7 +19,7 @@
       "missingResource": "备份需要的资源 {{id}} 不存在"
     },
     "sync": {
-      "privateConflictRequiresChoice": "两侧私密空间都已修改，同步已停止。请确认后选择本机覆盖云端或云端恢复本机。",
+      "privateConflictRequiresChoice": "加密分组存在同步冲突，请选择要保留的版本。",
       "conflictChanged": "冲突已变化，请刷新后重试",
       "invalidRemoteResponse": "同步服务返回的数据格式无效，请检查服务响应后重试。",
       "invalidConflict": "无法识别当前冲突数据，原数据未改变",
@@ -28,7 +28,9 @@
       "forbidden": "服务器禁止此操作（HTTP {{status}}，{{method}}）。请检查目标文件或文件夹权限、应用授权及服务限制。",
       "webdavUrlRequired": "WebDAV 服务器地址无效。请编辑连接并粘贴云盘提供的 HTTPS 地址；坚果云请使用 https://dav.jianguoyun.com/dav/。",
       "httpsRequired": "同步仅支持 HTTPS 地址，请编辑连接后重试。",
-      "redirectBlocked": "同步服务要求跳转，已停止请求以保护凭据和备份。请编辑连接，填写服务提供的最终 HTTPS 地址。"
+      "redirectBlocked": "同步服务要求跳转，已停止请求以保护凭据和备份。请编辑连接，填写服务提供的最终 HTTPS 地址。",
+      "protectedGroupConflict": "加密分组有同步冲突，请选择要保留的版本。",
+      "resolveBeforeProtecting": "请先处理这些内容的同步冲突，再开启加密。"
     },
     "remoteStatus": "远端服务返回 {{status}}",
     "missingBackupResource": "备份需要的资源 {{id}} 不存在",
@@ -44,7 +46,7 @@
     "organizeTitle": "按你的方式整理",
     "organizeDescription": "用分组和文件夹梳理内容，拖动网站完成排序。",
     "privacyTitle": "数据由你掌控",
-    "privacyDescription": "数据默认保存在本机，私密空间和同步均按需启用。",
+    "privacyDescription": "数据默认保存在本机，可按需加密分组或开启同步。",
     "saving": "保存中…"
   },
   "clock": {

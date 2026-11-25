@@ -183,6 +183,7 @@ export function SettingsSelect({
   disabled,
   name,
   triggerClassName,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -191,6 +192,7 @@ export function SettingsSelect({
   disabled?: boolean;
   name?: string;
   triggerClassName?: string;
+  placeholder?: string;
 }) {
   const id = useId();
   return (
@@ -200,7 +202,7 @@ export function SettingsSelect({
       </div>
       <Select value={value} onValueChange={onChange} disabled={disabled} name={name}>
         <SelectTrigger id={id} className={cn('min-w-0 w-32 max-w-[60%]', triggerClassName)}>
-          <SelectValue />
+          <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {options.map(([option, text]) => (

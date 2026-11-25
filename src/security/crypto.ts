@@ -82,3 +82,57 @@ function fromBase64(value: string) {
   const binary = atob(value);
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
+
+export const vaultChunkSchema = z.object({
+  version: z.literal(2),
+  iv: z.string().min(1),
+  ciphertext: z.string().min(1),
+});
+export type VaultChunk = z.infer<typeof vaultChunkSchema>;
+
+export async function importVaultKey(encoded: string) {
+  const raw = fromBase64(encoded);
+  if (raw.byteLength !== 32)
+    throw new AppError('messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged');
+  return crypto.subtle.importKey('raw', toArrayBuffer(raw), 'AES-GCM', false, [
+    'encrypt',
+    'decrypt',
+  ]);
+}
+
+export async function createVaultKey() {
+  const encoded = toBase64(crypto.getRandomValues(new Uint8Array(32)));
+  return { encoded, key: await importVaultKey(encoded) };
+}
+
+export async function sealChunk(
+  value: unknown,
+  key: CryptoKey,
+  context: string,
+): Promise<VaultChunk> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: encoder.encode(context) },
+    key,
+    encoder.encode(JSON.stringify(value)),
+  );
+  return { version: 2, iv: toBase64(iv), ciphertext: toBase64(new Uint8Array(ciphertext)) };
+}
+
+export async function openChunk(value: unknown, key: CryptoKey, context: string): Promise<unknown> {
+  const chunk = vaultChunkSchema.parse(value);
+  try {
+    const plain = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: toArrayBuffer(fromBase64(chunk.iv)),
+        additionalData: encoder.encode(context),
+      },
+      key,
+      toArrayBuffer(fromBase64(chunk.ciphertext)),
+    );
+    return JSON.parse(decoder.decode(plain));
+  } catch {
+    throw new AppError('messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged');
+  }
+}

@@ -2,7 +2,7 @@
   "errors": {
     "localRead": "Local data could not be read. Retry without clearing browser data.",
     "model": {
-      "groupRequired": "A space must contain at least one group",
+      "groupRequired": "Missing group record",
       "duplicateGroupId": "Duplicate group ID",
       "duplicateFolderId": "Duplicate folder ID",
       "duplicateSiteId": "Duplicate site ID",
@@ -19,7 +19,7 @@
       "missingResource": "Required backup resource {{id}} is missing"
     },
     "sync": {
-      "privateConflictRequiresChoice": "Both private spaces changed, so sync stopped. Confirm whether to overwrite the cloud or restore from it.",
+      "privateConflictRequiresChoice": "Encrypted groups have conflicting changes. Choose which version to keep.",
       "conflictChanged": "This conflict changed. Refresh and try again.",
       "invalidRemoteResponse": "The sync service returned an invalid response. Check the service and try again.",
       "invalidConflict": "This conflict could not be recognized. Existing data was not changed.",
@@ -28,7 +28,9 @@
       "forbidden": "The server forbids this operation (HTTP {{status}}, {{method}}). Check the target file or folder permissions, app authorization and service restrictions.",
       "webdavUrlRequired": "The WebDAV server URL is invalid. Edit the connection and paste the HTTPS URL provided by your cloud service. For Nutstore, use https://dav.jianguoyun.com/dav/.",
       "httpsRequired": "Sync requires an HTTPS URL. Edit the connection and try again.",
-      "redirectBlocked": "The sync service requested a redirect. The request was stopped to protect credentials and backups. Edit the connection using the final HTTPS URL provided by the service."
+      "redirectBlocked": "The sync service requested a redirect. The request was stopped to protect credentials and backups. Edit the connection using the final HTTPS URL provided by the service.",
+      "protectedGroupConflict": "Encrypted groups have conflicting changes. Choose which version to keep.",
+      "resolveBeforeProtecting": "Resolve pending sync conflicts for these items before encrypting them."
     },
     "remoteStatus": "The remote service returned {{status}}",
     "missingBackupResource": "Required backup resource {{id}} is missing",
@@ -44,7 +46,7 @@
     "organizeTitle": "Arrange it your way",
     "organizeDescription": "Organize with groups and folders, then drag sites into place.",
     "privacyTitle": "Keep control of your data",
-    "privacyDescription": "Data stays local by default. Private space and sync are optional.",
+    "privacyDescription": "Data stays on this device by default. You can encrypt groups or turn on sync.",
     "saving": "Saving…"
   },
   "clock": {

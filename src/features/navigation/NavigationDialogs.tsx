@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/native-select';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { errorMessage } from '@/lib/errors';
-import type { Group, Folder } from '@/storage/model';
+import type { GroupLabel, Folder } from '@/storage/model';
 import { destinationSchema, nameSchema, type Destination } from './navigation-form-schemas';
 
 export function DestinationSelect({
@@ -35,7 +35,7 @@ export function DestinationSelect({
   disabled,
   id,
 }: {
-  groups: Group[];
+  groups: GroupLabel[];
   folders: Folder[];
   value: Destination;
   onChange: (value: Destination) => void;
@@ -181,7 +181,7 @@ export function NameDialog({ title, initialName = '', onSave, onClose }: NameDia
 }
 
 export interface MoveDialogProps {
-  groups: Group[];
+  groups: GroupLabel[];
   folders: Folder[];
   initialGroupId: string;
   initialFolderId?: string | null;
@@ -191,7 +191,7 @@ export interface MoveDialogProps {
   description?: string;
   confirmLabel?: string;
   destructive?: boolean;
-  onMove: (groupId: string, folderId: string | null) => Promise<boolean>;
+  onMove: (groupId: string, folderId: string | null) => Promise<boolean | 'cancelled'>;
   onClose: () => void;
 }
 
@@ -258,6 +258,7 @@ export function MoveDialog({
           onSubmit={handleSubmit(async ({ location }) => {
             try {
               const moved = await onMove(location.groupId, location.folderId);
+              if (moved === 'cancelled') return;
               if (moved) toast.success(t(destructive ? 'messages.deleted' : 'navigation.moved'));
               onClose();
             } catch (reason) {

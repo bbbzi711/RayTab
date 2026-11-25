@@ -1,12 +1,13 @@
 import { openDB, type DBSchema } from 'idb';
 import type { RayState } from './model';
-import type { EncryptedEnvelope } from '@/security/crypto';
+import type { GroupCatalog } from './catalog';
+import type { EncryptedEnvelope, VaultChunk } from '@/security/crypto';
 
 export type WallpaperCache = { source: string; color: string; blob?: Blob; fetchedAt: number };
 export interface RayDatabase extends DBSchema {
-  state: { key: string; value: RayState };
+  state: { key: string; value: RayState | GroupCatalog };
   resources: { key: string; value: Blob };
-  vault: { key: string; value: EncryptedEnvelope };
+  vault: { key: string; value: EncryptedEnvelope | VaultChunk };
   wallpapers: { key: string; value: WallpaperCache };
 }
 

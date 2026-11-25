@@ -29,12 +29,16 @@ export async function encryptGroup(page: Page, name: string, password: string) {
   await page.getByRole('button', { name: '主页', exact: true }).click();
   const settings = await openSettings(page, '分组管理');
   const row = settings.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) });
-  await row.getByRole('button', { name: '加密', exact: true }).click();
+  const actions = row.getByRole('button', { name: `分组「${name}」的操作`, exact: true });
+  await actions.click();
+  await page.getByRole('menuitem', { name: '加密', exact: true }).click();
   const creating = page.getByRole('dialog', { name: '设置分组加密密码', exact: true });
-  await creating.getByLabel('输入私密分组密码', { exact: true }).fill(password);
+  await creating.getByLabel('输入分组密码', { exact: true }).fill(password);
   await creating.getByRole('button', { name: '加密', exact: true }).click();
   await expect(creating).not.toBeVisible();
-  await expect(row.getByRole('button', { name: '取消加密', exact: true })).toBeVisible();
+  await actions.click();
+  await expect(page.getByRole('menuitem', { name: '取消加密', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(
     settings.getByText('加密分组已锁定。解锁后可以修改或移除共用密码。', { exact: true }),
   ).toBeVisible();
@@ -43,8 +47,8 @@ export async function encryptGroup(page: Page, name: string, password: string) {
 
 export async function unlockGroup(page: Page, name: string, password: string) {
   await page.getByRole('button', { name, exact: true }).click();
-  const unlock = page.getByRole('dialog', { name: '解锁私密分组', exact: true });
-  await unlock.getByLabel('输入私密分组密码', { exact: true }).fill(password);
+  const unlock = page.getByRole('dialog', { name: '解锁加密分组', exact: true });
+  await unlock.getByLabel('输入分组密码', { exact: true }).fill(password);
   await unlock.getByRole('button', { name: '解锁', exact: true }).click();
   await expect(unlock).not.toBeVisible();
   await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute(
@@ -109,9 +113,13 @@ export async function noHorizontalOverflow(element: Locator) {
 
 /** Read the supported backup output, without depending on IndexedDB stores or records. */
 export async function exportNormalBackup(page: Page) {
-  const settings = await openSettings(page, '数据管理');
-  await settings.getByRole('combobox', { name: '导出范围', exact: true }).click();
-  await page.getByRole('option', { name: '普通空间', exact: true }).click();
+  const settings = await openSettings(page, '同步与备份');
+  await settings.getByRole('button', { name: '导出到本地', exact: true }).click();
+  const range = settings.getByRole('combobox', { name: '导出范围', exact: true });
+  if (await range.isVisible()) {
+    await range.click();
+    await page.getByRole('option', { name: '未加密分组', exact: true }).click();
+  }
   const downloading = page.waitForEvent('download');
   await settings.getByRole('button', { name: '导出所选备份', exact: true }).click();
   const stream = await (await downloading).createReadStream();
@@ -127,24 +135,29 @@ export function parseNormalBackup(text: string) {
   const document = z
     .object({
       format: z.literal('raytab-backup'),
-      spaces: z.object({
-        normal: z.object({
-          data: z.object({
-            sites: z.array(
-              z.object({
-                title: z.string(),
-                url: z.string(),
-                icon: z.object({ source: z.string(), resourceId: z.string().optional() }),
-                iconBackground: z.object({ mode: z.string() }),
-              }),
-            ),
-          }),
-          resources: z.array(z.object({ id: z.string(), type: z.string(), data: z.string() })),
+      version: z.literal(4),
+      groups: z.array(
+        z.object({
+          protection: z.literal('none'),
+          sites: z.array(
+            z.object({
+              title: z.string(),
+              url: z.string(),
+              icon: z.object({ source: z.string(), resourceId: z.string().optional() }),
+              iconBackground: z.object({ mode: z.string() }),
+            }),
+          ),
         }),
+      ),
+      preferences: z.object({
+        resources: z.array(z.object({ id: z.string(), type: z.string(), data: z.string() })),
       }),
     })
     .parse(JSON.parse(text));
-  return document.spaces.normal;
+  return {
+    data: { sites: document.groups.flatMap((group) => group.sites) },
+    resources: document.preferences.resources,
+  };
 }
 
 export async function readSiteImage(page: Page, title: string) {

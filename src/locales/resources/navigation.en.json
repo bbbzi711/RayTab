@@ -8,17 +8,16 @@
     "deleteGroupContents": "Delete group and contents",
     "groupContentsChanged": "The contents of the group changed. Review the group and confirm deletion again.",
     "noWritableGroups": "Create an available group on the home page first.",
-    "groupPrivacyHelp": "Hiding controls tab visibility. Encryption protects group contents, and names still appear on tabs.",
     "hideHiddenGroups": "Hide hidden groups",
     "showHiddenGroups": "Show hidden groups",
     "hideNamedGroup": "Hide {{name}}",
-    "hideGroup": "Hide",
+    "hideGroup": "Hide from homepage",
     "decryptGroup": "Remove encryption",
     "encryptGroup": "Encrypt",
     "unlockLegacyGroups": "Unlock existing encrypted groups",
     "unlockGroups": "Unlock encrypted groups",
     "createGroupPassword": "Set a group encryption password",
-    "sharedGroupPasswordHelp": "All encrypted groups share this password. Use at least six characters.",
+    "sharedGroupPasswordHelp": "Use at least 6 characters. All encrypted groups share this password. Group names stay visible when locked. Unlock to view their sites.",
     "encryptedGroupConflict": "This import or sync contains an unencrypted copy of an encrypted group. Your data was not changed.",
     "legacyGroupMigrationHelp": "Enter your existing password to add the groups to the shared tab bar. Their names are available as tab labels and their contents stay encrypted.",
     "invalidIcon": "Choose a valid icon and background color",
@@ -80,6 +79,8 @@
       "pink": "Pink",
       "purple": "Purple"
     },
-    "changedSiteIconFailed": "The URL has changed, but the new site icon could not be fetched. Retry, choose a text icon, or upload an image before saving."
+    "changedSiteIconFailed": "The URL has changed, but the new site icon could not be fetched. Retry, choose a text icon, or upload an image before saving.",
+    "groupActions": "Actions for {{name}}",
+    "showGroup": "Show on homepage"
   }
 }

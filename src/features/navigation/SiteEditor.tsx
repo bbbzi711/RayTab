@@ -81,7 +81,7 @@ export function SiteEditor({ site, spaceId, groupId, folderId, onClose }: SiteEd
   const { t } = useTranslation();
   const id = useId();
   const dispatch = useRayTabStore((store) => store.dispatch);
-  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
+  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, 'normal')))!;
   const [destination] = useState(() => ({
     groupId: site?.groupId ?? groupId,
     folderId: site ? site.folderId : folderId,
@@ -223,8 +223,12 @@ export function SiteEditor({ site, spaceId, groupId, folderId, onClose }: SiteEd
   };
   const shouldAutoFetch = () => {
     const requestedUrl = form.getValues('url');
+    const group = useRayTabStore
+      .getState()
+      .state?.spaces[spaceId].groups.find((item) => item.id === destination.groupId);
     return (
       spaceId === 'normal' &&
+      Boolean(group && !group.manualIconFetchOnly) &&
       form.getValues('iconType') === 'auto' &&
       Boolean(requestedUrl.trim()) &&
       automaticAttempt.current !== requestedUrl &&

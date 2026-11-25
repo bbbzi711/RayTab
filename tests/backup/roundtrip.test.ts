@@ -3,6 +3,7 @@ import { vectorArtwork, vectorImage } from '../helpers/images';
 import {
   backupSummary,
   createBackup,
+  encodeBackup,
   parseBackup,
   restoreBackup,
 } from '../../src/features/backup/backup';
@@ -11,7 +12,7 @@ import { createRepository } from '../../src/storage/database';
 import { applyCommand } from '../../src/storage/operations';
 
 describe('versioned backup', () => {
-  it('backs up selected spaces and encrypts private content', async () => {
+  it('restores a password-wrapped legacy group as hidden and preserves its icon bytes', async () => {
     const state = createInitialState();
     state.spaces.private.sites.push({
       id: 'secret',
@@ -32,16 +33,28 @@ describe('versioned backup', () => {
       'all',
       'private-pass',
     );
-    expect(JSON.stringify(document.spaces.private)).not.toContain('secret.example');
-    expect(JSON.stringify(document.spaces.private)).not.toContain(vectorArtwork);
+    const file = JSON.stringify(encodeBackup(document));
+    expect(file).not.toContain('secret.example');
+    expect(file).not.toContain(Buffer.from(vectorArtwork).toString('base64'));
     expect(backupSummary(document)).toMatchObject({
       normal: { sites: state.spaces.normal.sites.length },
       private: { protected: true },
     });
     const empty = createInitialState();
     empty.spaces.private.sites = [];
-    const restored = await restoreBackup(empty, document, 'replace', 'private-pass');
-    expect(restored.state.spaces.private.sites[0].url).toBe('https://secret.example/');
+    const parsed = await parseBackup(file);
+    await expect(restoreBackup(empty, parsed, 'replace', 'wrong-pass')).rejects.toThrow(
+      'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
+    );
+    const restored = await restoreBackup(empty, parsed, 'replace', 'private-pass');
+    const groupId = state.spaces.private.groups[0].id;
+    expect(restored.preserveGroupEncryption).toBe(false);
+    expect(restored.state.spaces.normal.groups).toContainEqual(
+      expect.objectContaining({ id: groupId, hidden: true }),
+    );
+    expect(restored.state.spaces.normal.sites).toContainEqual(
+      expect.objectContaining({ id: 'secret', groupId, url: 'https://secret.example/' }),
+    );
     expect(await restored.resources.get('secret-icon')?.text()).toBe(vectorArtwork);
     expect(restored.resources.get('secret-icon')?.type).toBe('image/svg+xml');
   });
@@ -228,12 +241,21 @@ describe('versioned backup', () => {
     },
   );
 
-  it.each(['normal', 'private'] as const)(
-    'merges concurrent additions from a deleted %s group and preserves them across saving and reloading',
-    async (spaceId) => {
+  it.each([
+    { kind: 'ordinary', spaceId: 'normal', destinationId: 'normal' },
+    { kind: 'encrypted', spaceId: 'private', destinationId: 'private' },
+    { kind: 'legacy hidden', spaceId: 'private', destinationId: 'normal' },
+  ] as const)(
+    'preserves concurrent additions from a deleted $kind group through restore, reload and repeated merge',
+    async ({ spaceId, destinationId, kind }) => {
       const initial = createInitialState();
       const groupId = initial.spaces[spaceId].groups[0].id;
       applyCommand(initial, { type: 'save-group', spaceId, id: 'target', name: 'Target' });
+      const encrypted = kind === 'encrypted';
+      if (encrypted) {
+        initial.privateSecurity = { protected: true, locked: false };
+        for (const group of initial.spaces.private.groups) group.hidden = false;
+      }
       const local = structuredClone(initial);
       const incoming = structuredClone(initial);
       applyCommand(local, {
@@ -269,39 +291,66 @@ describe('versioned backup', () => {
         spaceId,
         password,
       );
-      const restored = await restoreBackup(local, await parseBackup(backup), 'merge', password);
-      const recovery = restored.recoveries[spaceId]!;
+      const parsed = await parseBackup(JSON.stringify(encodeBackup(backup)));
+      const restored = await restoreBackup(local, parsed, 'merge', password);
+      const recovery = restored.recoveries[destinationId]!;
       expect(recovery).toMatchObject({ sites: 1, folders: 1, createdGroup: true });
-      expect(restored.state.spaces[spaceId].sites.map((site) => site.url).sort()).toEqual(
-        incoming.spaces[spaceId].sites.map((site) => site.url).sort(),
+      const recovered = restored.state.spaces[destinationId];
+      const expectedUrls = [
+        ...(spaceId !== destinationId ? local.spaces.normal.sites : []),
+        ...incoming.spaces[spaceId].sites,
+      ]
+        .map((site) => site.url)
+        .sort();
+      expect(recovered.sites.map((site) => site.url).sort()).toEqual(expectedUrls);
+      expect(recovered.groups.some((group) => group.id === groupId)).toBe(false);
+      expect(recovered.folders.find((folder) => folder.id === 'incoming-folder')?.groupId).toBe(
+        recovery.groupId,
       );
-      expect(
-        restored.state.spaces[spaceId].folders.find((folder) => folder.id === 'incoming-folder')
-          ?.groupId,
-      ).toBe(recovery.groupId);
-      expect(
-        restored.state.spaces[spaceId].sites.find((site) => site.id === 'incoming-site'),
-      ).toMatchObject({ groupId: recovery.groupId, folderId: 'incoming-folder' });
+      expect(recovered.sites.find((site) => site.id === 'incoming-site')).toMatchObject({
+        groupId: recovery.groupId,
+        folderId: 'incoming-folder',
+      });
+      expect(restored.preserveGroupEncryption).toBe(encrypted);
 
       const name = crypto.randomUUID();
       const destination = createRepository(name);
-      await destination.restore(local, new Map());
-      await destination.restore(restored.state, restored.resources, { range: spaceId });
-      await destination.close();
+      try {
+        await destination.restore(local, new Map(), encrypted ? { protectWith: password } : {});
+        if (encrypted) await destination.unlockPrivate(password!);
+        await destination.restore(restored.state, restored.resources, { range: restored.range });
+      } finally {
+        await destination.close();
+      }
       const reopened = createRepository(name);
       try {
-        const saved = await reopened.read();
-        expect(saved.spaces[spaceId]).toEqual(restored.state.spaces[spaceId]);
+        const onDisk = await reopened.read();
+        if (encrypted) {
+          expect(onDisk.privateSecurity.locked).toBe(true);
+          expect(await reopened.resource('incoming-icon')).toBeUndefined();
+        }
+        const saved = encrypted ? await reopened.unlockPrivate(password!) : onDisk;
+        expect(saved.spaces[destinationId]).toEqual(recovered);
         expect(await (await reopened.resource('incoming-icon'))?.text()).toBe('saved image');
-        const repeated = await restoreBackup(saved, backup, 'merge', password);
-        expect(repeated.state.spaces[spaceId]).toEqual(saved.spaces[spaceId]);
+        const repeated = await restoreBackup(saved, parsed, 'merge', password);
+        expect(repeated.state.spaces[destinationId]).toEqual(saved.spaces[destinationId]);
         expect(repeated.recoveries).toEqual({});
       } finally {
         await reopened.close();
       }
 
-      const replaced = await restoreBackup(local, backup, 'replace', password);
-      expect(replaced.state.spaces[spaceId]).toEqual(incoming.spaces[spaceId]);
+      const replaced = await restoreBackup(local, parsed, 'replace', password);
+      if (spaceId === destinationId) {
+        expect(replaced.state.spaces[destinationId]).toEqual(incoming.spaces[spaceId]);
+      } else {
+        expect(replaced.state.spaces.normal.sites).toEqual([
+          ...local.spaces.normal.sites,
+          ...incoming.spaces.private.sites,
+        ]);
+        expect(replaced.state.spaces.normal.groups).toContainEqual(
+          expect.objectContaining({ id: groupId, hidden: true }),
+        );
+      }
       expect(replaced.recoveries).toEqual({});
     },
   );

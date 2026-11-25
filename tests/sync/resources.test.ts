@@ -1,13 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { IDBFactory } from 'fake-indexeddb';
 import { vectorArtwork, vectorImage } from '../helpers/images';
-import { createBackup } from '../../src/features/backup/backup';
+import {
+  createBackup,
+  encodeBackup,
+  parseBackup,
+  privateBackupPayload,
+} from '../../src/features/backup/backup';
 import { createInitialState, type RayState } from '../../src/storage/model';
 import { createSyncConflict } from '../../src/sync/core/merge';
 import { encryptJson } from '../../src/security/crypto';
-import { upgradeLocalState } from '../../src/storage/upgrade-local';
+import { applyCommand } from '../../src/storage/operations';
 import { createLegacyV4State } from '../helpers/legacy';
 import { createTestLockManager } from '../helpers/locks';
 
+const protectedId = 'work-private';
+const vaultPassword = 'test-vault-password';
 const STATUS = 'raytab-sync-status';
 const BASELINE = 'raytab-sync-baseline';
 const encoded = (id: string, text = id) => ({ id, type: 'image/png', data: btoa(text) });
@@ -36,6 +44,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    vi.stubGlobal('indexedDB', new IDBFactory());
     values = {};
     content = '';
     version = 0;
@@ -84,8 +93,16 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     await engine.saveSyncConfig({
       ...(await engine.loadSyncConfig())!,
       includePrivate: true,
+      automatic: false,
       privatePassword: 'sync-password',
     });
+  }
+  async function createProtectedGroup() {
+    await repository.update((state) =>
+      applyCommand(state, { type: 'save-group', spaceId: 'normal', id: protectedId, name: 'Work' }),
+    );
+    await repository.protectPrivate(vaultPassword, { spaceId: 'normal', groupId: protectedId });
+    await repository.unlockPrivate(vaultPassword);
   }
   async function updatePrivate(title: string) {
     await repository.update((state) => {
@@ -94,7 +111,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
         {
           ...first,
           id: 'private-sync',
-          groupId: state.spaces.private.groups[0].id,
+          groupId: protectedId,
           title,
           url: 'https://private.example/',
           updatedAt: first.updatedAt + 1,
@@ -105,6 +122,8 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
 
   it('syncs vector bytes, MIME and deliberate composition through public and encrypted private payloads', async () => {
     await setAllRange();
+    await createProtectedGroup();
+    const privateArt = vectorArtwork.replace('RayTab 标记', 'Private artwork');
     await repository.update(
       (state) => {
         const first = state.spaces.normal.sites[0];
@@ -113,7 +132,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
           {
             ...first,
             id: 'private-vector-site',
-            groupId: state.spaces.private.groups[0].id,
+            groupId: protectedId,
             url: 'https://private.example/vector',
             icon: { source: 'resource', resourceId: 'private-vector' },
           },
@@ -121,16 +140,21 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
       },
       new Map([
         ['normal-vector', vectorImage()],
-        ['private-vector', vectorImage()],
+        ['private-vector', new Blob([privateArt], { type: 'image/svg+xml' })],
       ]),
     );
     await engine.synchronize('push');
     expect(content).not.toContain('https://private.example/vector');
     expect(content).not.toContain(vectorArtwork);
+    expect(content).not.toContain(Buffer.from(privateArt, 'utf8').toString('base64'));
+    expect(content).toContain(Buffer.from(vectorArtwork, 'utf8').toString('base64'));
     await repository.restore(createInitialState(), new Map());
     await engine.synchronize('pull');
     await reload();
-    const restored = await repository.read();
+    const locked = await repository.read();
+    expect(locked.privateSecurity).toEqual({ protected: true, locked: true });
+    expect(await repository.resource('private-vector')).toBeUndefined();
+    const restored = await repository.unlockPrivate(vaultPassword);
     expect(restored.spaces.normal.sites[0].icon).toEqual({
       source: 'auto',
       resourceId: 'normal-vector',
@@ -143,7 +167,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     for (const id of ['normal-vector', 'private-vector']) {
       const image = await repository.resource(id);
       expect(image?.type).toBe('image/svg+xml');
-      expect(await image?.text()).toBe(vectorArtwork);
+      expect(await image?.text()).toBe(id === 'private-vector' ? privateArt : vectorArtwork);
     }
   });
 
@@ -160,16 +184,16 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
       },
       new Map([['local-icon', image('original local bytes')]]),
     );
-    const remote = JSON.parse(content);
-    const remoteSite = remote.spaces.normal.data.sites.find(
+    const remote = await parseBackup(content);
+    const remoteSite = remote.spaces.normal!.data.sites.find(
       (site: { id: string }) => site.id === id,
-    );
+    )!;
     remoteSite.icon = { source: 'auto', resourceId: 'remote-icon' };
     remoteSite.iconBackground = { mode: 'color', color: '#654321' };
     remoteSite.updatedAt++;
     remoteSite.changeId = 'remote-icon-change';
-    remote.spaces.normal.resources.push(encoded('remote-icon', 'original remote bytes'));
-    content = JSON.stringify(remote);
+    remote.spaces.normal!.resources.push(encoded('remote-icon', 'original remote bytes'));
+    content = JSON.stringify(encodeBackup(remote));
     await engine.synchronize();
     let status = await engine.loadSyncStatus();
     expect(status.conflicts).toHaveLength(1);
@@ -204,7 +228,9 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     expect((await engine.loadSyncStatus()).conflicts).toEqual([]);
     await engine.synchronize();
     expect(
-      JSON.parse(content).spaces.normal.resources.map((resource: { id: string }) => resource.id),
+      (await parseBackup(content)).spaces.normal!.resources.map(
+        (resource: { id: string }) => resource.id,
+      ),
     ).toEqual(['remote-icon']);
     expect(JSON.stringify(values[BASELINE])).not.toContain('local-icon');
   });
@@ -221,14 +247,14 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     await repository.update((state) => {
       state.spaces.normal.sites.push(added);
     });
-    const remote = JSON.parse(content);
-    remote.spaces.normal.data.sites.push({
+    const remote = await parseBackup(content);
+    remote.spaces.normal!.data.sites.push({
       ...added,
       title: 'Remote website icon',
       icon: { source: 'auto', resourceId: 'whole-website-icon' },
     });
-    remote.spaces.normal.resources.push(encoded('whole-website-icon', 'website image bytes'));
-    content = JSON.stringify(remote);
+    remote.spaces.normal!.resources.push(encoded('whole-website-icon', 'website image bytes'));
+    content = JSON.stringify(encodeBackup(remote));
     await engine.synchronize();
     const conflict = (await engine.loadSyncStatus()).conflicts[0];
     expect(conflict).toMatchObject({
@@ -238,9 +264,9 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
       local: { icon: added.icon },
     });
     expect(
-      JSON.parse(content).spaces.normal.data.sites.find(
+      (await parseBackup(content)).spaces.normal!.data.sites.find(
         (site: { id: string }) => site.id === added.id,
-      ).icon,
+      )!.icon,
     ).toEqual(added.icon);
     expect(await repository.resource('whole-website-icon')).toBeUndefined();
     await engine.synchronize();
@@ -320,7 +346,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     ]);
     expect(JSON.stringify(status)).not.toContain('iconId');
     await engine.resolveSyncConflict(status.conflicts[0], 'remote');
-    expect(values[BASELINE]).toMatchObject({ version: 'original-etag', document: { version: 3 } });
+    expect(values[BASELINE]).toMatchObject({ version: 'original-etag', document: { version: 4 } });
     expect(values[STATUS]).toMatchObject({ schemaVersion: 1 });
     expect(await (await repository.resource('pending-icon'))!.text()).toBe('pending-icon');
     await reload();
@@ -388,7 +414,7 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     expect(JSON.stringify(normalized)).not.toContain('display');
     await engine.resolveSyncConflict(normalized.conflicts[0], 'remote');
     const cleanedBaseline = values[BASELINE];
-    expect(cleanedBaseline).toMatchObject({ version: 'original-etag', document: { version: 3 } });
+    expect(cleanedBaseline).toMatchObject({ version: 'original-etag', document: { version: 4 } });
     expect(JSON.stringify(cleanedBaseline)).not.toContain('display');
     expect(JSON.stringify(values[STATUS])).not.toContain('display');
     expect(await (await repository.resource('pending-icon'))!.text()).toBe('pending-icon');
@@ -408,14 +434,11 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
       {
         ...old.spaces.normal.sites[0],
         id: 'private-old',
+        url: 'https://legacy-private.example/image',
         groupId: old.spaces.private.groups[0].id,
         iconId: 'old-private-image',
       },
     ];
-    await repository.restore(
-      upgradeLocalState(old),
-      new Map([['old-private-image', image('old-private-image')]]),
-    );
     await setAllRange();
     const legacy = {
       format: 'raytab-backup',
@@ -438,10 +461,15 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     };
     content = JSON.stringify(legacy);
     version = 1;
+    await engine.synchronize('pull');
+    await reload();
+    expect((await repository.read()).privateSecurity.locked).toBe(true);
+    await repository.unlockPrivate('sync-password');
     values[BASELINE] = { document: structuredClone(legacy), version: 'v1' };
     await engine.synchronize();
     expect((await engine.loadSyncStatus()).conflicts).toEqual([]);
-    expect(JSON.parse(content).version).toBe(3);
+    expect(JSON.parse(content).version).toBe(4);
+    expect(content).not.toContain(old.spaces.private.sites[0].url);
     expect((await repository.read()).spaces.private.sites[0].icon).toEqual({
       source: 'resource',
       resourceId: 'old-private-image',
@@ -451,27 +479,30 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
     );
   });
 
-  it.each(['push', 'pull'] as const)(
-    'stops real private conflicts before either write and clears them only after an explicit %s',
-    async (mode) => {
+  it.each(['local', 'remote'] as const)(
+    'resolves only the conflicting protected group using the %s version after reload',
+    async (choice) => {
       await setAllRange();
+      await createProtectedGroup();
       await updatePrivate('Ancestor private');
       await engine.synchronize('push');
       const ancestor = await repository.snapshot();
       const baseline = structuredClone(values[BASELINE]);
       await updatePrivate('Local private');
+      await repository.update((state) => {
+        state.spaces.normal.sites[1].title = 'Local public';
+      });
       const localBefore = await repository.read();
       const remoteState: RayState = structuredClone(ancestor.state);
       remoteState.spaces.private.sites[0].title = 'Remote private';
       remoteState.spaces.normal.sites[0].title = 'Remote public';
       content = JSON.stringify(
-        await createBackup(remoteState, ancestor.resources, 'all', 'sync-password'),
+        encodeBackup(await createBackup(remoteState, ancestor.resources, 'all', 'sync-password')),
       );
+      version++;
       const remoteBefore = content;
       fetchMock.mockClear();
-      await expect(engine.synchronize()).rejects.toThrow(
-        'errors.sync.privateConflictRequiresChoice',
-      );
+      await expect(engine.synchronize()).rejects.toThrow('errors.sync.protectedGroupConflict');
       expect(content).toBe(remoteBefore);
       expect(await repository.read()).toEqual(localBefore);
       expect(values[BASELINE]).toEqual(baseline);
@@ -479,26 +510,45 @@ describe('icon sync, durable conflict resources and encrypted payloads', () => {
       const status = await engine.loadSyncStatus();
       expect(status).toMatchObject({
         retryCount: 1,
-        lastError: { code: 'errors.sync.privateConflictRequiresChoice' },
+        lastError: { code: 'errors.sync.protectedGroupConflict' },
         conflicts: [
-          { entity: 'group', id: 'private-space', field: '*', local: 'local', remote: 'remote' },
+          {
+            entity: 'group',
+            id: protectedId,
+            field: 'protected-group',
+            local: localBefore.revision,
+            remote: `v${version}`,
+          },
         ],
       });
       expect(JSON.stringify(values[STATUS])).not.toContain('Local private');
       expect(JSON.stringify(values[STATUS])).not.toContain('Remote private');
       await reload();
-      for (const choice of ['local', 'remote'] as const)
-        await expect(
-          engine.resolveSyncConflict((await engine.loadSyncStatus()).conflicts[0], choice),
-        ).rejects.toThrow('messages.resolvePrivateSpaceVersionsWithLocalToCloudOrCloudToLocal');
+      expect((await engine.loadSyncStatus()).conflicts).toEqual(status.conflicts);
+      await expect(engine.resolveSyncConflict(status.conflicts[0], choice)).rejects.toThrow(
+        'messages.unlockThePrivateSpaceBeforeCreatingABackupThatIncludesIt',
+      );
       expect(content).toBe(remoteBefore);
-      await engine.synchronize(mode);
+      await repository.unlockPrivate(vaultPassword);
+      await engine.resolveSyncConflict(status.conflicts[0], choice);
       expect((await engine.loadSyncStatus()).conflicts).toEqual([]);
       expect((await engine.loadSyncStatus()).lastError).toBeUndefined();
-      expect((await repository.read()).spaces.private.sites[0].title).toBe(
-        mode === 'push' ? 'Local private' : 'Remote private',
+      const expected = choice === 'local' ? 'Local private' : 'Remote private';
+      const state = await repository.read();
+      const published = await parseBackup(content);
+      expect(state.spaces.private.sites[0].title).toBe(expected);
+      expect((await privateBackupPayload(published, 'sync-password'))?.data.sites[0].title).toBe(
+        expected,
       );
-      if (mode === 'pull') expect(content).toBe(remoteBefore);
+      expect(content).not.toContain(expected);
+      expect(state.spaces.normal.sites.slice(0, 2).map((r) => r.title)).toEqual([
+        'Remote public',
+        'Local public',
+      ]);
+      expect(published.spaces.normal!.data.sites.slice(0, 2).map((r) => r.title)).toEqual([
+        'Remote public',
+        'Local public',
+      ]);
     },
   );
 

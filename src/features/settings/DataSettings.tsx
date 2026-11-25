@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
 import { useTranslation } from 'react-i18next';
-import { isPlaceholderGroup } from '@/storage/group-privacy';
+import { listGroupTabs } from '@/storage/group-privacy';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,10 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import {
   backupSummary,
   createBackup,
+  encodeBackup,
   parseBackup,
   restoreBackup,
+  restoreRange,
   type BackupDocument,
 } from '@/features/backup/backup';
 import {
@@ -22,7 +24,6 @@ import {
 } from '@/features/import/bookmarks';
 import { useRayTabStore } from '@/storage/store';
 import { repository } from '@/storage/repository';
-import type { SpaceId } from '@/storage/model';
 import { errorMessage } from '@/lib/errors';
 import {
   FormError,
@@ -109,69 +110,102 @@ function usePrivateLockReset(reset: () => void, enabled = true) {
 }
 
 export function DataSettings({
-  spaceId,
-  groupId,
   report,
+  disabled,
+  cloudRestore,
 }: {
-  spaceId: SpaceId;
-  groupId?: string;
   report: DraftReporter;
+  disabled: boolean;
+  cloudRestore: { available: boolean; run: () => void; hint?: string };
 }) {
   const { t } = useTranslation();
-  const [busyForms, setBusyForms] = useState<Record<string, boolean>>({});
-  const reportForm = useCallback<DraftReporter>(
-    (id, dirty, busy) => {
-      report(id, dirty, busy);
-      setBusyForms((previous) => (previous[id] === busy ? previous : { ...previous, [id]: busy }));
-    },
-    [report],
-  );
-  const otherFormBusy = (id: string) =>
-    Object.entries(busyForms).some(([form, busy]) => form !== id && busy);
-
+  const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
+  const exportFormId = useId();
+  const [task, setTask] = useState<'export' | 'restore'>();
+  const [showLocalRestore, setShowLocalRestore] = useState(false);
   return (
-    <div className="data-settings grid min-w-0 gap-5">
-      <SettingsSection title={t('settings.importBookmarks')}>
-        <fieldset
-          className="data-task-body min-w-0 py-2"
-          disabled={otherFormBusy('bookmark-import')}
-        >
-          <BookmarkImport spaceId={spaceId} groupId={groupId} report={reportForm} />
-        </fieldset>
-      </SettingsSection>
-      <SettingsSection title={t('settings.exportBackup')}>
-        <fieldset className="data-task-body min-w-0 py-2" disabled={otherFormBusy('backup-export')}>
-          <BackupExport report={reportForm} />
-        </fieldset>
-      </SettingsSection>
-      <SettingsSection title={t('settings.restoreBackup')}>
-        <fieldset
-          className="data-task-body min-w-0 py-2"
-          disabled={otherFormBusy('backup-restore')}
-        >
-          <BackupRestore report={reportForm} />
-        </fieldset>
-      </SettingsSection>
-    </div>
+    <SettingsSection>
+      <div className="data-settings min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 py-1">
+          <h3 className="min-w-0 text-sm font-semibold">{t('settings.backupActionsTitle')}</h3>
+          <div className="settings-form-actions">
+            <Button
+              type={protectedPrivate ? 'button' : 'submit'}
+              form={protectedPrivate ? undefined : exportFormId}
+              size="form-action"
+              variant={protectedPrivate && task === 'export' ? 'secondary' : 'outline'}
+              aria-expanded={protectedPrivate ? task === 'export' : undefined}
+              aria-controls={protectedPrivate ? 'backup-task-export' : undefined}
+              disabled={disabled}
+              onClick={() => setTask(protectedPrivate && task === 'export' ? undefined : 'export')}
+            >
+              {t('settings.exportAction')}
+            </Button>
+            <Button
+              type="button"
+              size="form-action"
+              variant={task === 'restore' ? 'secondary' : 'outline'}
+              aria-expanded={task === 'restore'}
+              aria-controls="backup-task-restore"
+              disabled={disabled}
+              onClick={() => setTask(task === 'restore' ? undefined : 'restore')}
+            >
+              {t('settings.restoreAction')}
+            </Button>
+          </div>
+        </div>
+        <div id="backup-task-export" hidden={task !== 'export'}>
+          <BackupExport formId={exportFormId} report={report} />
+        </div>
+        <div id="backup-task-restore" className="pt-3" hidden={task !== 'restore'}>
+          <fieldset className="min-w-0" disabled={disabled}>
+            <legend className="mb-2 text-sm">{t('settings.restoreSource')}</legend>
+            <div className="settings-form-actions">
+              <Button
+                type="button"
+                size="form-action"
+                variant={showLocalRestore ? 'secondary' : 'outline'}
+                aria-expanded={showLocalRestore}
+                aria-controls="backup-local-restore"
+                onClick={() => setShowLocalRestore(!showLocalRestore)}
+              >
+                {t('settings.localFile')}
+              </Button>
+              <Button
+                type="button"
+                size="form-action"
+                variant="outline"
+                disabled={!cloudRestore.available}
+                onClick={() => {
+                  setShowLocalRestore(false);
+                  cloudRestore.run();
+                }}
+              >
+                {t('settings.cloudBackup')}
+              </Button>
+            </div>
+            {cloudRestore.hint && (
+              <p className="mt-2 text-xs text-muted-foreground">{cloudRestore.hint}</p>
+            )}
+          </fieldset>
+          <div id="backup-local-restore" hidden={!showLocalRestore} className="pt-3">
+            <BackupRestore report={report} />
+          </div>
+        </div>
+      </div>
+    </SettingsSection>
   );
 }
 
-function BookmarkImport({
-  spaceId,
-  groupId,
-  report,
-}: {
-  spaceId: SpaceId;
-  groupId?: string;
-  report: DraftReporter;
-}) {
+export function BookmarkImport({ groupId, report }: { groupId?: string; report: DraftReporter }) {
   const { t } = useTranslation();
   const dispatch = useRayTabStore((store) => store.dispatch);
-  const space = useRayTabStore((store) => store.state?.spaces[spaceId])!;
-  const selectedGroup = useRayTabStore(
-    (store) => groupId ?? store.state?.local.activeGroup[spaceId],
-  )!;
-  const groups = space.groups.filter((group) => !isPlaceholderGroup(group.id));
+  const state = useRayTabStore((store) => store.state)!;
+  const groups = useMemo(
+    () => listGroupTabs(state).filter((group) => !group.encrypted || !state.privateSecurity.locked),
+    [state],
+  );
+  const selectedGroup = groupId ?? state.local.activeGroup[state.local.activeSpace];
   const activeGroup = groups.find((group) => group.id === selectedGroup)?.id ?? groups[0]?.id ?? '';
   const defaults = {
     action: 'preview' as const,
@@ -186,25 +220,28 @@ function BookmarkImport({
     resolver: zodResolver(bookmarkImportSchema),
     defaultValues: defaults,
   });
-  const { isDirty, isSubmitting, errors } = form.formState;
-  useDraftStatus('bookmark-import', isDirty, isSubmitting, report);
-  const [items, duplicateMode, organizeMode, file] = useWatch({
+  const { isSubmitting, errors } = form.formState;
+  const [items, duplicateMode, organizeMode, file, targetId] = useWatch({
     control: form.control,
-    name: ['items', 'duplicateMode', 'organizeMode', 'file'],
+    name: ['items', 'duplicateMode', 'organizeMode', 'file', 'groupId'],
   });
+  useDraftStatus('bookmark-import', Boolean(file?.length || items.length), isSubmitting, report);
+  const target = groups.find((group) => group.id === targetId);
+  const targetSites = target && state.spaces[target.spaceId].sites;
   const candidates = useMemo(
     () =>
       deduplicateBookmarks(
         organizeMode === 'flat' ? items.map(({ folder, ...item }) => item) : items,
-        space.sites.map((item) => item.url),
+        targetSites?.filter((site) => site.groupId === targetId).map((site) => site.url) ?? [],
         duplicateMode,
       ),
-    [items, organizeMode, duplicateMode, space.sites],
+    [items, organizeMode, duplicateMode, targetSites, targetId],
   );
-  const operationBoundary = usePrivateLockReset(
-    () => form.reset({ ...defaults, file: undefined, items: [] }),
-    spaceId === 'private',
-  );
+  function clearImport() {
+    form.resetField('file');
+    form.reset(defaults);
+  }
+  const operationBoundary = usePrivateLockReset(clearImport);
   const submit = form.handleSubmit(async (values) => {
     const isCurrent = operationBoundary();
     try {
@@ -218,14 +255,18 @@ function BookmarkImport({
         form.clearErrors();
         return;
       }
+      if (!target || target.id !== values.groupId) {
+        form.setError('groupId', { message: 'navigation.chooseLocation' });
+        return;
+      }
       await dispatch({
         type: 'import-bookmarks',
-        spaceId,
+        spaceId: target.spaceId,
         groupId: values.groupId,
         items: candidates,
       });
       if (!isCurrent()) return;
-      form.reset(defaults);
+      clearImport();
       toast.success(t('settings.bookmarksImported', { count: candidates.length }));
     } catch (reason) {
       if (isCurrent()) form.setError('root', { message: errorMessage(reason) });
@@ -261,7 +302,7 @@ function BookmarkImport({
           type="submit"
           variant="outline"
           size="sm"
-          disabled={isSubmitting || typeof browser === 'undefined' || !browser.bookmarks?.getTree}
+          disabled={isSubmitting || typeof browser === 'undefined' || !browser.permissions?.request}
           onClick={() => {
             form.setValue('source', 'browser');
             form.setValue('action', 'preview');
@@ -315,9 +356,7 @@ function BookmarkImport({
                   triggerClassName="w-full max-w-full"
                   label={t('settings.targetGroup')}
                   value={field.value}
-                  options={[...groups]
-                    .sort((a, b) => a.order - b.order)
-                    .map((group) => [group.id, group.name])}
+                  options={groups.map((group) => [group.id, group.name])}
                   onChange={field.onChange}
                   disabled={isSubmitting}
                 />
@@ -351,7 +390,7 @@ function BookmarkImport({
             <Button
               type="submit"
               size="sm"
-              disabled={isSubmitting || !candidates.length}
+              disabled={isSubmitting || !target || !candidates.length}
               onClick={() => form.setValue('action', 'import')}
             >
               {t(isSubmitting ? 'settings.importing' : 'settings.confirmImport')}
@@ -366,7 +405,7 @@ function BookmarkImport({
   );
 }
 
-function BackupExport({ report }: { report: DraftReporter }) {
+function BackupExport({ formId, report }: { formId: string; report: DraftReporter }) {
   const { t } = useTranslation();
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const locked = useRayTabStore((store) => store.state?.privateSecurity.locked);
@@ -391,7 +430,8 @@ function BackupExport({ report }: { report: DraftReporter }) {
   );
   return (
     <form
-      className="settings-form grid min-w-0 gap-3.5 text-sm"
+      id={formId}
+      className="settings-form grid min-w-0 gap-3.5 text-sm not-empty:pt-3"
       noValidate
       onSubmit={form.handleSubmit(async (values) => {
         const isCurrent = operationBoundary();
@@ -408,8 +448,14 @@ function BackupExport({ report }: { report: DraftReporter }) {
           );
           if (!isCurrent()) return;
           download(
-            'raytab-' + values.range + '-backup-' + new Date().toISOString().slice(0, 10) + '.json',
-            JSON.stringify(backup, null, 2),
+            'raytab-' +
+              { all: 'groups', normal: 'unencrypted-groups', private: 'encrypted-groups' }[
+                values.range
+              ] +
+              '-' +
+              new Date().toISOString().slice(0, 10) +
+              '.json',
+            JSON.stringify(encodeBackup(backup), null, 2),
           );
           form.reset({ range: values.range, password: '' });
           toast.success(t('settings.backupExported'));
@@ -418,27 +464,31 @@ function BackupExport({ report }: { report: DraftReporter }) {
         }
       })}
     >
-      <Controller
-        control={form.control}
-        name="range"
-        render={({ field }) => (
-          <SettingsSelect
-            triggerClassName="w-full max-w-full"
-            label={t('settings.exportRange')}
-            value={field.value}
-            options={[
-              ['all', t('settings.allSpaces')],
-              ['normal', t('settings.normalSpace')],
-              ['private', t('settings.privateSpace')],
-            ]}
-            onChange={field.onChange}
-            disabled={isSubmitting}
-          />
-        )}
-      />
-      <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-        {t('settings.backupContents')}
-      </p>
+      {protectedPrivate && (
+        <Controller
+          control={form.control}
+          name="range"
+          render={({ field }) => (
+            <SettingsSelect
+              triggerClassName="w-full max-w-full"
+              label={t('settings.exportRange')}
+              value={field.value}
+              options={[
+                ['all', t('settings.allSpaces')],
+                ['normal', t('settings.normalSpace')],
+                ['private', t('settings.privateSpace')],
+              ]}
+              onChange={field.onChange}
+              disabled={isSubmitting}
+            />
+          )}
+        />
+      )}
+      {protectedPrivate && (
+        <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+          {t('settings.backupContents')}
+        </p>
+      )}
       {protectedPrivate && range !== 'normal' && (
         <label className="data-input-field">
           <span>{t('settings.backupPassword')}</span>
@@ -463,11 +513,13 @@ function BackupExport({ report }: { report: DraftReporter }) {
       )}
       <FormError error={errors.password} />
       <FormError error={errors.root} />
-      <div className="data-form-actions">
-        <Button type="submit" size="sm" disabled={isSubmitting || (locked && range !== 'normal')}>
-          {t(isSubmitting ? 'settings.exporting' : 'settings.exportSelected')}
-        </Button>
-      </div>
+      {protectedPrivate && (
+        <div className="data-form-actions">
+          <Button type="submit" size="sm" disabled={isSubmitting || (locked && range !== 'normal')}>
+            {t(isSubmitting ? 'settings.exporting' : 'settings.exportSelected')}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }
@@ -480,21 +532,25 @@ function BackupRestore({ report }: { report: DraftReporter }) {
     action: 'preview' as const,
     file: undefined,
     document: undefined,
-    mode: 'merge' as const,
+    mode: 'replace' as const,
     password: '',
   };
   const form = useForm<z.infer<typeof restoreSchema>>({
     resolver: zodResolver(restoreSchema),
     defaultValues: defaults,
   });
-  const { isDirty, isSubmitting, errors } = form.formState;
+  const { isSubmitting, errors } = form.formState;
   const [backup, mode, file] = useWatch({
     control: form.control,
     name: ['document', 'mode', 'file'],
   });
   const summary = backup ? backupSummary(backup) : undefined;
-  useDraftStatus('backup-restore', isDirty, isSubmitting, report);
-  const operationBoundary = usePrivateLockReset(() => form.reset(defaults));
+  useDraftStatus('backup-restore', Boolean(file?.length || backup), isSubmitting, report);
+  function clearRestore() {
+    form.resetField('file');
+    form.reset(defaults);
+  }
+  const operationBoundary = usePrivateLockReset(clearRestore);
   return (
     <form
       className="settings-form grid min-w-0 gap-3.5 text-sm"
@@ -508,8 +564,8 @@ function BackupRestore({ report }: { report: DraftReporter }) {
             const document = await parseBackup(await values.file![0].text());
             if (!isCurrent()) return;
             if (
-              document.spaces.private &&
-              useRayTabStore.getState().state?.privateSecurity.locked
+              useRayTabStore.getState().state?.privateSecurity.locked &&
+              restoreRange(document, true) !== 'normal'
             ) {
               form.setError('root', { message: t('settings.unlockForRestore') });
               return;
@@ -528,11 +584,11 @@ function BackupRestore({ report }: { report: DraftReporter }) {
               title: t('settings.replaceTitle'),
               description: t('settings.replaceHelp', {
                 range: t(
-                  values.document.spaces.private
-                    ? values.document.spaces.normal
-                      ? 'settings.ranges.all'
-                      : 'settings.ranges.private'
-                    : 'settings.ranges.normal',
+                  'settings.ranges.' +
+                    restoreRange(
+                      values.document,
+                      Boolean(useRayTabStore.getState().state?.privateSecurity.protected),
+                    ),
                 ),
               }),
               confirmText: t('settings.replaceRestore'),
@@ -551,19 +607,33 @@ function BackupRestore({ report }: { report: DraftReporter }) {
             values.password || undefined,
           );
           if (!isCurrent()) return;
-          await repository.restore(result.state, result.resources, {
-            expectedRevision: current.revision,
-            ...(result.preserveGroupEncryption ? { protectWith: values.password } : {}),
-            range: values.document.spaces.private
-              ? values.document.spaces.normal
-                ? 'all'
-                : 'private'
-              : 'normal',
-          });
+          const restore = () =>
+            repository.restore(result.state, result.resources, {
+              expectedRevision: current.revision,
+              ...(result.preserveGroupEncryption ? { protectWith: values.password } : {}),
+              range: result.range,
+            });
+          if (
+            result.preserveGroupEncryption ||
+            (current.privateSecurity.protected && result.range !== 'normal')
+          ) {
+            const { withGroupProtectionSyncGuard } = await import('@/sync/core/engine');
+            const protectedData = result.state.spaces.private;
+            await withGroupProtectionSyncGuard(
+              [
+                ...protectedData.groups.map(({ id }) => ({ groupId: id })),
+                ...protectedData.folders.map(({ id }) => ({ folderId: id })),
+                { siteIds: protectedData.sites.map(({ id }) => id) },
+              ],
+              restore,
+            );
+          } else {
+            await restore();
+          }
           await refresh();
-          if (!isCurrent()) return;
-          form.reset(defaults);
+          clearRestore();
           toast.success(t('settings.backupRestored'));
+          if (!isCurrent()) return;
           for (const spaceId of ['normal', 'private'] as const) {
             const recovery = result.recoveries[spaceId];
             if (!recovery) continue;
@@ -626,7 +696,7 @@ function BackupRestore({ report }: { report: DraftReporter }) {
                 {'protected' in summary.private
                   ? t('settings.encryptedPrivate')
                   : t('settings.spaceSummary', {
-                      space: t('settings.privateSpace'),
+                      space: t('settings.legacyHiddenGroups'),
                       groups: summary.private.groups,
                       folders: summary.private.folders,
                       sites: summary.private.sites,
@@ -643,8 +713,8 @@ function BackupRestore({ report }: { report: DraftReporter }) {
                 label={t('settings.restoreMode')}
                 value={field.value}
                 options={[
-                  ['merge', t('settings.mergeRestore')],
                   ['replace', t('settings.replaceRestore')],
+                  ['merge', t('settings.mergeRestore')],
                 ]}
                 onChange={field.onChange}
                 disabled={isSubmitting}

@@ -14,6 +14,31 @@ import {
   type SpaceSettings,
 } from './model';
 
+function publicContentToProtect(command: Command) {
+  if (!('spaceId' in command) || command.spaceId !== 'normal') return;
+  if (command.type === 'set-group-encrypted' && command.encrypted)
+    return { groupId: command.groupId };
+  if (!('destinationSpaceId' in command) || command.destinationSpaceId !== 'private') return;
+  switch (command.type) {
+    case 'move-site':
+      return { siteIds: [command.id] };
+    case 'move-sites':
+      return { siteIds: command.ids };
+    case 'move-folder':
+      return { folderId: command.id };
+    case 'delete-group':
+      return { contentsOfGroup: command.id };
+  }
+}
+
+async function protectContent<T>(
+  selection: NonNullable<ReturnType<typeof publicContentToProtect>>,
+  update: () => Promise<T>,
+) {
+  const { withGroupProtectionSyncGuard } = await import('@/sync/core/engine');
+  return withGroupProtectionSyncGuard(selection, update);
+}
+
 const STARTUP_META_KEY = 'raytab-startup-meta';
 const commitSchema = z.object({
   revision: z.number().int().nonnegative(),
@@ -170,7 +195,9 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
     },
     dispatch: async (command, assets) => {
       const sessionVersion = privateSessionVersion;
-      const state = await repository.update((draft) => applyCommand(draft, command), assets);
+      const update = () => repository.update((draft) => applyCommand(draft, command), assets);
+      const selection = publicContentToProtect(command);
+      const state = selection ? await protectContent(selection, update) : await update();
       if (
         !publish(state, sessionVersion, {
           revision: state.revision,
@@ -180,9 +207,13 @@ export const useRayTabStore = create<RayTabStore>((set, get) => {
         await get().refresh();
     },
     protectPrivate: (password, target) =>
-      runPrivate(() =>
-        target ? repository.protectPrivate(password, target) : repository.protectPrivate(password),
-      ),
+      runPrivate(() => {
+        if (!target) return repository.protectPrivate(password);
+        const update = () => repository.protectPrivate(password, target);
+        return target.spaceId === 'normal'
+          ? protectContent({ groupId: target.groupId }, update)
+          : update();
+      }),
     unlockPrivate: (password, adoptGroups) =>
       runPrivate(() =>
         adoptGroups ? repository.unlockPrivate(password, true) : repository.unlockPrivate(password),

@@ -1,8 +1,9 @@
+import { expectFixtureCatalog, inspectFixtureVault } from '../helpers/catalog-fixture';
 import { openDB } from 'idb';
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../src/storage/model';
 import { createRepository } from '../../src/storage/database';
-import { decryptJson, encryptJson } from '../../src/security/crypto';
+import { encryptJson } from '../../src/security/crypto';
 import { upgradeLocalState } from '../../src/storage/upgrade-local';
 import { createLegacyV4State, legacyNavigation } from '../helpers/legacy';
 
@@ -130,7 +131,7 @@ describe('one-time local navigation migration', () => {
       try {
         const cleaned = await repo.read();
         expect(cleaned).toEqual({ ...state, revision: 18 });
-        expect(await db.get('state', 'current')).toEqual(cleaned);
+        expectFixtureCatalog(await db.get('state', 'current'), cleaned);
         expect(await repo.read()).toEqual(cleaned);
         expect(upgradeLocalState(cleaned)).toEqual(cleaned);
 
@@ -155,7 +156,7 @@ describe('one-time local navigation migration', () => {
         const reopened = createRepository(name);
         try {
           expect(await reopened.read()).toEqual(updated);
-          expect(await db.get('state', 'current')).toEqual(updated);
+          expectFixtureCatalog(await db.get('state', 'current'), updated);
         } finally {
           await reopened.close();
         }
@@ -202,8 +203,9 @@ describe('one-time local navigation migration', () => {
     await db.put('vault', envelope, 'private');
     const repo = createRepository(name);
     try {
-      expect((await repo.read()).privateSecurity.locked).toBe(true);
-      expect(await db.get('state', 'current')).toEqual(state);
+      const locked = await repo.read();
+      expect(locked).toEqual({ ...state, revision: state.revision + 1 });
+      expectFixtureCatalog(await db.get('state', 'current'), locked);
       expect(await db.get('vault', 'private')).toEqual(envelope);
       await expect(repo.unlockPrivate('wrong-password')).rejects.toThrow(
         'messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged',
@@ -211,14 +213,16 @@ describe('one-time local navigation migration', () => {
       expect(await db.get('vault', 'private')).toEqual(envelope);
 
       const unlocked = await repo.unlockPrivate('vault-password');
-      expect(unlocked.revision).toBe(state.revision + 1);
+      expect(unlocked.revision).toBe(locked.revision + 1);
       expect(unlocked.spaces.private).toEqual(space);
       expect(unlocked.privateSettingOverrides).toEqual(overrides);
       const convertedEnvelope = await db.get('vault', 'private');
       expect(convertedEnvelope.ciphertext).not.toBe(envelope.ciphertext);
-      expect(await decryptJson(convertedEnvelope, 'vault-password')).toEqual({
-        ...payload,
+      expect(await inspectFixtureVault(db, 'vault-password')).toEqual({
+        groups: [{ group: space.groups[0], folders: space.folders, sites: space.sites }],
         overrides,
+        resources: [],
+        tombstones: space.tombstones,
       });
       expect(JSON.stringify(await db.get('state', 'current'))).not.toContain(
         'Preserved private site',
@@ -267,7 +271,7 @@ describe('one-time local navigation migration', () => {
         recovered.privateSettingOverrides.cardSize! *
           recovered.privateSettingOverrides.iconSizeRatio!,
       ).toBe(44);
-      expect(await db.get('state', 'current')).toEqual(recovered);
+      expectFixtureCatalog(await db.get('state', 'current'), recovered);
       expect(await repo.read()).toEqual(recovered);
     } finally {
       await repo.close();

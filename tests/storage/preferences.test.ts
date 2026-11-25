@@ -1,3 +1,5 @@
+import { expectFixtureCatalog } from '../helpers/catalog-fixture';
+import { encodeBackup } from '../../src/features/backup/group-codec';
 import { openDB } from 'idb';
 import { describe, expect, it } from 'vitest';
 import { createBackup, parseBackup, restoreBackup } from '../../src/features/backup/backup';
@@ -43,7 +45,7 @@ function populatedState() {
 }
 
 describe('retired preferences at existing data boundaries', () => {
-  it('reads old preferences without rewriting data and preserves both spaces after a partial save', async () => {
+  it('converts old preferences once and preserves all groups and assets after a partial save', async () => {
     const { state, resources } = populatedState();
     const stored = {
       ...state,
@@ -61,18 +63,39 @@ describe('retired preferences at existing data boundaries', () => {
     for (const [id, blob] of resources) await db.put('resources', blob, id);
     const repo = createRepository(name);
     try {
-      expect(await repo.read()).toEqual(state);
-      expect(await db.get('state', 'current')).toEqual(stored);
+      const migrated = await repo.read();
+      const expectedGroup = {
+        ...state.spaces.private.groups[0],
+        hidden: true,
+        order: 1,
+        manualIconFetchOnly: true,
+      };
+      expect(migrated).toEqual({
+        ...state,
+        revision: state.revision + 1,
+        spaces: {
+          normal: {
+            ...state.spaces.normal,
+            groups: [...state.spaces.normal.groups, expectedGroup],
+            sites: [...state.spaces.normal.sites, ...state.spaces.private.sites],
+          },
+          private: createInitialState().spaces.private,
+        },
+      });
+      const saved = await db.get('state', 'current');
+      expectFixtureCatalog(saved, migrated);
+      expect(await repo.read()).toEqual(migrated);
+      expect(await db.get('state', 'current')).toEqual(saved);
 
       const updated = await repo.update((draft) =>
         applyCommand(draft, { type: 'settings', spaceId: 'normal', patch: { hour12: true } }),
       );
-      expect(updated.revision).toBe(state.revision + 1);
+      expect(updated.revision).toBe(migrated.revision + 1);
       expect(updated.normalSettings).toEqual({ ...state.normalSettings, hour12: true });
       expect(updated.privateSettingOverrides).toEqual(state.privateSettingOverrides);
-      expect(updated.spaces).toEqual(state.spaces);
+      expect(updated.spaces).toEqual(migrated.spaces);
       expect(await repo.read()).toEqual(updated);
-      expect(await db.get('state', 'current')).toEqual(updated);
+      expectFixtureCatalog(await db.get('state', 'current'), updated);
       for (const [id, blob] of resources)
         expect(await (await repo.resource(id))?.text()).toBe(await blob.text());
     } finally {
@@ -112,7 +135,16 @@ describe('retired preferences at existing data boundaries', () => {
       'replace',
       'backup-password',
     );
-    expect(restored.state.spaces).toEqual(state.spaces);
+    const protectedGroups = {
+      ...state.spaces.private,
+      groups: state.spaces.private.groups.map((group) => ({
+        ...group,
+        hidden: true,
+        manualIconFetchOnly: true,
+      })),
+    };
+    expect(restored.state.spaces).toEqual({ ...state.spaces, private: protectedGroups });
+    expect(restored.preserveGroupEncryption).toBe(true);
     expect(restored.state.normalSettings).toEqual(state.normalSettings);
     expect(effectiveSettings(restored.state, 'private')).toEqual(
       effectiveSettings(state, 'private'),
@@ -122,11 +154,13 @@ describe('retired preferences at existing data boundaries', () => {
 
     const repo = createRepository(crypto.randomUUID());
     try {
-      await repo.restore(restored.state, restored.resources);
-      await repo.protectPrivate('vault-password');
+      await repo.restore(restored.state, restored.resources, {
+        protectWith: 'vault-password',
+        range: restored.range,
+      });
       expect((await repo.read()).privateSecurity).toEqual({ protected: true, locked: true });
       const unlocked = await repo.unlockPrivate('vault-password');
-      expect(unlocked.spaces.private).toEqual(state.spaces.private);
+      expect(unlocked.spaces.private).toEqual(protectedGroups);
       expect(effectiveSettings(unlocked, 'private')).toEqual(effectiveSettings(state, 'private'));
       const snapshot = await repo.snapshot('all');
       const roundTrip = await createBackup(
@@ -137,11 +171,11 @@ describe('retired preferences at existing data boundaries', () => {
       );
       const recovered = await restoreBackup(
         createInitialState(),
-        await parseBackup(JSON.stringify(roundTrip)),
+        await parseBackup(JSON.stringify(encodeBackup(roundTrip))),
         'replace',
         'backup-password',
       );
-      expect(recovered.state.spaces).toEqual(state.spaces);
+      expect(recovered.state.spaces).toEqual({ ...state.spaces, private: protectedGroups });
       for (const key of Object.keys(retiredSettings)) {
         expect(recovered.state.normalSettings).not.toHaveProperty(key);
         expect(effectiveSettings(recovered.state, 'private')).not.toHaveProperty(key);

@@ -1,19 +1,22 @@
 import { AppError } from '@/lib/errors';
 import { z } from '@/lib/zod';
-import {
-  hasRetiredAppearanceSettings,
-  hasRetiredIconDisplay,
-  upgradeLocalSpace,
-  upgradeLocalState,
-  upgradeSettings,
-} from './upgrade-local';
+import { upgradeLocalSpace, upgradeLocalState, upgradeSettings } from './upgrade-local';
 import { type IDBPObjectStore } from 'idb';
+import { decodeCatalog, encodeCatalog, migrateGroupOrder } from './catalog';
+import {
+  prepareGroupVault,
+  readGroupVault,
+  type SerializedVault,
+  type VaultCache,
+  type VaultWrite,
+} from './group-vault';
 import { openRayDatabase, RAY_DATABASE_NAME, type RayDatabase } from './connection';
 import { decryptJson, encryptJson, type EncryptedEnvelope } from '@/security/crypto';
 import {
   adoptLegacyEncryptedGroups,
   assertEncryptedGroupBoundary,
   indexEncryptedGroups,
+  normalizePlainGroups,
   isUserGroup,
   transferGroup,
   type GroupPrivacyTarget,
@@ -30,12 +33,7 @@ import {
   type SpaceId,
 } from './model';
 
-type VaultSerialized = {
-  schemaVersion: 5;
-  space: RayState['spaces']['private'];
-  overrides: RayState['privateSettingOverrides'];
-  resources: { id: string; type: string; data: string }[];
-};
+type VaultSerialized = SerializedVault;
 type VaultSession = Omit<VaultSerialized, 'resources' | 'schemaVersion'> & {
   resources: Map<string, Blob>;
 };
@@ -48,7 +46,8 @@ export function createRepository(
 ) {
   let session: VaultSession | null = null;
   let sessionPassword: string | null = null;
-  let privateLocation: { groupId: string; folderId: string | null } | null = null;
+  let chunkCache: VaultCache | undefined;
+  let privateLocation: { active: boolean; groupId: string; folderId: string | null } | null = null;
   let sessionGeneration = 0;
   const dbPromise = openRayDatabase(name);
 
@@ -58,24 +57,52 @@ export function createRepository(
   async function readStored(): Promise<Stored> {
     const db = await dbPromise;
     const tx = db.transaction(['state', 'vault'], 'readwrite');
-    let state = await tx.objectStore('state').get('current');
-    if (!state) {
-      state = createInitialState();
-      await tx.objectStore('state').put(state, 'current');
+    const persisted = await tx.objectStore('state').get('current');
+    let state: RayState;
+    if (persisted?.schemaVersion === 6) {
+      state = decodeCatalog(persisted);
+    } else {
+      state = persisted ? upgradeLocalState(persisted) : createInitialState();
+      if (persisted) {
+        migrateGroupOrder(state);
+        normalizePlainGroups(state);
+        // Advance the revision so a transaction prepared against the old layout cannot commit.
+        state.revision = Math.max(state.revision, persisted.revision + 1);
+      }
+      const catalog = encodeCatalog(rayStateSchema.parse(state));
+      // Publish the same canonical selection and empty-group representation as
+      // a later read, including after the last legacy workspace group is moved.
+      state = decodeCatalog(catalog);
+      await tx.objectStore('state').put(catalog, 'current');
     }
-    const upgraded = upgradeLocalState(state);
-    if (state.schemaVersion !== upgraded.schemaVersion || state.revision !== upgraded.revision)
-      await tx.objectStore('state').put(upgraded, 'current');
     const envelope = await tx.objectStore('vault').get('private');
     await tx.done;
-    return { state: upgraded, envelope };
+    if (envelope?.version === 2)
+      throw new AppError('messages.thePasswordIsIncorrectOrTheEncryptedDataIsDamaged');
+    return { state, envelope };
   }
   function clearSession() {
     sessionGeneration++;
     session = null;
+    chunkCache = undefined;
     sessionPassword = null;
     privateLocation = null;
     sessionEnvelope = undefined;
+  }
+  async function openVault(envelope: EncryptedEnvelope, password: string) {
+    const plain = await decryptJson<unknown>(envelope, password);
+    const grouped = await readGroupVault(plain, async (slots) => {
+      const tx = (await dbPromise).transaction('vault', 'readonly');
+      const [head, chunks] = await Promise.all([
+        tx.store.get('private'),
+        Promise.all(slots.map((slot) => tx.store.get(slot))),
+      ]);
+      await tx.done;
+      if (head?.ciphertext !== envelope.ciphertext)
+        throw new AppError('messages.dataChangedInAnotherPageTryAgain');
+      return chunks;
+    });
+    return { data: await deserializeSession(grouped?.payload ?? plain), cache: grouped?.cache };
   }
   async function refreshSession(stored: Stored) {
     if (!stored.state.privateSecurity.protected || !stored.envelope) {
@@ -86,9 +113,10 @@ export function createRepository(
     const previous = session;
     const password = sessionPassword;
     try {
-      const next = await deserializeSession(await decryptJson<unknown>(stored.envelope, password));
+      const next = await openVault(stored.envelope, password);
       if (session === previous) {
-        session = next;
+        session = next.data;
+        chunkCache = next.cache;
         sessionEnvelope = stored.envelope.ciphertext;
       }
     } catch {
@@ -99,8 +127,10 @@ export function createRepository(
     const state = structuredClone(raw);
     if (state.privateSecurity.protected && session) {
       state.spaces.private = structuredClone(session.space);
+      useCatalogOrder(state);
       state.privateSettingOverrides = structuredClone(session.overrides);
       state.privateSecurity.locked = false;
+      if (privateLocation?.active) state.local.activeSpace = 'private';
       const { groups, folders } = state.spaces.private;
       const requestedGroup = privateLocation?.groupId ?? state.local.activeGroup.private;
       const groupId = (groups.find((group) => group.id === requestedGroup) ?? groups[0]).id;
@@ -125,6 +155,7 @@ export function createRepository(
     state: RayState,
     assets: Map<string, Blob>,
     envelope = stored.envelope,
+    vaultWrite?: VaultWrite,
   ) {
     const db = await dbPromise;
     const tx = db.transaction(['state', 'resources', 'vault'], 'readwrite');
@@ -139,16 +170,22 @@ export function createRepository(
       for (const [key, blob] of assets) await tx.objectStore('resources').put(blob, key);
       const persisted = state.privateSecurity.protected ? scrubPrivate(state) : state;
       if (state.privateSecurity.protected) {
-        if (envelope) await tx.objectStore('vault').put(envelope, 'private');
+        const vault = tx.objectStore('vault');
+        if (vaultWrite) {
+          for (const [slot, chunk] of vaultWrite.chunks) await vault.put(chunk, slot);
+          for (const slot of await vault.getAllKeys())
+            if (slot !== 'private' && !vaultWrite.keep.has(slot)) await vault.delete(slot);
+        }
+        if (envelope && envelope !== stored.envelope) await vault.put(envelope, 'private');
         await removePrivateOnlyResources(state, tx.objectStore('resources'));
       } else {
-        await tx.objectStore('vault').delete('private');
+        await tx.objectStore('vault').clear();
         const ids = resourceIds(state);
         for (const key of await tx.objectStore('resources').getAllKeys())
           if (!ids.has(key)) await tx.objectStore('resources').delete(key);
       }
       await validateResources(persisted, tx.objectStore('resources'));
-      await tx.objectStore('state').put(persisted, 'current');
+      await tx.objectStore('state').put(encodeCatalog(persisted), 'current');
       await tx.done;
     } catch (error) {
       try {
@@ -197,9 +234,17 @@ export function createRepository(
       }
     }
     let envelope = stored.envelope;
+    let sealed: Awaited<ReturnType<typeof prepareGroupVault>> | undefined;
     let nextSession: VaultSession | undefined;
     const password = protectOnRestore ? restorePassword : session && sessionPassword;
-    if (valid.privateSecurity.protected && password) {
+    const existingPrivate =
+      startingSession &&
+      JSON.stringify(valid.spaces.private) === JSON.stringify(startingSession.space) &&
+      JSON.stringify(valid.privateSettingOverrides) === JSON.stringify(startingSession.overrides) &&
+      !Array.from(assets.keys()).some((id) => startingSession.resources.has(id));
+    if (valid.privateSecurity.protected && password && existingPrivate && startingSession) {
+      nextSession = startingSession;
+    } else if (valid.privateSecurity.protected && password) {
       nextSession = {
         space: structuredClone(valid.spaces.private),
         overrides: structuredClone(valid.privateSettingOverrides),
@@ -211,7 +256,13 @@ export function createRepository(
         if (!blob) throw new AppError('messages.aPrivateSpaceImageIsMissingNoChangesWereSaved');
         nextSession.resources.set(id, blob);
       }
-      envelope = await encryptJson(await serializeSession(nextSession), password);
+      sealed = await prepareGroupVault(
+        await serializeSession(nextSession),
+        password,
+        chunkCache,
+        envelope,
+      );
+      envelope = sealed.envelope;
     } else if (
       valid.privateSecurity.protected &&
       (JSON.stringify(valid.spaces.private) !== JSON.stringify(raw.spaces.private) ||
@@ -222,7 +273,7 @@ export function createRepository(
     }
     if (nextSession && session !== startingSession)
       throw new AppError('messages.thePrivateSpaceStateChangedTryAgain');
-    await persist(stored, valid, savedAssets, envelope);
+    await persist(stored, valid, savedAssets, envelope, sealed?.write);
     if (protectOnRestore) {
       clearSession();
       onCommit({ revision: valid.revision, resourceIds: [...savedAssets.keys()] });
@@ -231,10 +282,15 @@ export function createRepository(
     const sessionChanged = nextSession && session !== startingSession;
     if (nextSession && !sessionChanged) {
       session = nextSession;
+      if (sealed) chunkCache = sealed.cache;
       sessionEnvelope = envelope?.ciphertext;
       const groupId = valid.local.activeGroup.private;
       // Keep the selected private group and folder in the unlocked session only.
-      privateLocation = { groupId, folderId: valid.local.selectedFolder.private[groupId] ?? null };
+      privateLocation = {
+        active: valid.local.activeSpace === 'private',
+        groupId,
+        folderId: valid.local.selectedFolder.private[groupId] ?? null,
+      };
     }
     onCommit({ revision: valid.revision, resourceIds: [...assets.keys()] });
     return sessionChanged ? read() : valid;
@@ -264,8 +320,8 @@ export function createRepository(
             throw new AppError('messages.theDestinationGroupDoesNotExist');
           group.hidden ??= true;
         }
-        state.encryptedGroupIndex = indexEncryptedGroups(state);
       }
+      state.encryptedGroupIndex = indexEncryptedGroups(state);
       const resources = new Map<string, Blob>();
       const db = await dbPromise;
       for (const id of privateResourceIds(state)) {
@@ -281,12 +337,15 @@ export function createRepository(
         overrides: state.privateSettingOverrides,
         resources,
       };
-      const envelope = await encryptJson(await serializeSession(payload), password);
+      const { envelope, write } = await prepareGroupVault(
+        await serializeSession(payload),
+        password,
+      );
       const next = structuredClone(state);
       next.privateSecurity = { protected: true, locked: true };
       next.local.activeSpace = 'normal';
       next.revision++;
-      await persist(stored, next, new Map(), envelope);
+      await persist(stored, next, new Map(), envelope, write);
       clearSession();
       onCommit({ revision: next.revision, resourceIds: [] });
       return read();
@@ -296,27 +355,53 @@ export function createRepository(
       const stored = await readStored();
       let { envelope } = stored;
       if (!envelope) throw new AppError('messages.thePrivateSpaceHasNoEncryptedData');
-      const plaintext = await decryptJson<unknown>(envelope, password);
-      const unlocked = await deserializeSession(plaintext);
+      const opened = await openVault(envelope, password);
+      const unlocked = opened.data;
+      let loadedCache = opened.cache;
       const adopt = adoptGroups && (stored.state.encryptedGroupIndex?.hasLegacyGroups ?? true);
       if (adopt) {
         const state = {
           ...stored.state,
           spaces: { ...stored.state.spaces, private: unlocked.space },
         };
+        const positions = new Map(
+          stored.state.encryptedGroupIndex?.labels.map((label) => [label.id, label.order]),
+        );
+        let order =
+          Math.max(
+            -1,
+            ...state.spaces.normal.groups.map((group) => group.order),
+            ...positions.values(),
+          ) + 1;
+        for (const group of [...unlocked.space.groups].sort(
+          (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+        )) {
+          if (isUserGroup(state, 'private', group))
+            group.order = positions.get(group.id) ?? order++;
+        }
         adoptLegacyEncryptedGroups(state);
         stored.state.encryptedGroupIndex = indexEncryptedGroups(state);
         assertEncryptedGroupBoundary(stored.state);
       }
-      if (
-        adopt ||
-        (typeof plaintext === 'object' &&
-          plaintext !== null &&
-          (!('schemaVersion' in plaintext) ||
-            ('overrides' in plaintext && hasRetiredAppearanceSettings(plaintext.overrides)) ||
-            ('space' in plaintext && hasRetiredIconDisplay(plaintext.space))))
-      ) {
-        envelope = await encryptJson(await serializeSession(unlocked), password);
+      if (!adopt && !stored.state.encryptedGroupIndex?.usage) {
+        const withData = {
+          ...stored.state,
+          spaces: { ...stored.state.spaces, private: unlocked.space },
+        };
+        const index = indexEncryptedGroups(withData);
+        stored.state.encryptedGroupIndex = {
+          ...(stored.state.encryptedGroupIndex ?? { labels: [], hasLegacyGroups: true }),
+          usage: index.usage,
+        };
+      }
+      if (adopt || !loadedCache) {
+        const sealed = await prepareGroupVault(
+          await serializeSession(unlocked),
+          password,
+          loadedCache,
+        );
+        envelope = sealed.envelope;
+        loadedCache = sealed.cache;
         if (generation !== sessionGeneration)
           throw new AppError('messages.thePrivateSpaceStateChangedTryAgain');
         await persist(
@@ -324,11 +409,13 @@ export function createRepository(
           { ...stored.state, revision: stored.state.revision + 1 },
           new Map(),
           envelope,
+          sealed.write,
         );
       }
       if (generation !== sessionGeneration)
         throw new AppError('messages.thePrivateSpaceStateChangedTryAgain');
       session = unlocked;
+      chunkCache = loadedCache;
       sessionPassword = password;
       privateLocation = null;
       sessionEnvelope = envelope.ciphertext;
@@ -344,27 +431,27 @@ export function createRepository(
     async changePrivatePassword(currentPassword: string, nextPassword: string) {
       const stored = await readStored();
       if (!stored.envelope) throw new AppError('messages.thePrivateSpaceDoesNotHaveAPassword');
-      const payload = await deserializeSession(
-        await decryptJson<unknown>(stored.envelope, currentPassword),
-      );
-      const envelope = await encryptJson(await serializeSession(payload), nextPassword);
+      const { data, cache } = await openVault(stored.envelope, currentPassword);
+      const { envelope, write } = cache
+        ? { envelope: await encryptJson(cache.manifest, nextPassword), write: undefined }
+        : await prepareGroupVault(await serializeSession(data), nextPassword);
       const next = { ...stored.state, revision: stored.state.revision + 1 };
-      await persist(stored, next, new Map(), envelope);
+      await persist(stored, next, new Map(), envelope, write);
       clearSession();
       onCommit({ revision: next.revision, resourceIds: [] });
     },
     async removePrivatePassword(password: string) {
       const stored = await readStored();
       if (!stored.envelope) throw new AppError('messages.thePrivateSpaceDoesNotHaveAPassword');
-      const payload = await deserializeSession(
-        await decryptJson<unknown>(stored.envelope, password),
-      );
+      const { data: payload } = await openVault(stored.envelope, password);
       const next = structuredClone(stored.state);
       next.spaces.private = payload.space;
+      useCatalogOrder(next);
       next.privateSettingOverrides = payload.overrides;
       next.privateSecurity = { protected: false, locked: false };
       delete next.encryptedGroupIndex;
       next.local.activeGroup.private = payload.space.groups[0].id;
+      normalizePlainGroups(next, 'unprotect');
       next.revision++;
       await persist(stored, rayStateSchema.parse(next), payload.resources);
       clearSession();
@@ -412,6 +499,7 @@ export function createRepository(
           }
           if (range !== 'private') draft.normalSettings = valid.normalSettings;
           if (range !== 'normal') draft.privateSettingOverrides = valid.privateSettingOverrides;
+          if (range !== 'normal' && !protectWith) normalizePlainGroups(draft);
         },
         assets,
         expectedRevision,
@@ -419,9 +507,18 @@ export function createRepository(
       );
     },
     async close() {
+      clearSession();
       (await dbPromise).close();
     },
   };
+}
+
+function useCatalogOrder(state: RayState) {
+  const positions = new Map(
+    state.encryptedGroupIndex?.labels.map((label) => [label.id, label.order]),
+  );
+  for (const group of state.spaces.private.groups)
+    group.order = positions.get(group.id) ?? group.order;
 }
 
 function scrubPrivate(state: RayState) {

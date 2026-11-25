@@ -26,7 +26,6 @@ export type CardBaseProps = {
   manageMode: boolean;
   disabledDrag?: boolean;
   selected?: boolean;
-  dragOverlay?: boolean;
   onToggleSelection?: () => void;
   menuActions?: NavigationAction[];
 };
@@ -66,13 +65,12 @@ function SelectableIcon({ children, selected }: { children: ReactNode; selected:
   );
 }
 
-export function SiteCardView({
+function SiteCardView({
   site,
   openInNewTab,
   showTitle,
   manageMode,
   selected = false,
-  dragOverlay = false,
   isDragging = false,
   onToggleSelection,
   setNodeRef,
@@ -89,16 +87,10 @@ export function SiteCardView({
       ref={setNodeRef}
       {...listeners}
       onDragStart={(event) => event.preventDefault()}
-      inert={dragOverlay || undefined}
-      aria-hidden={dragOverlay || undefined}
-      className={cn(
-        'site-card group relative',
-        isDragging && !dragOverlay && 'opacity-45 scale-95 z-50',
-        dragOverlay && 'scale-105 z-50 shadow-xl opacity-90',
-      )}
+      className={cn('site-card group relative', isDragging && 'opacity-0')}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-        transition: dragOverlay ? undefined : transition,
+        transition,
       }}
     >
       {manageMode ? (
@@ -136,7 +128,7 @@ export function SiteCardView({
     </article>
   );
 
-  if (manageMode || !menuActions || dragOverlay) {
+  if (manageMode || !menuActions) {
     return cardNode;
   }
 
@@ -151,7 +143,7 @@ export function SiteCardView({
 }
 
 export function SiteCard(props: SiteCardProps) {
-  const { manageMode, dragOverlay, disabledDrag, site } = props;
+  const { manageMode, disabledDrag, site } = props;
   const {
     attributes,
     listeners,
@@ -163,7 +155,7 @@ export function SiteCard(props: SiteCardProps) {
   } = useSortable({
     id: `site:${site.id}`,
     data: { type: 'site', site },
-    disabled: manageMode || dragOverlay || disabledDrag,
+    disabled: manageMode || disabledDrag,
   });
 
   return (
@@ -172,8 +164,8 @@ export function SiteCard(props: SiteCardProps) {
       isDragging={isDragging}
       setNodeRef={setNodeRef}
       setActivatorNodeRef={setActivatorNodeRef}
-      attributes={!manageMode && !dragOverlay && !disabledDrag ? attributes : undefined}
-      listeners={!manageMode && !dragOverlay && !disabledDrag ? listeners : undefined}
+      attributes={!manageMode && !disabledDrag ? attributes : undefined}
+      listeners={!manageMode && !disabledDrag ? listeners : undefined}
       transform={transform}
       transition={transition}
     />
@@ -212,13 +204,12 @@ export function FolderPreview({ sites }: { sites: Site[] }) {
   );
 }
 
-export function FolderCardView({
+function FolderCardView({
   folder,
   previewSites,
   showTitle,
   manageMode,
   selected = false,
-  dragOverlay = false,
   isDragging = false,
   isCenterOver = false,
   onToggleSelection,
@@ -242,20 +233,17 @@ export function FolderCardView({
       ref={setNodeRef}
       {...listeners}
       onDragStart={(event) => event.preventDefault()}
-      inert={dragOverlay || undefined}
-      aria-hidden={dragOverlay || undefined}
       className={cn(
         'site-card group relative',
-        isDragging && !dragOverlay && 'opacity-45 scale-95 z-50',
-        dragOverlay && 'scale-105 z-50 shadow-xl opacity-90',
-        isCenterOver && !isDragging && 'ring-2 ring-white/60 shadow-lg scale-105 bg-white/10',
+        isDragging && 'opacity-0',
+        isCenterOver && !isDragging && '[&_.folder-preview]:scale-110',
       )}
       style={{
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-        transition: dragOverlay ? undefined : transition,
+        transition,
       }}
     >
-      {!manageMode && !isDragging && !dragOverlay && (
+      {!manageMode && !isDragging && (
         <div
           ref={setCenterDropRef}
           className="absolute inset-[25%] z-10 rounded-xl pointer-events-none"
@@ -292,7 +280,7 @@ export function FolderCardView({
     </article>
   );
 
-  if (manageMode || !menuActions || dragOverlay) {
+  if (manageMode || !menuActions) {
     return cardNode;
   }
 
@@ -307,7 +295,7 @@ export function FolderCardView({
 }
 
 export function FolderCard(props: FolderCardProps) {
-  const { manageMode, dragOverlay, disabledDrag, folder } = props;
+  const { manageMode, disabledDrag, folder } = props;
   const {
     attributes,
     listeners,
@@ -319,13 +307,13 @@ export function FolderCard(props: FolderCardProps) {
   } = useSortable({
     id: `folder:${folder.id}`,
     data: { type: 'folder', folder },
-    disabled: manageMode || dragOverlay || disabledDrag,
+    disabled: manageMode || disabledDrag,
   });
 
   const { setNodeRef: setCenterDropRef, isOver: isCenterOver } = useDroppable({
     id: `folder-center:${folder.id}`,
     data: { type: 'folder-center', folderId: folder.id },
-    disabled: manageMode || dragOverlay || disabledDrag,
+    disabled: manageMode || disabledDrag,
   });
 
   return (
@@ -336,8 +324,8 @@ export function FolderCard(props: FolderCardProps) {
       setNodeRef={setSortableRef}
       setActivatorNodeRef={setActivatorNodeRef}
       setCenterDropRef={setCenterDropRef}
-      attributes={!manageMode && !dragOverlay && !disabledDrag ? attributes : undefined}
-      listeners={!manageMode && !dragOverlay && !disabledDrag ? listeners : undefined}
+      attributes={!manageMode && !disabledDrag ? attributes : undefined}
+      listeners={!manageMode && !disabledDrag ? listeners : undefined}
       transform={transform}
       transition={transition}
     />

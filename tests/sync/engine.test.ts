@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createBackup } from '../../src/features/backup/backup';
+import { createBackup, encodeBackup, parseBackup } from '../../src/features/backup/backup';
 import { createInitialState } from '../../src/storage/model';
 import { repository } from '../../src/storage/repository';
 import { createRepository } from '../../src/storage/database';
@@ -244,15 +244,16 @@ describe('sync engine', () => {
       { entity: 'group', id: 'private-space', field: '*', local: 'Local', remote: 'Remote' },
     ];
     local['raytab-sync-status'] = { conflicts };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
     const expected = (await loadSyncStatus()).conflicts[0];
-    await expect(resolveSyncConflict(expected, 'remote')).rejects.toThrow(
-      'messages.resolvePrivateSpaceVersionsWithLocalToCloudOrCloudToLocal',
-    );
-    expect((await loadSyncStatus()).conflicts).toEqual([expected]);
-    await expect(resolveSyncConflict(expected, 'local')).rejects.toThrow(
-      'messages.resolvePrivateSpaceVersionsWithLocalToCloudOrCloudToLocal',
-    );
-    expect((await loadSyncStatus()).conflicts).toEqual([expected]);
+    for (const choice of ['remote', 'local'] as const) {
+      await expect(resolveSyncConflict(expected, choice)).rejects.toThrow(
+        'errors.sync.conflictChanged',
+      );
+      expect((await loadSyncStatus()).conflicts).toEqual([expected]);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
     await clearSyncConfig();
     expect((await loadSyncStatus()).conflicts).toHaveLength(0);
   });
@@ -273,9 +274,14 @@ describe('sync engine', () => {
 
     expect(JSON.parse(written!)).toMatchObject({
       format: 'raytab-backup',
-      spaces: { normal: expect.any(Object) },
+      version: 4,
+      coverage: 'normal',
+      groups: [expect.objectContaining({ protection: 'none', sites: expect.any(Array) })],
     });
-    expect(local['raytab-sync-baseline']).toMatchObject({ version: 'v1' });
+    expect(local['raytab-sync-baseline']).toMatchObject({
+      version: 'v1',
+      document: JSON.parse(written!),
+    });
     await expect(loadSyncStatus()).resolves.toMatchObject({ conflicts: [], retryCount: 0 });
   });
 
@@ -313,7 +319,7 @@ describe('sync engine', () => {
     expect((await repository.read()).spaces.normal.sites).toContainEqual(
       expect.objectContaining({ id: localOnlyId }),
     );
-    expect(JSON.parse(content).spaces.normal.data.sites).toContainEqual(
+    expect((await parseBackup(content)).spaces.normal!.data.sites).toContainEqual(
       expect.objectContaining({ id: localOnlyId }),
     );
     expect((await loadSyncStatus()).conflicts).toEqual([]);
@@ -375,7 +381,7 @@ describe('sync engine', () => {
     expect(state.spaces.normal.sites).toContainEqual(
       expect.objectContaining({ id: 'remote-addition', groupId: recovery!.groupId }),
     );
-    expect(JSON.parse(content).spaces.normal.data.sites).toContainEqual(
+    expect((await parseBackup(content)).spaces.normal!.data.sites).toContainEqual(
       expect.objectContaining({ id: 'remote-addition' }),
     );
     await synchronize();
@@ -447,8 +453,18 @@ describe('sync engine', () => {
       });
       const before = await repository.read();
       await repository.protectPrivate('local-vault-password');
-      const remote = await createBackup(createInitialState(), new Map(), 'all', 'remote-password');
-      let content = JSON.stringify(remote);
+      const remoteState = createInitialState();
+      remoteState.privateSecurity = { protected: true, locked: false };
+      const remoteGroup = remoteState.spaces.private.groups[0];
+      remoteGroup.hidden = true;
+      remoteState.spaces.private.sites.push({
+        ...remoteState.spaces.normal.sites[0],
+        id: 'remote-private-site',
+        groupId: remoteGroup.id,
+        url: 'https://remote-private.example/',
+      });
+      const remote = await createBackup(remoteState, new Map(), 'all', 'remote-password');
+      let content = JSON.stringify(encodeBackup(remote));
       vi.stubGlobal(
         'fetch',
         vi.fn(async (_url: string, init: RequestInit = {}) => {
@@ -459,7 +475,8 @@ describe('sync engine', () => {
       try {
         await synchronize(mode);
         expect((await repository.read()).privateSecurity.locked).toBe(true);
-        expect(JSON.parse(content).spaces.private).toEqual(remote.spaces.private);
+        expect((await parseBackup(content)).spaces.private).toEqual(remote.spaces.private);
+        expect(content).not.toContain('https://remote-private.example/');
         const unlocked = await repository.unlockPrivate('local-vault-password');
         expect(unlocked.spaces.private).toEqual(before.spaces.private);
         expect(unlocked.privateSettingOverrides).toEqual(before.privateSettingOverrides);
@@ -670,10 +687,9 @@ describe('sync engine', () => {
         site: { ...first, title: 'Local edit' },
       }),
     );
-    const remote = JSON.parse(remoteContent);
-    remote.spaces.normal.data.sites.find((site: { id: string }) => site.id === second.id).title =
-      'Remote edit';
-    remoteContent = JSON.stringify(remote);
+    const remote = await parseBackup(remoteContent);
+    remote.spaces.normal!.data.sites.find((site) => site.id === second.id)!.title = 'Remote edit';
+    remoteContent = JSON.stringify(encodeBackup(remote));
 
     await synchronize('auto');
 
@@ -698,14 +714,14 @@ describe('sync engine', () => {
         site: { ...first, title: 'Second local edit' },
       }),
     );
-    const conflictingRemote = JSON.parse(remoteContent);
-    const remoteFirst = conflictingRemote.spaces.normal.data.sites.find(
+    const conflictingRemote = await parseBackup(remoteContent);
+    const remoteFirst = conflictingRemote.spaces.normal!.data.sites.find(
       (site: { id: string }) => site.id === first.id,
-    );
+    )!;
     remoteFirst.title = 'Second remote edit';
     remoteFirst.updatedAt++;
     remoteFirst.changeId = 'remote-change';
-    remoteContent = JSON.stringify(conflictingRemote);
+    remoteContent = JSON.stringify(encodeBackup(conflictingRemote));
 
     await synchronize('auto');
 
@@ -740,11 +756,11 @@ describe('sync engine', () => {
     );
 
     await synchronize('auto');
-    const remote = JSON.parse(remoteContent);
-    expect(remote.spaces.normal.data.sites).not.toContainEqual(
+    const remote = await parseBackup(remoteContent);
+    expect(remote.spaces.normal!.data.sites).not.toContainEqual(
       expect.objectContaining({ id: deletedId }),
     );
-    expect(remote.spaces.normal.data.tombstones).toContainEqual(
+    expect(remote.spaces.normal!.data.tombstones).toContainEqual(
       expect.objectContaining({ id: deletedId, entity: 'site' }),
     );
 

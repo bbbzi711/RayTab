@@ -8,17 +8,16 @@
     "deleteGroupContents": "删除分组及内容",
     "groupContentsChanged": "分组里的内容已变化，请重新确认删除。",
     "noWritableGroups": "请先在首页创建一个可用分组。",
-    "groupPrivacyHelp": "隐藏控制标签显示。加密保护分组内容，名称仍用于显示标签。",
     "hideHiddenGroups": "收起隐藏分组",
     "showHiddenGroups": "显示隐藏分组",
     "hideNamedGroup": "隐藏 {{name}}",
-    "hideGroup": "隐藏",
+    "hideGroup": "从首页隐藏",
     "decryptGroup": "取消加密",
     "encryptGroup": "加密",
     "unlockLegacyGroups": "解锁已有加密分组",
     "unlockGroups": "解锁加密分组",
     "createGroupPassword": "设置分组加密密码",
-    "sharedGroupPasswordHelp": "所有加密分组共用这个密码。请至少输入 6 个字符。",
+    "sharedGroupPasswordHelp": "所有加密分组共用这个密码，至少 6 个字符。锁定后仍可看到分组名，查看网站需要解锁。",
     "encryptedGroupConflict": "这次导入或同步包含已加密分组的普通副本，数据未更改。",
     "legacyGroupMigrationHelp": "输入现有密码，已有分组会加入统一分组栏，分组名称用于显示标签，内容仍加密。",
     "invalidIcon": "请选择有效的图标和背景颜色",
@@ -80,6 +79,8 @@
       "pink": "粉色",
       "purple": "紫色"
     },
-    "changedSiteIconFailed": "网址已更改，但未获取到新网站的图标。请重试，或选择文字图标、上传图片后保存。"
+    "changedSiteIconFailed": "网址已更改，但未获取到新网站的图标。请重试，或选择文字图标、上传图片后保存。",
+    "groupActions": "分组「{{name}}」的操作",
+    "showGroup": "在首页显示"
   }
 }

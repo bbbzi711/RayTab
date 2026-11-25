@@ -1,7 +1,12 @@
-import { LockKeyhole, Trash2 } from 'lucide-react';
+import { Ellipsis, EyeOff, LockKeyhole, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { groupPrivacyActions, NavigationMenuItems } from './NavigationMenu';
 import type { GroupTab } from '@/storage/group-privacy';
 
 export function GroupManagement({
@@ -9,8 +14,7 @@ export function GroupManagement({
   legacyLocked,
   showHidden,
   onShowHidden,
-  onHiddenChange,
-  onEncryptionChange,
+  onPrivacyChange,
   onDeleteGroup,
   onOpenLegacy,
 }: {
@@ -18,17 +22,13 @@ export function GroupManagement({
   legacyLocked: boolean;
   showHidden: boolean;
   onShowHidden: () => void;
-  onHiddenChange: (group: GroupTab, hidden: boolean) => void;
-  onEncryptionChange: (group: GroupTab) => void;
+  onPrivacyChange: (group: GroupTab, hidden?: boolean) => void;
   onDeleteGroup: (group: GroupTab) => void;
   onOpenLegacy: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <>
-      <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-        {t('navigation.groupPrivacyHelp')}
-      </p>
       {(legacyLocked || groups.some((group) => group.hidden)) && (
         <Button
           type="button"
@@ -42,41 +42,50 @@ export function GroupManagement({
       <ul className="grid min-w-0 gap-1">
         {groups.map((group) => (
           <li
-            key={`${group.spaceId}:${group.id}`}
-            className="settings-group-row grid min-w-0 grid-cols-[minmax(0,1fr)_auto_5rem_auto] items-center gap-x-1.5 gap-y-1 border-b border-border py-2"
+            key={group.id}
+            className="flex min-w-0 items-center gap-2 border-b border-border py-2"
           >
-            <span className="flex min-w-0 items-center gap-1.5 break-all text-sm">
-              {group.encrypted && <LockKeyhole className="size-3.5 shrink-0" aria-hidden="true" />}
-              {group.name}
-            </span>
-            <label className="flex min-w-0 items-center gap-1.5 text-xs">
-              <Switch
-                checked={group.hidden}
-                aria-label={t('navigation.hideNamedGroup', { name: group.name })}
-                onCheckedChange={(hidden) => onHiddenChange(group, hidden)}
+            <span className="min-w-0 flex-1 break-all text-sm">{group.name}</span>
+            {group.hidden && (
+              <EyeOff
+                className="size-3.5 text-muted-foreground"
+                aria-label={t('navigation.hideGroup')}
               />
-              {t('navigation.hideGroup')}
-            </label>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-auto min-h-8 w-full px-1 whitespace-normal"
-              onClick={() => onEncryptionChange(group)}
-            >
-              {t(group.encrypted ? 'navigation.decryptGroup' : 'navigation.encryptGroup')}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8 text-muted-foreground hover:text-destructive"
-              aria-label={t('navigation.deleteNamedGroup', { name: group.name })}
-              title={t('messages.delete')}
-              onClick={() => onDeleteGroup(group)}
-            >
-              <Trash2 className="size-4" aria-hidden="true" />
-            </Button>
+            )}
+            {group.encrypted && (
+              <LockKeyhole
+                className="size-3.5 text-muted-foreground"
+                aria-label={t('navigation.encryptGroup')}
+              />
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('navigation.groupActions', { name: group.name })}
+                >
+                  <Ellipsis aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <NavigationMenuItems
+                  dropdown
+                  actions={[
+                    ...groupPrivacyActions(group, t, onPrivacyChange),
+                    {
+                      id: 'delete',
+                      label: t('messages.delete'),
+                      icon: Trash2,
+                      separator: true,
+                      destructive: true,
+                      run: () => onDeleteGroup(group),
+                    },
+                  ]}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </li>
         ))}
       </ul>

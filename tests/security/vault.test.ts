@@ -1,3 +1,4 @@
+import { openDB } from 'idb';
 import { vectorArtwork, vectorImage } from '../helpers/images';
 import { describe, expect, it, vi } from 'vitest';
 import { decryptJson, encryptJson, encryptedEnvelopeSchema } from '../../src/security/crypto';
@@ -279,8 +280,90 @@ describe('private vault repository', () => {
     expect((await repo.read()).spaces.private.sites).toHaveLength(0);
     const restored = await repo.removePrivatePassword('vault-password');
     expect(restored.privateSecurity.protected).toBe(false);
-    expect(restored.spaces.private.sites[0].title).toBe('Private');
+    expect(restored.spaces.normal.sites.find((site) => site.id === 'private-site')).toEqual(
+      expect.objectContaining({
+        title: 'Private',
+        groupId,
+        url: 'https://private.example/',
+        icon: { source: 'resource', resourceId: 'private-icon' },
+      }),
+    );
+    expect(restored.spaces.private.sites).toHaveLength(0);
+    expect(await (await repo.resource('private-icon'))?.text()).toBe(vectorArtwork);
     await repo.close();
+  });
+
+  it('encrypts groups independently and changes the shared password without rewriting their contents', async () => {
+    const name = crypto.randomUUID();
+    const repo = createRepository(name);
+    await repo.update((draft) => {
+      for (const id of ['first', 'second']) {
+        applyCommand(draft, { type: 'save-group', spaceId: 'normal', id, name: id });
+        applyCommand(draft, {
+          type: 'save-site',
+          spaceId: 'normal',
+          id: id + '-site',
+          groupId: id,
+          folderId: null,
+          site: {
+            title: id,
+            url: 'https://' + id + '.example/',
+            icon: { source: 'auto' },
+            iconBackground: { mode: 'auto' },
+          },
+        });
+      }
+    });
+    const db = await openDB(name);
+    try {
+      await repo.protectPrivate('old-password', { spaceId: 'normal', groupId: 'first' });
+      await repo.unlockPrivate('old-password');
+      await repo.update((draft) =>
+        applyCommand(draft, {
+          type: 'set-group-encrypted',
+          spaceId: 'normal',
+          groupId: 'second',
+          encrypted: true,
+        }),
+      );
+      const directory = await decryptJson<{ groups: { id: string; slot: string }[] }>(
+        await db.get('vault', 'private'),
+        'old-password',
+      );
+      const slots = Object.fromEntries(directory.groups.map((record) => [record.id, record.slot]));
+      expect(Object.keys(slots).sort()).toEqual(['first', 'second']);
+      expect(slots.first).not.toBe(slots.second);
+      const first = await db.get('vault', slots.first);
+      const second = await db.get('vault', slots.second);
+      await repo.update((draft) => {
+        const site = draft.spaces.private.sites.find((item) => item.id === 'first-site')!;
+        applyCommand(draft, {
+          type: 'save-site',
+          spaceId: 'private',
+          id: site.id,
+          groupId: site.groupId,
+          folderId: null,
+          site: { ...site, title: 'Edited private title' },
+        });
+      });
+      const edited = await db.get('vault', slots.first);
+      expect(edited.ciphertext).not.toBe(first.ciphertext);
+      expect(await db.get('vault', slots.second)).toEqual(second);
+      const head = await db.get('vault', 'private');
+      await repo.changePrivatePassword('old-password', 'new-password');
+      expect((await db.get('vault', 'private')).ciphertext).not.toBe(head.ciphertext);
+      expect(await db.get('vault', slots.first)).toEqual(edited);
+      expect(await db.get('vault', slots.second)).toEqual(second);
+      await expect(repo.unlockPrivate('old-password')).rejects.toThrow();
+      const unlocked = await repo.unlockPrivate('new-password');
+      expect(unlocked.spaces.private.sites.map((site) => [site.id, site.title])).toEqual([
+        ['first-site', 'Edited private title'],
+        ['second-site', 'second'],
+      ]);
+    } finally {
+      await repo.close();
+      db.close();
+    }
   });
 
   it('changes the password, locks the vault, and removes protection with the new password', async () => {
@@ -319,8 +402,13 @@ describe('private vault repository', () => {
     const unprotected = await repo.removePrivatePassword('second-password');
     expect(unprotected.revision).toBe(protectedState.revision + 2);
     expect(unprotected.privateSecurity).toEqual({ protected: false, locked: false });
-    expect(unprotected.spaces.private.sites).toContainEqual(
-      expect.objectContaining({ id: 'protected-site' }),
+    expect(unprotected.spaces.private.sites).toHaveLength(0);
+    expect(unprotected.spaces.normal.sites).toContainEqual(
+      expect.objectContaining({
+        id: 'protected-site',
+        groupId: initial.spaces.private.groups[0].id,
+        url: 'https://protected.example/',
+      }),
     );
     await repo.close();
   });

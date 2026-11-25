@@ -39,6 +39,7 @@ export const groupSchema = z.object({
   name: titleSchema,
   order: z.number().int().nonnegative(),
   hidden: z.boolean().optional(),
+  manualIconFetchOnly: z.literal(true).optional(),
 });
 export const groupLabelSchema = groupSchema.pick({
   id: true,
@@ -131,11 +132,24 @@ export const spaceSettingsSchema = z.object({
   overlay: z.number().min(0).max(0.8),
 });
 
+export const catalogLimits = {
+  groups: 400,
+  folders: 4000,
+  sites: 20000,
+  tombstones: 40000,
+} as const;
+export const catalogUsageSchema = z.object({
+  groups: z.number().int().nonnegative(),
+  folders: z.number().int().nonnegative(),
+  sites: z.number().int().nonnegative(),
+  tombstones: z.number().int().nonnegative(),
+});
 const spaceDataBaseSchema = z.object({
-  groups: z.array(groupSchema).max(200),
-  folders: z.array(folderSchema).max(2000),
-  sites: z.array(siteSchema).max(10000),
-  tombstones: z.array(tombstoneSchema).max(20000),
+  // A legacy in-memory view can also contain one empty navigation placeholder.
+  groups: z.array(groupSchema).max(catalogLimits.groups + 1),
+  folders: z.array(folderSchema).max(catalogLimits.folders),
+  sites: z.array(siteSchema).max(catalogLimits.sites),
+  tombstones: z.array(tombstoneSchema).max(catalogLimits.tombstones),
 });
 export const spaceDataSchema = spaceDataBaseSchema.superRefine((space, ctx) => {
   const groupIds = new Set(space.groups.map((item) => item.id));
@@ -181,10 +195,11 @@ export const rayStateSchema = z
     privateSecurity: z.object({ protected: z.boolean(), locked: z.boolean() }),
     encryptedGroupIndex: z
       .object({
-        labels: z.array(groupLabelSchema).max(200),
+        labels: z.array(groupLabelSchema).max(400),
         hasLegacyGroups: z.boolean(),
-        folderIds: z.array(idSchema).max(2000).optional(),
-        siteIds: z.array(idSchema).max(10000).optional(),
+        usage: catalogUsageSchema.optional(),
+        folderIds: z.array(idSchema).max(4000).optional(),
+        siteIds: z.array(idSchema).max(20000).optional(),
       })
       .optional(),
     local: localStateSchema,
@@ -247,40 +262,28 @@ export const defaultSettings: SpaceSettings = {
   overlay: 0.1,
 };
 
-function meta(id: string, now = 0) {
-  return { id, createdAt: now, updatedAt: now, changeId: `initial-${id}` };
-}
-function createSpace(prefix: SpaceId, withExamples: boolean): SpaceData {
+function createSpace(prefix: SpaceId): SpaceData {
   const groupId = `${prefix}-group-home`;
-  const examples = [
-    ['GitHub', 'https://github.com'],
-    ['Google', 'https://www.google.com'],
-    ['微博', 'https://weibo.com'],
-    ['哔哩哔哩', 'https://www.bilibili.com'],
-    ['YouTube', 'https://www.youtube.com'],
-  ];
   return {
-    groups: [{ ...meta(groupId), name: '主页', order: 0 }],
+    groups: [
+      {
+        id: groupId,
+        name: '主页',
+        order: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        changeId: `initial-${groupId}`,
+      },
+    ],
     folders: [],
-    sites: withExamples
-      ? examples.map(([title, url], order) => ({
-          ...meta(`${prefix}-site-${order}`),
-          groupId,
-          folderId: null,
-          title,
-          url,
-          icon: { ...defaultSiteIcon },
-          iconBackground: { ...defaultSiteIconBackground },
-          order,
-        }))
-      : [],
+    sites: [],
     tombstones: [],
   };
 }
 
 export function createInitialState(): RayState {
-  const normal = createSpace('normal', true);
-  const privateSpace = createSpace('private', false);
+  const normal = createSpace('normal');
+  const privateSpace = createSpace('private');
   return {
     schemaVersion: 5,
     revision: 0,
@@ -298,7 +301,7 @@ export function createInitialState(): RayState {
   };
 }
 export function createLockedPrivateSpace() {
-  return createSpace('private', false);
+  return createSpace('private');
 }
 export function effectiveSettings(state: RayState, spaceId: SpaceId): SpaceSettings {
   const settings =

@@ -144,14 +144,15 @@ test('全局偏好在普通和加密分组间双向一致，重载保留设置�
 });
 
 test('设置表单在栏目间保留草稿，关闭时确认放弃', async ({ newTab }) => {
-  const settings = await openSettings(newTab, '云端同步');
+  const settings = await openSettings(newTab, '同步与备份');
   await expect(settings.getByText('尚未设置同步', { exact: true })).toBeVisible();
+  await settings.getByRole('button', { name: '连接云端', exact: true }).click();
   await expect(settings.getByLabel('服务器地址', { exact: true })).toBeVisible();
   await settings
     .getByLabel('服务器地址', { exact: true })
     .fill('https://dav.example.test/draft.json');
   await settings.getByRole('tab', { name: '图标布局', exact: true }).click();
-  await settings.getByRole('tab', { name: '云端同步', exact: true }).click();
+  await settings.getByRole('tab', { name: '同步与备份', exact: true }).click();
   await expect(settings.getByLabel('服务器地址', { exact: true })).toHaveValue(
     'https://dav.example.test/draft.json',
   );

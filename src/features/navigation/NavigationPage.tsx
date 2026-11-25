@@ -13,8 +13,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { RayTabMark } from '@/components/ui/raytab-mark';
 import { toast } from 'sonner';
-import { errorMessage } from '@/lib/errors';
-import { NavigationMenuItems, type NavigationAction } from './NavigationMenu';
+import { AppError, errorMessage } from '@/lib/errors';
+import { groupPrivacyActions, NavigationMenuItems, type NavigationAction } from './NavigationMenu';
 import { useShallow } from 'zustand/react/shallow';
 import {
   DndContext,
@@ -63,10 +63,10 @@ import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import type { Command } from '@/storage/operations';
 import type { GroupTab } from '@/storage/group-privacy';
 import { useConfirm } from '@/components/ui/confirm-dialog';
-import { type Site, type Folder, type Group } from '@/storage/model';
-import { resolveHomeTextColors } from '@/features/appearance/text-colors';
+import { type Site, type Folder, type Group, type SpaceId } from '@/storage/model';
+import { SiteIcon } from './SiteIcon';
 import { cn } from '@/lib/utils';
-import { SiteCard, SiteCardView, FolderCard, FolderCardView, SiteTitle } from './NavigationCards';
+import { SiteCard, FolderCard, FolderPreview, SiteTitle } from './NavigationCards';
 import { SiteEditor } from './SiteEditor';
 import { NameDialog, MoveDialog } from './NavigationDialogs';
 import { navigationDropCommand, type NavigationDrag } from './navigation-drop';
@@ -92,6 +92,8 @@ export interface NavigationPageProps {
   onGroupWheel: (event: WheelEvent) => void;
   onToggleHidden: () => void;
   onDeleteGroup: (group: GroupTab) => void;
+  onPrivacyChange: (group: GroupTab, hidden?: boolean) => void;
+  onRequestUnlock: () => Promise<boolean>;
   groupsCollapsed: boolean;
   onToggleGroups: () => void;
   settingsAction?: ReactNode;
@@ -117,6 +119,8 @@ export function NavigationPage({
   onGroupWheel,
   onToggleHidden,
   onDeleteGroup,
+  onPrivacyChange,
+  onRequestUnlock,
   groupsCollapsed,
   onToggleGroups,
   settingsAction,
@@ -145,22 +149,18 @@ export function NavigationPage({
     [dispatch],
   );
 
-  const orderedGroups = useMemo(
-    () =>
-      space.groups
-        .filter((group) => groupTabs.some((tab) => tab.spaceId === spaceId && tab.id === group.id))
-        .sort(byOrder),
-    [groupTabs, spaceId, space.groups],
+  const activeGroup = space.groups.find((group) => group.id === activeGroupId) ?? space.groups[0];
+  const folders = useRayTabStore(
+    useShallow((store) => [
+      ...(store.state?.spaces.normal.folders ?? []),
+      ...(store.state?.spaces.private.folders ?? []),
+    ]),
   );
-  const activeGroup = orderedGroups.find((group) => group.id === activeGroupId) ?? space.groups[0];
   const groupStrip = useRef<HTMLDivElement>(null);
   const pendingClick = useRef<{ count: number; timer: ReturnType<typeof setTimeout> } | null>(null);
   const firstGestureGroup = groupTabs.find((group) => !group.hidden && !group.encrypted);
   const hasHiddenGroups = legacyLocked || groupTabs.some((group) => group.hidden);
-  const visibleTabs = [
-    ...groupTabs.filter((group) => !group.hidden),
-    ...(showHidden ? groupTabs.filter((group) => group.hidden) : []),
-  ];
+  const visibleTabs = groupTabs.filter((group) => showHidden || !group.hidden);
 
   const clearPendingClick = () => {
     if (pendingClick.current) clearTimeout(pendingClick.current.timer);
@@ -248,6 +248,7 @@ export function NavigationPage({
   const [nameTarget, setNameTarget] = useState<{
     type: 'group' | 'folder';
     item?: Group | Folder;
+    groupSpaceId?: SpaceId;
   } | null>(null);
   const [moveTarget, setMoveTarget] = useState<{
     type: 'site' | 'folder' | 'sites';
@@ -314,7 +315,7 @@ export function NavigationPage({
   }, []);
 
   const handleDragEnd = useCallback(
-    ({ active, over }: DragEndEvent) => {
+    async ({ active, over }: DragEndEvent) => {
       setActiveDrag(null);
       if (!over) return;
 
@@ -328,14 +329,27 @@ export function NavigationPage({
         over.data?.current as Record<string, unknown> | undefined,
       );
 
-      if (drop) {
-        const cmd = navigationDropCommand(space, spaceId, drag, drop);
-        if (cmd) {
-          run(cmd);
+      if (!drop) return;
+      if (drop.type === 'container') {
+        const destination = groupTabs.find((group) => group.id === drop.groupId);
+        if (destination && destination.spaceId !== spaceId) {
+          if (destination.encrypted && !(await onRequestUnlock())) return;
+          const location = {
+            spaceId,
+            destinationSpaceId: destination.spaceId,
+            id: drag.id,
+            groupId: destination.id,
+          };
+          if (drag.type === 'site')
+            await run({ type: 'move-site', ...location, folderId: drop.folderId });
+          else if (drop.folderId === null) await run({ type: 'move-folder', ...location });
+          return;
         }
       }
+      const command = navigationDropCommand(space, spaceId, drag, drop);
+      if (command) await run(command);
     },
-    [space, spaceId, run],
+    [space, spaceId, groupTabs, onRequestUnlock, run],
   );
 
   const handleDragCancel = useCallback(() => {
@@ -395,7 +409,7 @@ export function NavigationPage({
     const id = isNew ? crypto.randomUUID() : nameTarget.item!.id;
     const expected = isNew ? undefined : nameTarget.item!.updatedAt;
     if (nameTarget.type === 'group') {
-      const destination = isNew ? 'normal' : spaceId;
+      const destination = isNew ? 'normal' : (nameTarget.groupSpaceId ?? spaceId);
       await dispatch({ type: 'save-group', spaceId: destination, id, name, expected });
       if (isNew)
         onSelectGroup({
@@ -413,21 +427,38 @@ export function NavigationPage({
 
   const handleMoveSave = async (groupId: string, folderId: string | null) => {
     if (!moveTarget) return false;
+    const destination = groupTabs.find((group) => group.id === groupId);
+    if (!destination) throw new AppError('messages.theDestinationGroupDoesNotExist');
+    if (destination.encrypted && !(await onRequestUnlock())) return 'cancelled' as const;
+    const destinationSpaceId = destination.spaceId;
     if (moveTarget.type === 'site' && moveTarget.item) {
       const site = space.sites.find((item) => item.id === moveTarget.item!.id);
       if (site?.groupId === groupId && site.folderId === folderId) return false;
-      await dispatch({ type: 'move-site', spaceId, id: moveTarget.item.id, groupId, folderId });
+      await dispatch({
+        type: 'move-site',
+        spaceId,
+        destinationSpaceId,
+        id: moveTarget.item.id,
+        groupId,
+        folderId,
+      });
     } else if (moveTarget.type === 'folder' && moveTarget.item) {
       if (space.folders.find((item) => item.id === moveTarget.item!.id)?.groupId === groupId)
         return false;
-      await dispatch({ type: 'move-folder', spaceId, id: moveTarget.item.id, groupId });
+      await dispatch({
+        type: 'move-folder',
+        spaceId,
+        destinationSpaceId,
+        id: moveTarget.item.id,
+        groupId,
+      });
     } else if (moveTarget.type === 'sites' && moveTarget.ids) {
       const ids = moveTarget.ids.filter((id) => {
         const site = space.sites.find((item) => item.id === id);
         return site?.groupId !== groupId || site.folderId !== folderId;
       });
       if (!ids.length) return false;
-      await dispatch({ type: 'move-sites', spaceId, ids, groupId, folderId });
+      await dispatch({ type: 'move-sites', spaceId, destinationSpaceId, ids, groupId, folderId });
       setSelectedIds(new Set());
       setManageMode(false);
     }
@@ -519,44 +550,53 @@ export function NavigationPage({
       },
     },
   ];
-  const groupActions = (group: Group, index: number, tab: GroupTab): NavigationAction[] => [
-    {
-      id: 'rename',
-      label: t('messages.rename'),
-      icon: Pencil,
-      run: () => setNameTarget({ type: 'group', item: group }),
-    },
-    {
-      id: 'earlier',
-      label: t('messages.moveEarlier'),
-      icon: ArrowUp,
-      disabled: index === 0,
-      run: () =>
-        run({ type: 'move-group', spaceId, id: group.id, beforeId: orderedGroups[index - 1]?.id }),
-    },
-    {
-      id: 'later',
-      label: t('messages.moveLater'),
-      icon: ArrowDown,
-      disabled: index === orderedGroups.length - 1,
-      run: () =>
-        run({ type: 'move-group', spaceId, id: group.id, beforeId: orderedGroups[index + 2]?.id }),
-    },
-    {
-      id: 'delete',
-      label: t('messages.delete'),
-      icon: Trash2,
-      separator: true,
-      destructive: true,
-      run: () => onDeleteGroup(tab),
-    },
-  ];
+  const groupActions = (tab: GroupTab): NavigationAction[] => {
+    const index = groupTabs.indexOf(tab);
+    const reorder = async (beforeId?: string) => {
+      if (tab.encrypted && !(await onRequestUnlock())) return;
+      return run({ type: 'move-group', spaceId: tab.spaceId, id: tab.id, beforeId });
+    };
+    return [
+      {
+        id: 'rename',
+        label: t('messages.rename'),
+        icon: Pencil,
+        run: async () => {
+          if (tab.encrypted && !(await onRequestUnlock())) return;
+          const group = useRayTabStore
+            .getState()
+            .state?.spaces[tab.spaceId].groups.find((item) => item.id === tab.id);
+          if (group) setNameTarget({ type: 'group', item: group, groupSpaceId: tab.spaceId });
+          else toast.error(t('messages.theDestinationGroupDoesNotExist'));
+        },
+      },
+      {
+        id: 'earlier',
+        label: t('messages.moveEarlier'),
+        icon: ArrowUp,
+        disabled: index === 0,
+        run: () => reorder(groupTabs[index - 1]?.id),
+      },
+      {
+        id: 'later',
+        label: t('messages.moveLater'),
+        icon: ArrowDown,
+        disabled: index === groupTabs.length - 1,
+        run: () => reorder(groupTabs[index + 2]?.id),
+      },
+      ...groupPrivacyActions(tab, t, onPrivacyChange),
+      {
+        id: 'delete',
+        label: t('messages.delete'),
+        icon: Trash2,
+        separator: true,
+        destructive: true,
+        run: () => onDeleteGroup(tab),
+      },
+    ];
+  };
 
   const renderGroupTab = (tab: GroupTab) => {
-    const groupIndex =
-      tab.spaceId === spaceId ? orderedGroups.findIndex((group) => group.id === tab.id) : -1;
-    const editable = orderedGroups[groupIndex];
-    const key = `${tab.spaceId}:${tab.id}`;
     const GroupIcon = tab.encrypted ? LockKeyhole : tab === firstGestureGroup ? House : Layers3;
     const button = (
       <Button
@@ -572,20 +612,14 @@ export function NavigationPage({
         <span className="home-group-name truncate">{tab.name}</span>
       </Button>
     );
-    if (!editable)
-      return (
-        <Tooltip key={key} content={tab.name}>
-          {button}
-        </Tooltip>
-      );
     return (
-      <DroppableGroupTab key={key} group={editable} className="min-w-0 shrink-0">
+      <DroppableGroupTab key={tab.id} group={tab} className="min-w-0 shrink-0">
         <ContextMenu>
           <Tooltip content={tab.name}>
             <ContextMenuTrigger asChild>{button}</ContextMenuTrigger>
           </Tooltip>
           <ContextMenuContent>
-            <NavigationMenuItems actions={groupActions(editable, groupIndex, tab)} />
+            <NavigationMenuItems actions={groupActions(tab)} />
           </ContextMenuContent>
         </ContextMenu>
       </DroppableGroupTab>
@@ -931,7 +965,7 @@ export function NavigationPage({
             </DialogHeader>
 
             {activeDrag && (
-              <FolderModalDropTargets activeGroupId={activeGroup.id} groups={orderedGroups} />
+              <FolderModalDropTargets activeGroupId={activeGroup.id} groups={groupTabs} />
             )}
 
             {manageMode && renderToolbar(folderSites)}
@@ -992,8 +1026,8 @@ export function NavigationPage({
         {moveTarget && (
           <MoveDialog
             title={t('messages.move')}
-            groups={orderedGroups}
-            folders={space.folders}
+            groups={groupTabs}
+            folders={folders}
             initialGroupId={activeGroupId}
             initialFolderId={
               moveTarget.type === 'site'
@@ -1022,54 +1056,26 @@ export function NavigationPage({
 
         {createPortal(
           <DragOverlay dropAnimation={null} zIndex={100}>
-            {activeDrag?.type === 'site' && activeSite && (
+            {(activeSite || activeFolder) && (
               <div
+                aria-hidden="true"
+                className={cn(
+                  'pointer-events-none flex h-full justify-center',
+                  settings.showSiteTitle ? 'items-start pt-2' : 'items-center',
+                )}
                 style={
                   {
-                    width: `${settings.cardSize}px`,
-                    height: `${settings.cardSize}px`,
-                    '--home-cards-color': selectedFolder
-                      ? 'var(--dialog-text)'
-                      : resolveHomeTextColors(settings).cards,
-                    '--site-card-size': `${settings.cardSize}px`,
-                    '--site-icon-size': `${settings.cardSize * settings.iconSizeRatio}px`,
+                    '--site-icon-size': `${iconPixels}px`,
                     '--site-icon-radius': `${settings.iconRadius}%`,
                   } as React.CSSProperties
                 }
               >
-                <SiteCardView
-                  site={activeSite}
-                  openInNewTab={settings.openInNewTab}
-                  showTitle={settings.showSiteTitle}
-                  manageMode={false}
-                  dragOverlay
-                />
-              </div>
-            )}
-            {activeDrag?.type === 'folder' && activeFolder && (
-              <div
-                style={
-                  {
-                    width: `${settings.cardSize}px`,
-                    height: `${settings.cardSize}px`,
-                    '--home-cards-color': selectedFolder
-                      ? 'var(--dialog-text)'
-                      : resolveHomeTextColors(settings).cards,
-                    '--site-card-size': `${settings.cardSize}px`,
-                    '--site-icon-size': `${settings.cardSize * settings.iconSizeRatio}px`,
-                    '--site-icon-radius': `${settings.iconRadius}%`,
-                  } as React.CSSProperties
-                }
-              >
-                <FolderCardView
-                  folder={activeFolder}
-                  previewSites={space.sites
-                    .filter((s) => s.folderId === activeFolder.id)
-                    .sort(byOrder)}
-                  showTitle={settings.showSiteTitle}
-                  manageMode={false}
-                  dragOverlay
-                />
+                {activeSite && <SiteIcon site={activeSite} />}
+                {activeFolder && (
+                  <FolderPreview
+                    sites={space.sites.filter((s) => s.folderId === activeFolder.id).sort(byOrder)}
+                  />
+                )}
               </div>
             )}
           </DragOverlay>,

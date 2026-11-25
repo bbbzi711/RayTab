@@ -1,4 +1,5 @@
 import { SyncBusyError, synchronizeAutomatically } from '@/sync/core/engine';
+import { requestUnlockedPage } from '@/sync/unlocked-page';
 
 export default defineBackground(() => {
   const ensureSyncAlarm = () => void browser.alarms.create('raytab-sync', { periodInMinutes: 15 });
@@ -13,7 +14,7 @@ export default defineBackground(() => {
   });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== 'raytab-sync') return;
-    void synchronizeAutomatically().catch((error: unknown) => {
+    void synchronizeAutomatically({ requestUnlockedPage }).catch((error: unknown) => {
       if (error instanceof SyncBusyError) return;
       console.error('RayTab automatic sync failed. Check the sync status in settings.');
     });

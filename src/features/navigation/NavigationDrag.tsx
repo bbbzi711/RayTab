@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { pointerWithin, closestCenter, useDroppable, type CollisionDetection } from '@dnd-kit/core';
 import { FolderUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Group, SpaceData } from '@/storage/model';
+import type { GroupLabel, SpaceData } from '@/storage/model';
 import type { NavigationDrag, NavigationDrop } from './navigation-drop';
 
 export function createNavigationCollision({
@@ -167,7 +167,7 @@ export function DroppableGroupTab({
   className,
   children,
 }: {
-  group: Group;
+  group: GroupLabel;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -201,7 +201,7 @@ export function FolderModalDropTargets({
   groups,
 }: {
   activeGroupId: string;
-  groups: Group[];
+  groups: GroupLabel[];
 }) {
   const { t } = useTranslation();
   const { setNodeRef: setOutRef, isOver: isOutOver } = useDroppable({
@@ -238,7 +238,7 @@ export function FolderModalDropTargets({
   );
 }
 
-function ModalGroupDropItem({ group }: { group: Group }) {
+function ModalGroupDropItem({ group }: { group: GroupLabel }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `container:modal:group:${group.id}`,
     data: {

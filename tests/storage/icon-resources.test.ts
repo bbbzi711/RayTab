@@ -1,3 +1,5 @@
+import { expectFixtureCatalog, inspectFixtureVault } from '../helpers/catalog-fixture';
+import { encodeBackup } from '../../src/features/backup/group-codec';
 import { openDB } from 'idb';
 import { describe, expect, it, vi } from 'vitest';
 import { createRepository } from '../../src/storage/database';
@@ -66,7 +68,7 @@ describe('atomic icon data and its conversion boundary', () => {
       expect(new Uint8Array(await (await repo.resource('kept-icon'))!.arrayBuffer())).toEqual(
         bytes,
       );
-      expect(await db.get('state', 'current')).toEqual(converted);
+      expectFixtureCatalog(await db.get('state', 'current'), converted);
       const backup = await createBackup(converted, new Map([['kept-icon', image()]]), 'normal');
       const imported = await parseBackup({
         ...backup,
@@ -113,7 +115,7 @@ describe('atomic icon data and its conversion boundary', () => {
       await repo.close();
       repo = createRepository(name);
       expect(await repo.read()).toEqual(current);
-      expect(await db.get('state', 'current')).toEqual(current);
+      expectFixtureCatalog(await db.get('state', 'current'), current);
     } finally {
       await repo.close();
       db.close();
@@ -179,14 +181,14 @@ describe('atomic icon data and its conversion boundary', () => {
       try {
         const converted = await repo.read();
         expect(converted).toEqual({ ...initial, revision: initial.revision + 1 });
-        expect(await db.get('state', 'current')).toEqual(converted);
+        expectFixtureCatalog(await db.get('state', 'current'), converted);
         expect(new Uint8Array(await (await repo.resource('saved-icon'))!.arrayBuffer())).toEqual(
           bytes,
         );
         await repo.close();
         repo = createRepository(name);
         expect(await repo.read()).toEqual(converted);
-        expect(await db.get('state', 'current')).toEqual(converted);
+        expectFixtureCatalog(await db.get('state', 'current'), converted);
       } finally {
         await repo.close();
         db.close();
@@ -218,12 +220,14 @@ describe('atomic icon data and its conversion boundary', () => {
     await db.put('vault', envelope, 'private');
     const repo = createRepository(name);
     try {
-      expect(await repo.read()).toEqual(initial);
+      const locked = await repo.read();
+      expect(locked).toEqual({ ...initial, revision: initial.revision + 1 });
+      expectFixtureCatalog(await db.get('state', 'current'), locked);
       expect(await db.get('vault', 'private')).toEqual(envelope);
       await expect(repo.unlockPrivate('wrong-password')).rejects.toThrow();
       expect(await db.get('vault', 'private')).toEqual(envelope);
       const unlocked = await repo.unlockPrivate('vault-password');
-      expect(unlocked.revision).toBe(initial.revision + 1);
+      expect(unlocked.revision).toBe(locked.revision + 1);
       expect(unlocked.spaces.private.sites[0].icon).toEqual({
         source: 'auto',
         resourceId: 'cached-private',
@@ -232,11 +236,19 @@ describe('atomic icon data and its conversion boundary', () => {
         bytes,
       );
       const cleaned = await db.get('vault', 'private');
-      const plaintext = await cryptoModule.decryptJson<{ space: unknown; resources: unknown[] }>(
-        cleaned,
-        'vault-password',
-      );
-      expect(JSON.stringify(plaintext.space)).not.toContain('display');
+      const plaintext = await inspectFixtureVault(db, 'vault-password');
+      expect(plaintext.groups).toEqual([
+        {
+          group: space.groups[0],
+          folders: [],
+          sites: [
+            {
+              ...space.sites[0],
+              icon: { source: 'auto', resourceId: 'cached-private' },
+            },
+          ],
+        },
+      ]);
       expect(plaintext.resources).toEqual([encoded('cached-private')]);
       await repo.lockPrivate();
       expect((await repo.unlockPrivate('vault-password')).revision).toBe(unlocked.revision);
@@ -284,11 +296,11 @@ describe('atomic icon data and its conversion boundary', () => {
       expect(unlocked.privateSettingOverrides.iconRadius).toBe(33);
       const migrated = await db.get('vault', 'private');
       expect(migrated.version).toBe(1);
-      const plaintext = await cryptoModule.decryptJson<{
-        schemaVersion: number;
-        resources: unknown[];
-      }>(migrated, 'vault-password');
-      expect(plaintext.schemaVersion).toBe(5);
+      const plaintext = await inspectFixtureVault(db, 'vault-password');
+      expect(plaintext.groups).toEqual([
+        { group: space.groups[0], folders: [], sites: unlocked.spaces.private.sites },
+      ]);
+      expect(plaintext.overrides).toEqual({ iconRadius: 33 });
       expect(plaintext.resources).toEqual([encoded('private-image')]);
       expect(await db.get('resources', 'private-image')).toBeUndefined();
       expect(JSON.stringify(await db.get('state', 'current'))).not.toContain('Private original');
@@ -362,6 +374,7 @@ describe('atomic icon data and its conversion boundary', () => {
       {
         ...old.spaces.normal.sites[0],
         id: 'private-backup',
+        url: 'https://private-backup.example/path?token=preserved',
         groupId: old.spaces.private.groups[0].id,
         iconId: 'private-image',
       },
@@ -404,8 +417,12 @@ describe('atomic icon data and its conversion boundary', () => {
     );
     const repo = createRepository(crypto.randomUUID());
     try {
-      await repo.restore(restored.state, restored.resources);
-      await repo.protectPrivate('local-password');
+      expect(restored.preserveGroupEncryption).toBe(true);
+      await repo.restore(restored.state, restored.resources, {
+        protectWith: 'local-password',
+        range: restored.range,
+      });
+      expect((await repo.read()).privateSecurity.locked).toBe(true);
       await repo.unlockPrivate('local-password');
       const snapshot = await repo.snapshot();
       const exported = await createBackup(
@@ -417,17 +434,22 @@ describe('atomic icon data and its conversion boundary', () => {
       expect(exported.version).toBe(3);
       expect(exported.spaces.private!.protected).toBe(true);
       if (!exported.spaces.private!.protected) throw new Error('expected protected fixture');
-      expect(
-        (
-          await cryptoModule.decryptJson<{ schemaVersion: number }>(
-            exported.spaces.private!.envelope,
-            'export-password',
-          )
-        ).schemaVersion,
-      ).toBe(5);
+      const wire = encodeBackup(exported);
+      expect(wire).toMatchObject({
+        format: 'raytab-backup',
+        version: 4,
+        protection: { format: 'groups' },
+      });
+      expect(JSON.stringify(wire)).not.toContain(old.spaces.private.sites[0].url);
+      const recoveredPrivate = await privateBackupPayload(
+        await parseBackup(wire),
+        'export-password',
+      );
+      expect(recoveredPrivate?.data).toEqual(snapshot.state.spaces.private);
+      expect(recoveredPrivate?.resources).toEqual([encoded('private-image')]);
       const roundtrip = await restoreBackup(
         createInitialState(),
-        exported,
+        await parseBackup(wire),
         'replace',
         'export-password',
       );

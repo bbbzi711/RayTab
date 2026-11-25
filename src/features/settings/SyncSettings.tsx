@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from '@/lib/zod';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { Cloud } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
+import { DataSettings } from './DataSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -16,9 +17,10 @@ import {
   resolveSyncConflict,
   saveSyncConfig,
   synchronize,
+  syncTarget,
   type SyncStatus,
 } from '@/sync/core/engine';
-import type { SyncConnection } from '@/sync/providers';
+import { SyncProviderError, type SyncConnection } from '@/sync/providers/types';
 import { resolveWebDavFileUrl } from '@/sync/providers/webdav';
 import type { SyncConflict } from '@/sync/core/merge';
 import { useRayTabStore } from '@/storage/store';
@@ -47,7 +49,7 @@ const emptyDraft = {
   includePrivate: false,
   privatePassword: '',
 };
-export const createSyncDraftSchema = (privateLocked: boolean, privateProtected = false) =>
+export const createSyncDraftSchema = (privateLocked: boolean, privateProtected = privateLocked) =>
   z
     .object({
       type: z.enum(['webdav', 'github', 'gitee']),
@@ -64,12 +66,6 @@ export const createSyncDraftSchema = (privateLocked: boolean, privateProtected =
       privatePassword: z.string(),
     })
     .superRefine((draft, ctx) => {
-      if (draft.automatic && draft.includePrivate && privateProtected)
-        ctx.addIssue({
-          code: 'custom',
-          path: ['automatic'],
-          message: 'settings.protectedPrivateAutomaticSync',
-        });
       if (draft.type === 'webdav') {
         try {
           resolveWebDavFileUrl(draft.url);
@@ -77,11 +73,17 @@ export const createSyncDraftSchema = (privateLocked: boolean, privateProtected =
           ctx.addIssue({ code: 'custom', path: ['url'], message: 'settings.syncInvalidUrl' });
         }
       } else {
-        for (const key of ['token', 'owner', 'repo', 'path'] as const)
+        if (![draft.owner, draft.repo].every((part) => /^[^/\s]+$/.test(part)))
+          ctx.addIssue({
+            code: 'custom',
+            path: ['repo'],
+            message: 'settings.syncInvalidRepository',
+          });
+        for (const key of ['token', 'path'] as const)
           if (!draft[key])
             ctx.addIssue({ code: 'custom', path: [key], message: 'settings.required' });
       }
-      if (draft.includePrivate && privateLocked)
+      if (draft.includePrivate && privateProtected && privateLocked)
         ctx.addIssue({
           code: 'custom',
           path: ['privatePassword'],
@@ -126,9 +128,14 @@ const actionSchema = z.object({
   conflict: z.custom<SyncConflict>().optional(),
 });
 
-export function SyncSettings({ report }: { report: DraftReporter }) {
+export function SyncSettings({ report, localBusy }: { report: DraftReporter; localBusy: boolean }) {
   const { t, i18n } = useTranslation();
   const refresh = useRayTabStore((store) => store.refresh);
+  const groupIndex = useRayTabStore((store) => store.state?.encryptedGroupIndex);
+  const protectedGroupNames = useMemo(
+    () => new Map(groupIndex?.labels.map((group) => [group.id, group.name])),
+    [groupIndex],
+  );
   const locked = useRayTabStore((store) => store.state?.privateSecurity.locked);
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const available =
@@ -137,10 +144,14 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   const [confirm, confirmation] = useConfirm();
   const [connectionInfo, setConnectionInfo] = useState<{
     provider: SyncDraft['type'];
+    target: string;
     automatic: boolean;
     includePrivate: boolean;
+    hasSyncPassword: boolean;
   } | null>(null);
   const connected = connectionInfo !== null;
+  const [editing, setEditing] = useState(false);
+  const [repoSeparator, setRepoSeparator] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadFailure, setLoadFailure] = useState<'invalid' | 'unavailable'>();
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -164,8 +175,9 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
   });
   const { isDirty, isSubmitting, errors } = form.formState;
   const busy = isSubmitting || actions.formState.isSubmitting;
-  const formDisabled = busy || loading || !available || loadFailure === 'unavailable';
+  const formDisabled = localBusy || busy || loading || !available || loadFailure === 'unavailable';
   const provider = useWatch({ control: form.control, name: 'type' });
+  const [owner, repo] = useWatch({ control: form.control, name: ['owner', 'repo'] });
   const includePrivate = useWatch({ control: form.control, name: 'includePrivate' });
   useDraftStatus('sync', isDirty, busy, report);
   const { reset, resetField } = form;
@@ -191,74 +203,99 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       }
       if (!mounted || version !== loadVersion) return;
       setLoadFailure(undefined);
+      setStatus(nextStatus);
+      const values = draftFromConfig(config);
+      if (useRayTabStore.getState().state?.privateSecurity.locked) values.privatePassword = '';
+      const previousProvider = form.getValues('type');
+      const previousToken = form.getValues('token');
+      reset(values, { keepDirtyValues: true });
+      const selectedProvider = form.getValues('type');
+      // RHF merges dirty fields separately. Keep a token paired with the provider that supplied it.
+      if (selectedProvider !== previousProvider || selectedProvider !== values.type)
+        form.setValue('token', selectedProvider === values.type ? values.token : previousToken, {
+          shouldDirty: true,
+        });
+      if (useRayTabStore.getState().state?.privateSecurity.locked)
+        resetField('privatePassword', { defaultValue: '' });
       setConnectionInfo(
         config
           ? {
               provider: config.connection.type,
+              target: syncTarget(config.connection),
               automatic: config.automatic,
               includePrivate: config.includePrivate,
+              hasSyncPassword: Boolean(config.privatePassword),
             }
           : null,
       );
-      setStatus(nextStatus);
-      const values = draftFromConfig(config);
-      if (useRayTabStore.getState().state?.privateSecurity.locked) values.privatePassword = '';
-      reset(values, { keepDirtyValues: true });
-      if (useRayTabStore.getState().state?.privateSecurity.locked)
-        resetField('privatePassword', { defaultValue: '' });
     };
     void reload()
       .catch((reason: unknown) => {
         if (mounted) {
-          const invalid = reason instanceof InvalidSyncConfigError;
+          const invalid =
+            reason instanceof InvalidSyncConfigError ||
+            (reason instanceof SyncProviderError && reason.code === 'invalid');
           setLoadFailure(invalid ? 'invalid' : 'unavailable');
           if (invalid) setConnectionInfo(null);
+          setEditing(true);
           form.setError('root', { message: errorMessage(reason) });
         }
       })
       .finally(() => {
         if (mounted) setLoading(false);
       });
+    const refreshConnection = () => {
+      void reload().catch((reason: unknown) => {
+        if (mounted) toast.error(errorMessage(reason));
+      });
+    };
     const changed: Parameters<typeof browser.storage.onChanged.addListener>[0] = (
       changes,
       area,
     ) => {
-      if (area === 'local' && (changes['raytab-sync-status'] || changes['raytab-sync-config']))
-        void reload().catch((reason: unknown) => {
-          if (mounted) toast.error(errorMessage(reason));
-        });
+      if (
+        (area === 'local' && (changes['raytab-sync-status'] || changes['raytab-sync-config'])) ||
+        (area === 'session' && changes['raytab-sync-private-password'])
+      )
+        refreshConnection();
     };
+    const unsubscribe = useRayTabStore.subscribe((store, previous) => {
+      if (store.state?.privateSecurity.locked !== previous.state?.privateSecurity.locked) {
+        if (store.state?.privateSecurity.locked)
+          resetField('privatePassword', { defaultValue: '' });
+        refreshConnection();
+      }
+    });
     browser.storage.onChanged.addListener(changed);
     return () => {
       mounted = false;
+      unsubscribe();
       browser.storage.onChanged.removeListener(changed);
       reset(emptyDraft);
     };
-  }, [available, reset, loadAttempt]);
-  useEffect(() => {
-    if (locked) resetField('privatePassword', { defaultValue: '' });
-    return useRayTabStore.subscribe((store, previous) => {
-      if (store.state?.privateSecurity.locked && !previous.state?.privateSecurity.locked)
-        resetField('privatePassword', { defaultValue: '' });
-    });
-  }, [locked, resetField]);
-  const connectionFrom = (draft: SyncDraft): SyncConnection =>
-    draft.type === 'webdav'
-      ? { type: 'webdav', url: draft.url, username: draft.username, password: draft.password }
-      : {
-          type: draft.type,
-          token: draft.token,
-          owner: draft.owner,
-          repo: draft.repo,
-          path: draft.path,
-          branch: draft.branch || undefined,
-        };
+  }, [available, reset, resetField, loadAttempt]);
+  const connectionFrom = (draft: SyncDraft): SyncConnection => {
+    if (draft.type === 'webdav')
+      return { type: 'webdav', url: draft.url, username: draft.username, password: draft.password };
+    return {
+      type: draft.type,
+      token: draft.token,
+      owner: draft.owner,
+      repo: draft.repo,
+      path: draft.path,
+      branch: draft.branch || undefined,
+    };
+  };
   const run = (
     operation: z.infer<typeof actionSchema>['operation'],
     conflict?: SyncConflict,
     choice: 'local' | 'remote' = 'local',
   ) => {
-    if (busy || loading) return;
+    if (formDisabled || isDirty || !connectionInfo) return;
+    const expected =
+      operation === 'push' || operation === 'pull'
+        ? { target: connectionInfo.target, includePrivate: connectionInfo.includePrivate }
+        : undefined;
     actions.setValue('operation', operation);
     actions.setValue('conflict', conflict);
     actions.setValue('choice', choice);
@@ -266,12 +303,18 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       actions.clearErrors();
       if (
         values.operation === 'disconnect' ||
-        values.operation === 'push' ||
-        values.operation === 'pull'
+        values.operation === 'pull' ||
+        values.operation === 'push'
       ) {
         const confirmed = await confirm({
           title: t('settings.syncConfirm.' + values.operation + '.title'),
-          description: t('settings.syncConfirm.' + values.operation + '.description'),
+          description: t('settings.syncConfirm.' + values.operation + '.description', {
+            scope: t(
+              connectionInfo?.includePrivate
+                ? 'settings.syncFullScope'
+                : 'settings.syncPublicScope',
+            ),
+          }),
           confirmText: t('settings.continue'),
           cancelText: t('settings.cancel'),
           variant: 'destructive',
@@ -282,6 +325,7 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
         if (values.operation === 'disconnect') {
           await clearSyncConfig();
           form.reset(emptyDraft);
+          setEditing(false);
           setConnectionInfo(null);
           setStatus({ schemaVersion: 1, conflicts: [] });
         } else if (values.operation === 'resolve' && values.conflict) {
@@ -290,10 +334,10 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
           setStatus(await loadSyncStatus());
         } else if (
           values.operation === 'auto' ||
-          values.operation === 'push' ||
-          values.operation === 'pull'
+          values.operation === 'pull' ||
+          values.operation === 'push'
         ) {
-          await synchronize(values.operation);
+          await synchronize(values.operation, expected);
           await refresh();
           setStatus(await loadSyncStatus());
         }
@@ -301,7 +345,11 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
           t(
             values.operation === 'disconnect'
               ? 'settings.syncDisconnected'
-              : 'settings.syncCompleted',
+              : values.operation === 'pull'
+                ? 'settings.backupRestored'
+                : values.operation === 'push'
+                  ? 'settings.cloudReplaced'
+                  : 'settings.syncCompleted',
           ),
         );
       } catch (reason) {
@@ -315,398 +363,472 @@ export function SyncSettings({ report }: { report: DraftReporter }) {
       }
     })();
   };
-  const fields = useMemo(
-    () =>
-      provider === 'webdav'
-        ? ([
-            ['url', 'serverAddress', 'url'],
-            ['username', 'username', 'text'],
-            ['password', 'password', 'password'],
-          ] as const)
-        : ([
-            ['token', 'token', 'password'],
-            ['owner', 'owner', 'text'],
-            ['repo', 'repo', 'text'],
-            ['path', 'path', 'text'],
-            ['branch', 'branch', 'text'],
-          ] as const),
-    [provider],
+  const renderField = (
+    name: 'url' | 'username' | 'password' | 'token' | 'path' | 'branch',
+    type = 'text',
+    placeholder?: string,
+  ) => (
+    <div className={name === 'url' ? 'col-span-full' : undefined}>
+      <label>
+        {t('settings.' + (name === 'url' ? 'serverAddress' : name))}
+        <Input
+          type={type}
+          {...form.register(name)}
+          autoComplete={
+            name === 'username' ? 'username' : name === 'password' ? 'current-password' : undefined
+          }
+          placeholder={placeholder}
+          aria-invalid={Boolean(errors[name])}
+        />
+      </label>
+      <FormError error={errors[name]} />
+    </div>
   );
+  const encryptedSyncHint =
+    connectionInfo?.includePrivate &&
+    (locked
+      ? connectionInfo.automatic
+        ? 'settings.syncEncryptedLockedAutomatic'
+        : 'settings.syncEncryptedLocked'
+      : !connectionInfo.hasSyncPassword
+        ? 'settings.syncEncryptedNeedsPassword'
+        : undefined);
   const actionError = actions.formState.errors.root;
   const lastError = storedErrorMessage(status.lastError);
   const showLastError = lastError && lastError !== actionError?.message;
   return (
-    <div className="sync-settings grid min-w-0 gap-4 py-1">
-      <section className="grid min-w-0 gap-3" aria-label={t('settings.syncOverview.status')}>
-        <div className="grid gap-1">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <h2 className="wrap-anywhere text-base font-semibold tracking-tight">
-              {t(
-                loading
-                  ? 'settings.syncOverview.loading'
-                  : loadFailure
-                    ? 'settings.syncOverview.loadFailed'
-                    : connected
-                      ? 'settings.syncOverview.configured'
-                      : 'settings.syncOverview.notConfigured',
-                {
-                  provider:
-                    connectionInfo?.provider === 'webdav'
-                      ? 'WebDAV'
-                      : connectionInfo?.provider === 'github'
-                        ? 'GitHub'
-                        : 'Gitee',
-                },
+    <div className="sync-settings grid min-w-0 gap-4">
+      <SettingsSection>
+        <fieldset disabled={localBusy} className="grid min-w-0 gap-2">
+          <section className="grid min-w-0 gap-2" aria-label={t('settings.syncOverview.status')}>
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 py-1">
+              <div className="min-w-0">
+                <h2 className="wrap-anywhere text-sm font-semibold">
+                  {connected
+                    ? t('settings.providerSync', {
+                        provider: { webdav: 'WebDAV', github: 'GitHub', gitee: 'Gitee' }[
+                          connectionInfo.provider
+                        ],
+                      })
+                    : t('settings.cloudSync')}
+                </h2>
+                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                  {!available
+                    ? t('settings.syncUnavailable')
+                    : loading
+                      ? t('settings.syncOverview.loading')
+                      : loadFailure
+                        ? t('settings.syncOverview.loadFailed')
+                        : !connected
+                          ? t('settings.syncOverview.notConfigured')
+                          : status.lastSuccess
+                            ? t('settings.lastSync', {
+                                date: new Date(status.lastSuccess).toLocaleString(i18n.language),
+                              })
+                            : t('settings.syncOverview.noSuccess')}
+                </p>
+              </div>
+              {available && (
+                <div className="settings-form-actions">
+                  {connected && (
+                    <Button
+                      type="button"
+                      size="form-action"
+                      disabled={formDisabled || isDirty}
+                      onClick={() => run('auto')}
+                    >
+                      {t(
+                        actions.formState.isSubmitting && actions.getValues('operation') === 'auto'
+                          ? 'settings.syncing'
+                          : 'settings.syncNow',
+                      )}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size={connected ? 'icon-sm' : 'form-action'}
+                    variant="outline"
+                    aria-expanded={editing}
+                    aria-controls="sync-connection-editor"
+                    aria-label={t(
+                      connected ? 'settings.manageConnection' : 'settings.configureConnection',
+                    )}
+                    title={connected ? t('settings.manageConnection') : undefined}
+                    disabled={formDisabled || isDirty}
+                    onClick={() => {
+                      setEditing(!editing);
+                      setRepoSeparator(false);
+                    }}
+                  >
+                    {connected ? (
+                      <Settings2 aria-hidden="true" />
+                    ) : (
+                      t('settings.configureConnection')
+                    )}
+                  </Button>
+                  {loadFailure && (
+                    <Button
+                      type="button"
+                      size="form-action"
+                      variant="outline"
+                      onClick={() => setLoadAttempt((value) => value + 1)}
+                    >
+                      {t('settings.syncOverview.retryLoad')}
+                    </Button>
+                  )}
+                </div>
               )}
-            </h2>
-            <span
-              className="grid size-8 shrink-0 place-items-center rounded-md bg-secondary text-muted-foreground"
-              aria-hidden="true"
-            >
-              <Cloud size={18} />
-            </span>
-          </div>
-          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-            {t(
-              !available
-                ? 'settings.syncUnavailable'
-                : connected
-                  ? connectionInfo.automatic
-                    ? status.automaticPaused || (connectionInfo.includePrivate && protectedPrivate)
-                      ? 'settings.syncOverview.automaticPaused'
-                      : 'settings.syncOverview.automatic'
-                    : 'settings.syncOverview.manual'
-                  : 'settings.syncHelp',
-            )}
-          </p>
-          {connected && (
-            <p className="text-xs leading-5 text-muted-foreground">
-              {status.lastSuccess
-                ? t('settings.lastSync', {
-                    date: new Date(status.lastSuccess).toLocaleString(i18n.language),
-                  })
-                : t('settings.syncOverview.noSuccess')}
-            </p>
-          )}
-        </div>
-        {status.recovery && (
-          <p role="status" className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-            {t('settings.syncRecovered', {
-              sites: status.recovery.sites,
-              folders: status.recovery.folders,
-              group: recoveryGroupName ?? 'Recovered',
-            })}
-          </p>
-        )}
-        {(connected || loadFailure) && (
-          <div className="sync-columns">
-            {connected && (
-              <Button
-                type="button"
-                size="form-action"
-                disabled={busy || isDirty || loading}
-                onClick={() => run('auto')}
-              >
-                {t(actions.formState.isSubmitting ? 'settings.syncing' : 'settings.twoWaySync')}
-              </Button>
-            )}
-            {loadFailure && (
-              <Button
-                type="button"
-                size="form-action"
-                variant="outline"
-                onClick={() => setLoadAttempt((value) => value + 1)}
-              >
-                {t('settings.syncOverview.retryLoad')}
-              </Button>
-            )}
-          </div>
-        )}
-        {isDirty && (
-          <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-            {t('settings.syncDirtyHelp')}
-          </p>
-        )}
-        {(actionError?.message || showLastError || status.nextRetryAt) && (
-          <div className="grid gap-1">
-            <FormError error={actionError} />
-            {showLastError && (
-              <p className="wrap-anywhere text-xs text-destructive" role="alert">
-                {lastError}
+            </div>
+            {encryptedSyncHint && (
+              <p role="status" className="wrap-anywhere text-xs text-muted-foreground">
+                {t(encryptedSyncHint)}
               </p>
             )}
-            {status.nextRetryAt && (
-              <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                {t('settings.syncRetry', {
-                  count: status.retryCount ?? 0,
-                  date: new Date(status.nextRetryAt).toLocaleString(i18n.language),
+            {status.recovery && (
+              <p role="status" className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                {t('settings.syncRecovered', {
+                  sites: status.recovery.sites,
+                  folders: status.recovery.folders,
+                  group: recoveryGroupName ?? 'Recovered',
                 })}
               </p>
             )}
-          </div>
-        )}
-      </section>
-      <section className="grid min-w-0 gap-3 border-t border-border pt-4">
-        <h2 className="text-sm font-semibold">{t('settings.sections.connection')}</h2>
-        <form
-          aria-label={t('settings.sections.connection')}
-          className="settings-form grid min-w-0 gap-3.5 text-sm"
-          noValidate
-          onSubmit={(event) => {
-            if (formDisabled) {
-              event.preventDefault();
-              return;
-            }
-            void form.handleSubmit(async (draft) => {
-              form.clearErrors('root');
-              try {
-                const origin =
-                  draft.type === 'webdav'
-                    ? new URL(draft.url).origin + '/*'
-                    : draft.type === 'github'
-                      ? 'https://api.github.com/*'
-                      : 'https://gitee.com/*';
-                if (!(await browser.permissions.request({ origins: [origin] }))) {
-                  form.setError('root', { message: t('settings.syncPermission') });
+            {isDirty && (
+              <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                {t('settings.syncDirtyHelp')}
+              </p>
+            )}
+            {(actionError?.message || showLastError || status.nextRetryAt) && (
+              <div className="grid gap-1">
+                <FormError error={actionError} />
+                {showLastError && (
+                  <p className="wrap-anywhere text-xs text-destructive" role="alert">
+                    {lastError}
+                  </p>
+                )}
+                {status.nextRetryAt && (
+                  <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                    {t('settings.syncRetry', {
+                      count: status.retryCount ?? 0,
+                      date: new Date(status.nextRetryAt).toLocaleString(i18n.language),
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+          <div
+            id="sync-connection-editor"
+            hidden={!editing}
+            className="border-t border-border pt-2"
+          >
+            <form
+              aria-label={t('settings.sections.connection')}
+              className="settings-form grid min-w-0 gap-3.5 text-sm"
+              noValidate
+              onSubmit={(event) => {
+                if (formDisabled) {
+                  event.preventDefault();
                   return;
                 }
-                if (
-                  draft.includePrivate &&
-                  useRayTabStore.getState().state?.privateSecurity.locked
-                ) {
-                  form.setError('root', { message: 'settings.unlockPrivateForSync' });
-                  return;
-                }
-                await saveSyncConfig({
-                  connection: connectionFrom(draft),
-                  automatic: draft.automatic,
-                  includePrivate: draft.includePrivate,
-                  privatePassword: useRayTabStore.getState().state?.privateSecurity.locked
-                    ? undefined
-                    : draft.privatePassword || undefined,
-                });
-                form.reset({
-                  ...draft,
-                  privatePassword: useRayTabStore.getState().state?.privateSecurity.locked
-                    ? ''
-                    : draft.privatePassword,
-                });
-                setConnectionInfo({
-                  provider: draft.type,
-                  automatic: draft.automatic,
-                  includePrivate: draft.includePrivate,
-                });
-                toast.success(t('settings.connectionSaved'));
-              } catch (reason) {
-                form.setError('root', { message: errorMessage(reason) });
-              }
-            })(event);
-          }}
-        >
-          <fieldset disabled={formDisabled}>
-            <Controller
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <SettingsSelect
-                  triggerClassName="sync-provider-select"
-                  label={t('settings.provider')}
-                  value={field.value}
-                  options={[
-                    ['webdav', 'WebDAV'],
-                    ['github', 'GitHub'],
-                    ['gitee', 'Gitee'],
-                  ]}
-                  onChange={field.onChange}
-                  disabled={formDisabled}
-                />
-              )}
-            />
-            <div className="sync-columns">
-              {fields.map(([name, label, type]) => (
-                <div
-                  className={name === 'url' || name === 'token' ? 'col-span-full' : undefined}
-                  key={name}
-                >
-                  <label>
-                    {t('settings.' + label)}
-                    <Input
-                      type={type}
-                      {...form.register(name)}
-                      autoComplete={
-                        name === 'username'
-                          ? 'username'
-                          : name === 'password'
-                            ? 'current-password'
-                            : undefined
-                      }
-                      placeholder={name === 'url' ? 'https://dav.jianguoyun.com/dav/' : undefined}
-                      aria-invalid={Boolean(errors[name])}
-                    />
-                  </label>
-                  <FormError error={errors[name]} />
-                </div>
-              ))}
-            </div>
-            <div className="grid min-w-0 border-y border-border py-1">
-              <Controller
-                control={form.control}
-                name="automatic"
-                render={({ field }) => (
-                  <Toggle
-                    label={t('settings.automaticSync')}
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled={formDisabled}
-                  />
-                )}
-              />
-              <Controller
-                control={form.control}
-                name="includePrivate"
-                render={({ field }) => (
-                  <Toggle
-                    label={t('settings.includePrivate')}
-                    checked={field.value}
-                    onChange={field.onChange}
-                    disabled={formDisabled || locked}
-                  />
-                )}
-              />
-              <FormError error={errors.automatic} />
-              {includePrivate && protectedPrivate && (
-                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                  {t('settings.protectedPrivateAutomaticSync')}
-                </p>
-              )}
-              {locked && (
-                <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                  {t('settings.unlockPrivateForSync')}
-                </p>
-              )}
-              {includePrivate && (
-                <div>
-                  <label>
-                    {t('settings.privateSyncPassword')}
-                    <Input
-                      type="password"
-                      autoComplete="new-password"
-                      {...form.register('privatePassword')}
-                      aria-invalid={Boolean(errors.privatePassword)}
-                      disabled={locked}
-                    />
-                  </label>
-                  <FormError error={errors.privatePassword} />
-                </div>
-              )}
-            </div>
-            <a
-              href="https://github.com/bbbzi711/RayTab/blob/main/PRIVACY.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="justify-self-start text-xs leading-5 text-muted-foreground underline underline-offset-4"
+                void form.handleSubmit(async (draft) => {
+                  form.clearErrors('root');
+                  try {
+                    const origin =
+                      draft.type === 'webdav'
+                        ? new URL(draft.url).origin + '/*'
+                        : draft.type === 'github'
+                          ? 'https://api.github.com/*'
+                          : 'https://gitee.com/*';
+                    if (!(await browser.permissions.request({ origins: [origin] }))) {
+                      form.setError('root', { message: t('settings.syncPermission') });
+                      return;
+                    }
+                    if (
+                      draft.includePrivate &&
+                      useRayTabStore.getState().state?.privateSecurity.locked
+                    ) {
+                      form.setError('root', { message: 'settings.unlockPrivateForSync' });
+                      return;
+                    }
+                    const connection = connectionFrom(draft);
+                    await saveSyncConfig({
+                      connection,
+                      automatic: draft.automatic,
+                      includePrivate: draft.includePrivate,
+                      privatePassword: draft.includePrivate ? draft.privatePassword : undefined,
+                    });
+                    form.reset({
+                      ...draft,
+                      privatePassword:
+                        draft.includePrivate &&
+                        !useRayTabStore.getState().state?.privateSecurity.locked
+                          ? draft.privatePassword
+                          : '',
+                    });
+                    setConnectionInfo({
+                      provider: draft.type,
+                      target: syncTarget(connection),
+                      automatic: draft.automatic,
+                      includePrivate: draft.includePrivate,
+                      hasSyncPassword: draft.includePrivate && Boolean(draft.privatePassword),
+                    });
+                    setRepoSeparator(false);
+                    setEditing(false);
+                    toast.success(t('settings.connectionSaved'));
+                  } catch (reason) {
+                    form.setError('root', { message: errorMessage(reason) });
+                  }
+                })(event);
+              }}
             >
-              {t('settings.privacyPolicy')}
-            </a>
-            <FormError error={errors.root} />
-            <div className="sync-columns">
-              <Button
-                type="submit"
-                size="form-action"
-                disabled={formDisabled || (locked && includePrivate)}
-              >
-                {t(isSubmitting ? 'settings.saving' : 'settings.saveConnection')}
-              </Button>
-            </div>
-          </fieldset>
-        </form>
-      </section>
-      <section className="grid min-w-0 gap-3 border-t border-border pt-4">
-        <h2 className="text-sm font-semibold">{t('settings.syncOverwriteRestore')}</h2>
-        <div className="sync-columns">
-          <Button
-            type="button"
-            variant="outline"
-            size="form-action"
-            disabled={busy || loading || !connected || isDirty}
-            onClick={() => run('push')}
-          >
-            {t('settings.overwriteCloud')}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="form-action"
-            disabled={busy || loading || !connected || isDirty}
-            onClick={() => run('pull')}
-          >
-            {t('settings.restoreCloud')}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            size="form-action"
-            disabled={busy || loading || !connected}
-            onClick={() => run('disconnect')}
-          >
-            {t('settings.disconnect')}
-          </Button>
-        </div>
-      </section>
+              <fieldset disabled={formDisabled}>
+                <Controller
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <SettingsSelect
+                      triggerClassName="sync-provider-select"
+                      label={t('settings.provider')}
+                      value={field.value}
+                      options={[
+                        ['webdav', 'WebDAV'],
+                        ['github', 'GitHub'],
+                        ['gitee', 'Gitee'],
+                      ]}
+                      onChange={(value) => {
+                        if (value !== field.value)
+                          form.setValue('token', '', { shouldDirty: true });
+                        field.onChange(value);
+                      }}
+                      disabled={formDisabled}
+                    />
+                  )}
+                />
+                {provider === 'webdav' ? (
+                  <div className="sync-columns">
+                    {renderField('url', 'url', 'https://dav.jianguoyun.com/dav/')}
+                    {renderField('username')}
+                    {renderField('password', 'password')}
+                  </div>
+                ) : (
+                  <div className="sync-columns">
+                    <Controller
+                      control={form.control}
+                      name="repo"
+                      render={({ field }) => (
+                        <div>
+                          <label>
+                            {t('settings.repo')}
+                            <Input
+                              ref={field.ref}
+                              name={field.name}
+                              onBlur={field.onBlur}
+                              value={owner + (repo || repoSeparator ? '/' + repo : '')}
+                              onChange={(event) => {
+                                const [nextOwner, ...name] = event.target.value.split('/');
+                                setRepoSeparator(name.length > 0);
+                                form.setValue('owner', nextOwner, { shouldDirty: true });
+                                field.onChange(name.join('/'));
+                              }}
+                              placeholder="owner/repo"
+                              aria-invalid={Boolean(errors.repo)}
+                            />
+                          </label>
+                          <FormError error={errors.repo} />
+                        </div>
+                      )}
+                    />
+                    {renderField('token', 'password')}
+                    {renderField('path', 'text', emptyDraft.path)}
+                    {renderField('branch', 'text', t('settings.defaultBranch'))}
+                  </div>
+                )}
+                <div className="grid min-w-0 border-y border-border py-1">
+                  <Controller
+                    control={form.control}
+                    name="automatic"
+                    render={({ field }) => (
+                      <Toggle
+                        label={t('settings.automaticSync')}
+                        checked={field.value}
+                        onChange={field.onChange}
+                        disabled={formDisabled}
+                      />
+                    )}
+                  />
+                  <Controller
+                    control={form.control}
+                    name="includePrivate"
+                    render={({ field }) => (
+                      <Toggle
+                        label={t('settings.includePrivate')}
+                        checked={field.value}
+                        onChange={field.onChange}
+                        disabled={formDisabled || (locked && !field.value)}
+                      />
+                    )}
+                  />
+                  {locked && (
+                    <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                      {t('settings.unlockPrivateForSync')}
+                    </p>
+                  )}
+                  {includePrivate && (
+                    <div>
+                      <label>
+                        {t('settings.privateSyncPassword')}
+                        <Input
+                          type="password"
+                          autoComplete="new-password"
+                          {...form.register('privatePassword')}
+                          aria-invalid={Boolean(errors.privatePassword)}
+                          disabled={locked}
+                        />
+                      </label>
+                      <FormError error={errors.privatePassword} />
+                    </div>
+                  )}
+                </div>
+                <a
+                  href="https://github.com/bbbzi711/RayTab/blob/main/PRIVACY.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="justify-self-start text-xs leading-5 text-muted-foreground underline underline-offset-4"
+                >
+                  {t('settings.privacyPolicy')}
+                </a>
+                <FormError error={errors.root} />
+                <div className="settings-form-actions">
+                  <Button
+                    type="submit"
+                    size="form-action"
+                    disabled={formDisabled || (locked && includePrivate)}
+                  >
+                    {t(isSubmitting ? 'settings.saving' : 'settings.saveConnection')}
+                  </Button>
+                  {!loadFailure && (
+                    <Button
+                      type="button"
+                      size="form-action"
+                      variant="ghost"
+                      disabled={formDisabled}
+                      onClick={() => {
+                        form.reset();
+                        setEditing(false);
+                        setRepoSeparator(false);
+                      }}
+                    >
+                      {t('settings.cancel')}
+                    </Button>
+                  )}
+                </div>
+              </fieldset>
+            </form>
+            {connected && (
+              <div className="settings-form-actions mt-3 border-t border-border pt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="form-action"
+                  disabled={formDisabled || isDirty}
+                  onClick={() => run('push')}
+                >
+                  {t('settings.replaceCloud')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="form-action"
+                  disabled={formDisabled || isDirty}
+                  onClick={() => run('disconnect')}
+                >
+                  {t('settings.disconnect')}
+                </Button>
+              </div>
+            )}
+          </div>
+        </fieldset>
+      </SettingsSection>
       {status.conflicts.length > 0 && (
         <SettingsSection title={t('settings.conflicts')}>
           <div className="sync-conflicts">
             {status.conflicts.map((conflict, index) => (
               <div className="sync-conflict" key={conflict.key}>
                 <strong>{t('settings.conflictNumber', { number: index + 1 })}</strong>
-                <small>{t('settings.localValue', { value: summarize(conflict.local) })}</small>
-                <small>{t('settings.remoteValue', { value: summarize(conflict.remote) })}</small>
-                {conflict.id === 'private-space' && (
-                  <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                    {t('settings.privateSyncConflictHelp')}
+                {conflict.field === 'protected-group' ||
+                conflict.field === 'protected-settings' ||
+                conflict.id === 'private-space' ? (
+                  <p className="wrap-anywhere text-xs text-muted-foreground">
+                    {conflict.id === 'private-space'
+                      ? t('settings.legacySyncConflict')
+                      : conflict.field === 'protected-group'
+                        ? t('settings.protectedGroupConflict', {
+                            name:
+                              protectedGroupNames.get(conflict.id) ?? t('settings.privateSpace'),
+                          })
+                        : t('settings.privateSyncConflictHelp')}
                   </p>
+                ) : (
+                  <>
+                    <small>{t('settings.localValue', { value: summarize(conflict.local) })}</small>
+                    <small>
+                      {t('settings.remoteValue', { value: summarize(conflict.remote) })}
+                    </small>
+                  </>
                 )}
-                <div className="settings-form-actions">
+                {conflict.id === 'private-space' ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={busy || (conflict.id === 'private-space' && isDirty)}
-                    onClick={() =>
-                      conflict.id === 'private-space'
-                        ? run('push')
-                        : run('resolve', conflict, 'local')
-                    }
+                    disabled={busy || localBusy || isDirty}
+                    onClick={() => run('auto')}
                   >
-                    {t(
-                      conflict.id === 'private-space'
-                        ? 'settings.overwriteCloud'
-                        : 'settings.keepLocal',
-                    )}
+                    {t('settings.syncNow')}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={busy || (conflict.id === 'private-space' && isDirty)}
-                    onClick={() =>
-                      conflict.id === 'private-space'
-                        ? run('pull')
-                        : run('resolve', conflict, 'remote')
-                    }
-                  >
-                    {t(
-                      conflict.id === 'private-space'
-                        ? 'settings.restoreCloud'
-                        : 'settings.useRemote',
-                    )}
-                  </Button>
-                </div>
+                ) : (
+                  <div className="settings-form-actions">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy || localBusy || isDirty}
+                      onClick={() => run('resolve', conflict, 'local')}
+                    >
+                      {t('settings.keepLocal')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy || localBusy || isDirty}
+                      onClick={() => run('resolve', conflict, 'remote')}
+                    >
+                      {t('settings.useRemote')}
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </SettingsSection>
       )}
+      <fieldset className="min-w-0" disabled={busy || localBusy}>
+        <DataSettings
+          report={report}
+          disabled={busy || localBusy}
+          cloudRestore={{
+            available: connected && !loading && !isDirty && !loadFailure,
+            run: () => run('pull'),
+            hint: !connected
+              ? t('settings.connectToRestore')
+              : isDirty
+                ? t('settings.syncDirtyHelp')
+                : undefined,
+          }}
+        />
+      </fieldset>
       {confirmation}
     </div>
   );

@@ -11,9 +11,16 @@ import {
   type SpaceSettings,
 } from './model';
 import type { BookmarkCandidate } from '@/features/import/bookmarks';
-import { ensureSpaceGroup, isPlaceholderGroup, isUserGroup, transferGroup } from './group-privacy';
+import {
+  ensureSpaceGroup,
+  isPlaceholderGroup,
+  isUserGroup,
+  listGroupTabs,
+  transferGroup,
+} from './group-privacy';
 
 export type SiteInput = Pick<Site, 'title' | 'url' | 'icon' | 'iconBackground'>;
+type TransferDestination = { destinationSpaceId?: SpaceId };
 type Destination = { groupId: string; folderId: string | null };
 export type Command =
   | { type: 'switch-space'; spaceId: SpaceId; groupId?: string }
@@ -25,7 +32,12 @@ export type Command =
   | { type: 'move-group'; spaceId: SpaceId; id: string; beforeId?: string }
   | { type: 'select-folder'; spaceId: SpaceId; groupId: string; folderId: string | null }
   | { type: 'save-group'; spaceId: SpaceId; id: string; name: string; expected?: number }
-  | { type: 'delete-group'; spaceId: SpaceId; id: string; destinationGroupId: string }
+  | ({
+      type: 'delete-group';
+      spaceId: SpaceId;
+      id: string;
+      destinationGroupId: string;
+    } & TransferDestination)
   | { type: 'remove-group'; spaceId: SpaceId; id: string; siteIds: string[]; folderIds: string[] }
   | {
       type: 'save-folder';
@@ -45,9 +57,16 @@ export type Command =
     } & Destination)
   | { type: 'delete-site'; spaceId: SpaceId; id: string }
   | { type: 'delete-sites'; spaceId: SpaceId; ids: string[] }
-  | ({ type: 'move-sites'; spaceId: SpaceId; ids: string[] } & Destination)
-  | ({ type: 'move-site'; spaceId: SpaceId; id: string; beforeId?: string } & Destination)
-  | { type: 'move-folder'; spaceId: SpaceId; id: string; groupId: string; beforeId?: string }
+  | ({ type: 'move-sites'; spaceId: SpaceId; ids: string[] } & Destination & TransferDestination)
+  | ({ type: 'move-site'; spaceId: SpaceId; id: string; beforeId?: string } & Destination &
+      TransferDestination)
+  | ({
+      type: 'move-folder';
+      spaceId: SpaceId;
+      id: string;
+      groupId: string;
+      beforeId?: string;
+    } & TransferDestination)
   | { type: 'settings'; spaceId: SpaceId; patch: Partial<SpaceSettings> }
   | { type: 'reset-private-setting'; keys: (keyof SpaceSettings)[] }
   | { type: 'import-bookmarks'; spaceId: SpaceId; groupId: string; items: BookmarkCandidate[] };
@@ -57,8 +76,8 @@ const byOrder = (a: { order: number; id: string }, b: { order: number; id: strin
 function changed(current = 0) {
   return { updatedAt: Math.max(Date.now(), current + 1), changeId: crypto.randomUUID() };
 }
-function reorder<T extends { id: string; order: number; updatedAt: number; changeId: string }>(
-  items: T[],
+function reorder(
+  items: { id: string; order: number; updatedAt?: number }[],
   movingId: string,
   beforeId?: string,
 ) {
@@ -71,7 +90,9 @@ function reorder<T extends { id: string; order: number; updatedAt: number; chang
   if (beforeId && index < 0) throw new AppError('messages.theSortTargetIsNotInTheDestination');
   rest.splice(index < 0 ? rest.length : index, 0, moving);
   rest.forEach((item, order) => {
-    if (item.order !== order) Object.assign(item, { order, ...changed(item.updatedAt) });
+    if (item.order === order) return;
+    item.order = order;
+    if (item.updatedAt !== undefined) Object.assign(item, changed(item.updatedAt));
   });
 }
 function ensureExpected(item: { updatedAt: number } | undefined, expected?: number) {
@@ -106,6 +127,40 @@ function checkBefore(space: SpaceData, target: Destination, beforeId?: string) {
     throw new AppError('messages.theSortTargetIsNotInTheDestination');
 }
 
+// The two compatibility partitions share stable IDs. The source deletion lets an
+// offline peer retire its old copy on the next sync.
+function transferNavigationRecord(
+  source: SpaceData,
+  target: SpaceData,
+  ...record: ['site', Site] | ['folder', SpaceData['folders'][number]]
+) {
+  const [entity, item] = record;
+  if (
+    target.sites.some((entry) => entry.id === item.id) ||
+    target.folders.some((entry) => entry.id === item.id)
+  )
+    throw new AppError('navigation.encryptedGroupConflict');
+  if (entity === 'site') {
+    source.sites = source.sites.filter((site) => site.id !== item.id);
+    target.sites.push(item);
+  } else {
+    source.folders = source.folders.filter((folder) => folder.id !== item.id);
+    target.folders.push(item);
+  }
+  source.tombstones = source.tombstones.filter(
+    (entry) => entry.entity !== entity || entry.id !== item.id,
+  );
+  source.tombstones.push({
+    entity,
+    id: item.id,
+    deletedAt: item.updatedAt,
+    changeId: item.changeId,
+  });
+  target.tombstones = target.tombstones.filter(
+    (entry) => entry.entity !== entity || entry.id !== item.id,
+  );
+}
+
 export function applyCommand(state: RayState, command: Command) {
   if (command.type === 'complete-onboarding') {
     state.local.onboardingComplete = true;
@@ -133,9 +188,15 @@ export function applyCommand(state: RayState, command: Command) {
     if (command.keys.includes('searchEngines')) delete state.privateSettingOverrides.searchEngine;
     return;
   }
-  if (command.spaceId === 'private' && state.privateSecurity.locked)
-    throw new AppError('messages.unlockThePrivateSpaceFirst');
   const space = state.spaces[command.spaceId];
+  const targetSpaceId =
+    ('destinationSpaceId' in command && command.destinationSpaceId) || command.spaceId;
+  if (
+    state.privateSecurity.locked &&
+    (command.spaceId === 'private' || targetSpaceId === 'private')
+  )
+    throw new AppError('messages.unlockThePrivateSpaceFirst');
+  const targetSpace = state.spaces[targetSpaceId];
   if (command.type === 'set-group-hidden') {
     const group = space.groups.find((item) => item.id === command.groupId);
     if (!group) throw new AppError('messages.theDestinationGroupDoesNotExist');
@@ -172,7 +233,13 @@ export function applyCommand(state: RayState, command: Command) {
     return;
   }
   if (command.type === 'move-group') {
-    reorder(space.groups, command.id, command.beforeId);
+    const ordinaryGroups = state.spaces.normal.groups.filter((item) =>
+      isUserGroup(state, 'normal', item),
+    );
+    const protectedGroups = state.privateSecurity.locked
+      ? (state.encryptedGroupIndex?.labels ?? [])
+      : state.spaces.private.groups.filter((item) => isUserGroup(state, 'private', item));
+    reorder([...ordinaryGroups, ...protectedGroups], command.id, command.beforeId);
     return;
   }
   if (command.type === 'save-group' || command.type === 'save-folder') {
@@ -195,7 +262,7 @@ export function applyCommand(state: RayState, command: Command) {
           Math.max(
             -1,
             ...(command.type === 'save-group'
-              ? space.groups
+              ? listGroupTabs(state)
               : containerItems(space, { groupId: command.groupId, folderId: null })
             ).map((item) => item.order),
           ) + 1,
@@ -239,11 +306,12 @@ export function applyCommand(state: RayState, command: Command) {
     return;
   }
   if (command.type === 'delete-group') {
-    if (space.groups.length === 1) throw new AppError('messages.keepAtLeastOneGroup');
+    if (space === targetSpace && space.groups.length === 1)
+      throw new AppError('messages.keepAtLeastOneGroup');
     if (command.id === command.destinationGroupId)
       throw new AppError('messages.chooseAnotherGroupToReceiveTheContents');
     destination(space, { groupId: command.id, folderId: null });
-    destination(space, { groupId: command.destinationGroupId, folderId: null });
+    destination(targetSpace, { groupId: command.destinationGroupId, folderId: null });
     for (const item of containerItems(space, { groupId: command.id, folderId: null }).sort(byOrder))
       applyCommand(
         state,
@@ -252,6 +320,7 @@ export function applyCommand(state: RayState, command: Command) {
               type: 'move-site',
               spaceId: command.spaceId,
               id: item.id,
+              destinationSpaceId: targetSpaceId,
               groupId: command.destinationGroupId,
               folderId: null,
             }
@@ -259,13 +328,22 @@ export function applyCommand(state: RayState, command: Command) {
               type: 'move-folder',
               spaceId: command.spaceId,
               id: item.id,
+              destinationSpaceId: targetSpaceId,
               groupId: command.destinationGroupId,
             },
       );
     space.groups = space.groups.filter((item) => item.id !== command.id);
     tombstone('group', command.id);
-    if (state.local.activeGroup[command.spaceId] === command.id)
-      state.local.activeGroup[command.spaceId] = command.destinationGroupId;
+    if (state.local.activeGroup[command.spaceId] === command.id) {
+      state.local.activeGroup[command.spaceId] =
+        space === targetSpace
+          ? command.destinationGroupId
+          : ensureSpaceGroup(state, command.spaceId).id;
+      if (state.local.activeSpace === command.spaceId) {
+        state.local.activeSpace = targetSpaceId;
+        state.local.activeGroup[targetSpaceId] = command.destinationGroupId;
+      }
+    }
     delete state.local.selectedFolder[command.spaceId][command.id];
     return;
   }
@@ -326,7 +404,7 @@ export function applyCommand(state: RayState, command: Command) {
   }
   if (command.type === 'move-sites') {
     const ids = [...new Set(command.ids)];
-    destination(space, command);
+    destination(targetSpace, command);
     if (ids.some((id) => !space.sites.some((item) => item.id === id)))
       throw new AppError('messages.theSiteDoesNotExist');
     for (const id of space.sites
@@ -337,41 +415,46 @@ export function applyCommand(state: RayState, command: Command) {
         type: 'move-site',
         spaceId: command.spaceId,
         id,
+        destinationSpaceId: targetSpaceId,
         groupId: command.groupId,
         folderId: command.folderId,
       });
     return;
   }
   if (command.type === 'move-site') {
-    destination(space, command);
+    destination(targetSpace, command);
     const item = space.sites.find((entry) => entry.id === command.id);
     if (!item) throw new AppError('messages.theSiteDoesNotExist');
     if (command.beforeId === command.id && at(item, command)) return;
-    checkBefore(space, command, command.beforeId);
+    checkBefore(targetSpace, command, command.beforeId);
     Object.assign(item, {
       groupId: command.groupId,
       folderId: command.folderId,
       ...changed(item.updatedAt),
     });
-    reorder(containerItems(space, command), item.id, command.beforeId);
+    if (space !== targetSpace) transferNavigationRecord(space, targetSpace, 'site', item);
+    reorder(containerItems(targetSpace, command), item.id, command.beforeId);
     return;
   }
   if (command.type === 'move-folder') {
     const item = space.folders.find((entry) => entry.id === command.id);
     if (!item) throw new AppError('messages.theFolderDoesNotExist');
-    destination(space, { groupId: command.groupId, folderId: null });
+    destination(targetSpace, { groupId: command.groupId, folderId: null });
     if (command.beforeId === command.id && item.groupId === command.groupId) return;
-    checkBefore(space, { groupId: command.groupId, folderId: null }, command.beforeId);
+    checkBefore(targetSpace, { groupId: command.groupId, folderId: null }, command.beforeId);
     if (
       state.local.selectedFolder[command.spaceId][item.groupId] === item.id &&
       item.groupId !== command.groupId
     )
       state.local.selectedFolder[command.spaceId][item.groupId] = null;
     Object.assign(item, { groupId: command.groupId, ...changed(item.updatedAt) });
-    for (const site of space.sites.filter((entry) => entry.folderId === item.id))
+    if (space !== targetSpace) transferNavigationRecord(space, targetSpace, 'folder', item);
+    for (const site of space.sites.filter((entry) => entry.folderId === item.id)) {
       Object.assign(site, { groupId: command.groupId, ...changed(site.updatedAt) });
+      if (space !== targetSpace) transferNavigationRecord(space, targetSpace, 'site', site);
+    }
     reorder(
-      containerItems(space, { groupId: command.groupId, folderId: null }),
+      containerItems(targetSpace, { groupId: command.groupId, folderId: null }),
       item.id,
       command.beforeId,
     );

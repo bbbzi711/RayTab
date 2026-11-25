@@ -368,12 +368,6 @@
   white-space: nowrap;
 }
 @container (max-width: 260px) {
-  .settings-group-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
-  }
-  .settings-group-row > span:first-child {
-    grid-column: 1 / -1;
-  }
   .setting-row:has(> .settings-group-sidebar-select) {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

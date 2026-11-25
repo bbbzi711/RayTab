@@ -10,17 +10,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import {
-  Check,
-  SlidersHorizontal,
-  Grid2X2,
-  Palette,
-  House,
-  Layers3,
-  Cloud,
-  Database,
-  X,
-} from 'lucide-react';
+import { Check, SlidersHorizontal, Grid2X2, Palette, House, Layers3, Cloud, X } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -29,7 +19,7 @@ import { RayTabMark } from '@/components/ui/raytab-mark';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { selectEffectiveSettings, useRayTabStore } from '@/storage/store';
 import { errorMessage } from '@/lib/errors';
-import { effectiveSettings, type SpaceId, type SpaceSettings } from '@/storage/model';
+import type { SpaceSettings } from '@/storage/model';
 import { PasswordForm, SearchEngineSettings, type SaveSettings } from './SettingsForms';
 import {
   RangeSetting,
@@ -42,14 +32,15 @@ import {
 import { WallpaperSettings } from './WallpaperSettings';
 import './settings.css';
 
-const DataSettings = lazy(() =>
-  import('./DataSettings').then((module) => ({ default: module.DataSettings })),
-);
 const SyncSettings = lazy(() =>
   import('./SyncSettings').then((module) => ({ default: module.SyncSettings })),
 );
+const BookmarkImport = lazy(() =>
+  import('./DataSettings').then((module) => ({ default: module.BookmarkImport })),
+);
 
-const tabs = ['general', 'icons', 'wallpaper', 'home', 'groups', 'sync', 'data'] as const;
+const settingsPartition = 'normal';
+const tabs = ['general', 'icons', 'wallpaper', 'home', 'groups', 'sync'] as const;
 const tabIcons = {
   general: SlidersHorizontal,
   icons: Grid2X2,
@@ -57,43 +48,36 @@ const tabIcons = {
   home: House,
   groups: Layers3,
   sync: Cloud,
-  data: Database,
 };
 type SettingsTab = (typeof tabs)[number];
 
 export type SettingsHandle = { canClose: () => Promise<boolean> };
 
 export default function SettingsPanel({
-  spaceId,
   ref,
   onClose,
   onUnlockGroups,
   groupManagement,
-  importSpaceId,
   importGroupId,
 }: {
-  spaceId: SpaceId;
   ref?: Ref<SettingsHandle>;
   onClose: () => void;
   onUnlockGroups: () => void;
   groupManagement: ReactNode;
-  importSpaceId: SpaceId;
   importGroupId?: string;
 }) {
   const { t } = useTranslation();
-  const settings = useRayTabStore(useShallow((store) => selectEffectiveSettings(store, spaceId)))!;
-  const savedSettings = useRayTabStore(
-    useShallow((store) => store.state && effectiveSettings(store.state, spaceId)),
+  const settings = useRayTabStore(
+    useShallow((store) => selectEffectiveSettings(store, settingsPartition)),
   )!;
+  const savedSettings = useRayTabStore((store) => store.state?.normalSettings)!;
   const dispatch = useRayTabStore((store) => store.dispatch);
   const previewSettings = useRayTabStore((store) => store.previewSettings);
   const clearPreview = useRayTabStore((store) => store.clearSettingsPreview);
   const protectedPrivate = useRayTabStore((store) => store.state?.privateSecurity.protected);
   const privateLocked = useRayTabStore((store) => store.state?.privateSecurity.locked);
-  const privateOverrideCount = useRayTabStore(
-    (store) => Object.keys(store.state?.privateSettingOverrides ?? {}).length,
-  );
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [showBookmarkImport, setShowBookmarkImport] = useState(false);
   const [visited, setVisited] = useState<Set<SettingsTab>>(() => new Set(['general']));
   const [drafts, setDrafts] = useState<Record<string, { dirty: boolean; busy: boolean }>>({});
   const [saving, setSaving] = useState(false);
@@ -126,9 +110,9 @@ export default function SettingsPanel({
 
   useEffect(
     () => () => {
-      clearPreview(spaceId);
+      clearPreview(settingsPartition);
     },
-    [spaceId, clearPreview],
+    [clearPreview],
   );
 
   const report: DraftReporter = useCallback((id, dirty, busy) => {
@@ -141,14 +125,15 @@ export default function SettingsPanel({
 
   const persistSettings = useCallback(
     async (patch: Partial<SpaceSettings>, assets?: Map<string, Blob>, retryable = false) => {
-      if (retryable || 'background' in patch) previewSettings(spaceId, patch);
+      if (retryable || 'background' in patch) previewSettings(settingsPartition, patch);
       setSaving(true);
-      const persist = () => dispatch({ type: 'settings', spaceId, patch }, assets);
+      const persist = () =>
+        dispatch({ type: 'settings', spaceId: settingsPartition, patch }, assets);
       const operation = queue.current.then(persist, persist);
       queue.current = operation;
       try {
         await operation;
-        clearPreview(spaceId, patch);
+        clearPreview(settingsPartition, patch);
         setFailedPatch((current) =>
           Object.fromEntries(Object.entries(current).filter(([key]) => !(key in patch))),
         );
@@ -166,7 +151,7 @@ export default function SettingsPanel({
         if (queue.current === operation) setSaving(false);
       }
     },
-    [spaceId, dispatch, previewSettings, clearPreview],
+    [dispatch, previewSettings, clearPreview],
   );
 
   const save: SaveSettings = persistSettings;
@@ -174,7 +159,7 @@ export default function SettingsPanel({
     void persistSettings(patch, undefined, true).catch((reason: unknown) =>
       toast.error(errorMessage(reason)),
     );
-  const preview = (patch: Partial<SpaceSettings>) => previewSettings(spaceId, patch);
+  const preview = (patch: Partial<SpaceSettings>) => previewSettings(settingsPartition, patch);
 
   const canClose = async () => {
     if (busy) {
@@ -182,7 +167,7 @@ export default function SettingsPanel({
       return false;
     }
     const unsavedPreview = useRayTabStore.getState().settingsPreview;
-    if (hasDraft || unsavedPreview?.spaceId === spaceId) {
+    if (hasDraft || unsavedPreview?.spaceId === settingsPartition) {
       if (
         !(await confirm({
           title: t('settings.discardTitle'),
@@ -194,7 +179,7 @@ export default function SettingsPanel({
       )
         return false;
     }
-    clearPreview(spaceId);
+    clearPreview(settingsPartition);
     return true;
   };
 
@@ -245,7 +230,7 @@ export default function SettingsPanel({
   const retry = () => {
     const pending = useRayTabStore.getState().settingsPreview;
     const patch = { ...failedPatch };
-    if (pending?.spaceId === spaceId)
+    if (pending?.spaceId === settingsPartition)
       for (const key of Object.keys(patch) as (keyof SpaceSettings)[])
         if (key in pending.patch) Object.assign(patch, { [key]: pending.patch[key] });
     void persistSettings(patch, undefined, true).catch((reason: unknown) =>
@@ -270,41 +255,6 @@ export default function SettingsPanel({
       const nextTab = tabs[nextIndex];
       changeTab(nextTab);
       tabRefs.current[nextTab]?.focus();
-    }
-  };
-
-  const resetPrivatePreferences = async () => {
-    if (busy || hasDraft) return;
-    if (
-      !(await confirm({
-        title: t('settings.resetPrivateTitle'),
-        description: t('settings.resetPrivateDescription'),
-        confirmText: t('settings.followNormal'),
-        variant: 'destructive',
-      }))
-    )
-      return;
-    const overrides = useRayTabStore.getState().state?.privateSettingOverrides;
-    if (!overrides || !Object.keys(overrides).length) return;
-    setSaving(true);
-    const reset = () =>
-      dispatch({
-        type: 'reset-private-setting',
-        keys: Object.keys(overrides) as (keyof SpaceSettings)[],
-      });
-    const operation = queue.current.then(reset, reset);
-    queue.current = operation;
-    try {
-      await operation;
-      clearPreview(spaceId);
-      setFailedPatch({});
-      setFailure(undefined);
-      setHasSaved(true);
-    } catch (reason) {
-      setFailure(errorMessage(reason));
-      toast.error(errorMessage(reason));
-    } finally {
-      if (queue.current === operation) setSaving(false);
     }
   };
 
@@ -403,7 +353,7 @@ export default function SettingsPanel({
                 aria-selected={activeTab === tab}
                 aria-controls={`settings-tabpanel-${tab}`}
                 tabIndex={activeTab === tab ? 0 : -1}
-                className="settings-nav-tab min-w-0 w-full"
+                className="settings-nav-tab min-w-0 w-full gap-1.5 px-1.5"
                 onClick={() => changeTab(tab)}
                 title={t('settings.tabs.' + tab)}
               >
@@ -507,6 +457,33 @@ export default function SettingsPanel({
             <>
               <SettingsSection title={t('settings.sections.groups')}>
                 {groupManagement}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="form-action"
+                  disabled={busy}
+                  aria-expanded={showBookmarkImport}
+                  aria-controls="group-bookmark-import"
+                  onClick={() => setShowBookmarkImport(!showBookmarkImport)}
+                >
+                  {t('settings.importBookmarks')}
+                </Button>
+                <fieldset
+                  id="group-bookmark-import"
+                  className="data-settings min-w-0 pt-3"
+                  hidden={!showBookmarkImport}
+                  disabled={Boolean(
+                    drafts.sync?.busy ||
+                    drafts['backup-restore']?.busy ||
+                    drafts['backup-export']?.busy,
+                  )}
+                >
+                  {(showBookmarkImport || drafts['bookmark-import']?.dirty) && (
+                    <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
+                      <BookmarkImport groupId={importGroupId} report={report} />
+                    </Suspense>
+                  )}
+                </fieldset>
               </SettingsSection>
               <SettingsSection title={t('settings.sidebar')}>
                 <SettingsSelect
@@ -526,38 +503,24 @@ export default function SettingsPanel({
                   </p>
                 )}
               </SettingsSection>
-              <SettingsSection title={t('settings.groupPassword')}>
-                {(!protectedPrivate || privateLocked) && (
-                  <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
-                    {t(protectedPrivate ? 'settings.lockedHelp' : 'settings.protectionHelp')}
-                  </p>
-                )}
-                {protectedPrivate && privateLocked && (
-                  <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
-                    {t('navigation.unlockGroups')}
-                  </Button>
-                )}
-                {protectedPrivate && !privateLocked && (
-                  <>
-                    <PasswordForm mode="change" report={report} />
-                    <PasswordForm mode="remove" report={report} />
-                  </>
-                )}
-              </SettingsSection>
-              {spaceId === 'private' && (
-                <SettingsSection title={t('settings.privateInheritance')}>
-                  <p className="m-0 py-1 text-xs leading-5 text-muted-foreground">
-                    {t('settings.privateInheritanceHelp', { count: privateOverrideCount })}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="form-action"
-                    disabled={busy || hasDraft || privateOverrideCount === 0}
-                    onClick={() => void resetPrivatePreferences()}
-                  >
-                    {t('settings.followNormal')}
-                  </Button>
+              {protectedPrivate && (
+                <SettingsSection title={t('settings.groupPassword')}>
+                  {privateLocked && (
+                    <p className="wrap-anywhere text-xs leading-5 text-muted-foreground">
+                      {t('settings.lockedHelp')}
+                    </p>
+                  )}
+                  {privateLocked && (
+                    <Button type="button" variant="outline" size="sm" onClick={onUnlockGroups}>
+                      {t('navigation.unlockGroups')}
+                    </Button>
+                  )}
+                  {!privateLocked && (
+                    <>
+                      <PasswordForm mode="change" report={report} />
+                      <PasswordForm mode="remove" report={report} />
+                    </>
+                  )}
                 </SettingsSection>
               )}
             </>,
@@ -565,17 +528,13 @@ export default function SettingsPanel({
 
           {panel(
             'sync',
-            <SettingsSection>
-              <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
-                <SyncSettings report={report} />
-              </Suspense>
-            </SettingsSection>,
-          )}
-
-          {panel(
-            'data',
             <Suspense fallback={<p role="status">{t('settings.loading')}</p>}>
-              <DataSettings spaceId={importSpaceId} groupId={importGroupId} report={report} />
+              <SyncSettings
+                report={report}
+                localBusy={['bookmark-import', 'backup-export', 'backup-restore'].some(
+                  (id) => drafts[id]?.busy,
+                )}
+              />
             </Suspense>,
           )}
         </div>

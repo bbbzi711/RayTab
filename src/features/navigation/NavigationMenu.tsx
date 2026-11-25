@@ -1,6 +1,9 @@
 import { Fragment } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { Eye, EyeOff, LockKeyhole, LockKeyholeOpen, type LucideIcon } from 'lucide-react';
+import type { TFunction } from 'i18next';
 import { ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
+import { DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import type { GroupTab } from '@/storage/group-privacy';
 
 export type NavigationAction = {
   id: string;
@@ -12,11 +15,40 @@ export type NavigationAction = {
   separator?: boolean;
 };
 
-export function NavigationMenuItems({ actions }: { actions: NavigationAction[] }) {
+export function groupPrivacyActions(
+  group: GroupTab,
+  t: TFunction,
+  onChange: (group: GroupTab, hidden?: boolean) => void,
+): NavigationAction[] {
+  return [
+    {
+      id: 'hidden',
+      label: t(group.hidden ? 'navigation.showGroup' : 'navigation.hideGroup'),
+      icon: group.hidden ? Eye : EyeOff,
+      run: () => onChange(group, !group.hidden),
+    },
+    {
+      id: 'encryption',
+      label: t(group.encrypted ? 'navigation.decryptGroup' : 'navigation.encryptGroup'),
+      icon: group.encrypted ? LockKeyholeOpen : LockKeyhole,
+      run: () => onChange(group),
+    },
+  ];
+}
+
+export function NavigationMenuItems({
+  actions,
+  dropdown = false,
+}: {
+  actions: NavigationAction[];
+  dropdown?: boolean;
+}) {
+  const Item = dropdown ? DropdownMenuItem : ContextMenuItem;
+  const Separator = dropdown ? DropdownMenuSeparator : ContextMenuSeparator;
   return actions.map((action) => (
     <Fragment key={action.id}>
-      {action.separator && <ContextMenuSeparator />}
-      <ContextMenuItem
+      {action.separator && <Separator />}
+      <Item
         disabled={action.disabled}
         variant={action.destructive ? 'destructive' : 'default'}
         onSelect={() => {
@@ -25,7 +57,7 @@ export function NavigationMenuItems({ actions }: { actions: NavigationAction[] }
       >
         <action.icon aria-hidden="true" />
         {action.label}
-      </ContextMenuItem>
+      </Item>
     </Fragment>
   ));
 }

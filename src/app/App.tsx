@@ -24,9 +24,10 @@ import { NavigationPage, type NavigationHandle } from '@/features/navigation/Nav
 import { GroupManagement } from '@/features/navigation/GroupManagement';
 import { MoveDialog } from '@/features/navigation/NavigationDialogs';
 import { SearchBar } from '@/features/search/SearchBar';
-import { isUserGroup, listGroupTabs, type GroupTab } from '@/storage/group-privacy';
+import { listGroupTabs, type GroupTab } from '@/storage/group-privacy';
 import type { RayState } from '@/storage/model';
 import { selectEffectiveSettings, startRayTabStore, useRayTabStore } from '@/storage/store';
+import { useUnlockedSync } from '@/sync/use-unlocked-sync';
 import { Clock } from '@/widgets/clock/Clock';
 import { Onboarding } from '@/features/onboarding/Onboarding';
 import {
@@ -50,13 +51,12 @@ const SettingsPanel = lazy(() => import('@/features/settings/SettingsPanel'));
 type PasswordRequest =
   | { kind: 'group'; group?: GroupTab }
   | { kind: 'settings' }
+  | { kind: 'operation'; finish: (unlocked: boolean) => void }
   | { kind: 'delete'; group: GroupTab }
   | { kind: 'privacy'; group: GroupTab; hidden?: boolean; create: boolean };
 
 function deletionDestinations(state: RayState, group: GroupTab) {
-  return state.spaces[group.spaceId].groups.filter(
-    (candidate) => candidate.id !== group.id && isUserGroup(state, group.spaceId, candidate),
-  );
+  return listGroupTabs(state).filter((candidate) => candidate.id !== group.id);
 }
 
 export default function App() {
@@ -93,6 +93,7 @@ export default function App() {
   const unlockPrivate = useRayTabStore((store) => store.unlockPrivate);
   const protectPrivate = useRayTabStore((store) => store.protectPrivate);
   useEffect(startRayTabStore, []);
+  useUnlockedSync(Boolean(protectedPrivate && !privateLocked));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [groupsCollapsed, setGroupsCollapsed] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -146,6 +147,10 @@ export default function App() {
     const trigger = document.activeElement;
     passwordTriggerRef.current = trigger instanceof HTMLElement ? trigger : null;
     setPasswordRequest(request);
+  };
+  const requestGroupUnlock = () => {
+    if (!useRayTabStore.getState().state?.privateSecurity.locked) return Promise.resolve(true);
+    return new Promise<boolean>((finish) => openSettingsPassword({ kind: 'operation', finish }));
   };
   useEffect(() => {
     void i18n.changeLanguage(settings?.language ?? 'zh-CN');
@@ -221,10 +226,7 @@ export default function App() {
       Math.abs(event.deltaY) <= Math.abs(event.deltaX)
     )
       return;
-    const tabs = [
-      ...groupTabs.filter((group) => !group.hidden),
-      ...(showHidden ? groupTabs.filter((group) => group.hidden) : []),
-    ];
+    const tabs = groupTabs.filter((group) => showHidden || !group.hidden);
     const index = tabs.findIndex(
       (group) => group.spaceId === displayedSpace && group.id === displayedGroup?.id,
     );
@@ -415,6 +417,7 @@ export default function App() {
       }
       unlockForm.reset({ password: '' });
       setPasswordRequest(null);
+      if (passwordRequest.kind === 'operation') passwordRequest.finish(true);
       if (passwordRequest.kind === 'delete') {
         passwordTriggerRef.current = null;
         void prepareGroupDeletion(passwordRequest.group);
@@ -576,7 +579,7 @@ export default function App() {
                       />
                     )}
                     {settings.showSearch && (
-                      <div className="desktop-search relative z-20 w-full flex justify-center mt-[29px]">
+                      <div className="desktop-search pointer-events-none relative z-20 w-full flex justify-center mt-[29px] [&>*]:pointer-events-auto">
                         <SearchBar key={spaceId} spaceId="normal" />
                       </div>
                     )}
@@ -626,6 +629,8 @@ export default function App() {
                       onSelectGroup={openGroup}
                       onGroupWheel={onGroupWheel}
                       onToggleHidden={toggleHiddenGroups}
+                      onRequestUnlock={requestGroupUnlock}
+                      onPrivacyChange={changeGroupPrivacy}
                       onDeleteGroup={deleteGroup}
                     />
                   </div>
@@ -666,8 +671,6 @@ export default function App() {
               }
             >
               <SettingsPanel
-                spaceId="normal"
-                importSpaceId={displayedSpace}
                 importGroupId={displayedGroup?.id}
                 ref={settingsRef}
                 onClose={closeSettings}
@@ -678,8 +681,7 @@ export default function App() {
                     legacyLocked={legacyLocked}
                     showHidden={showHidden}
                     onShowHidden={toggleHiddenGroups}
-                    onHiddenChange={changeGroupPrivacy}
-                    onEncryptionChange={changeGroupPrivacy}
+                    onPrivacyChange={changeGroupPrivacy}
                     onDeleteGroup={deleteGroup}
                     onOpenLegacy={() => void openGroup()}
                   />
@@ -711,8 +713,12 @@ export default function App() {
             destructive
             confirmLabel={t('messages.deleteAndMoveContents')}
             onMove={async (destinationGroupId) => {
+              const destination = groupTabs.find((group) => group.id === destinationGroupId);
+              if (!destination) throw new AppError('messages.theDestinationGroupDoesNotExist');
+              if (destination.encrypted && !(await requestGroupUnlock())) return 'cancelled';
               await dispatch({
                 type: 'delete-group',
+                destinationSpaceId: destination.spaceId,
                 spaceId: groupToMove.spaceId,
                 id: groupToMove.id,
                 destinationGroupId,
@@ -729,6 +735,7 @@ export default function App() {
           open={unlockOpen}
           onOpenChange={(open) => {
             if (!open && !unlockForm.formState.isSubmitting) {
+              if (passwordRequest?.kind === 'operation') passwordRequest.finish(false);
               unlockForm.reset({ password: '' });
               setPasswordRequest(null);
             }
